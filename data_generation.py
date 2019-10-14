@@ -67,7 +67,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', type=str, default='cartpole')
-    parser.add_argument('--N', type=int, default=400000)
+    parser.add_argument('--N', type=int, default=40000)
     parser.add_argument('--max_iter', type=int, default=1000)
     parser.add_argument('--path_file', type=str, default='./data/cartpole/train.pkl')
     args = parser.parse_args()
