@@ -29,6 +29,7 @@ def main(args):
     # load net
     # load previously trained model if start epoch > 0
     model_path='kmpnet_epoch_%d.pkl' %(args.start_epoch)
+    torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
         load_net_state(mpnet, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
