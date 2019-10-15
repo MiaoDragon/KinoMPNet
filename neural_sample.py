@@ -8,7 +8,7 @@ from model.mlp import MLP
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
-from plan_utility import cartpole
+from plan_utility import cart_pole
 import argparse
 import numpy as np
 import random
@@ -19,8 +19,8 @@ def main(args):
         torch.cuda.set_device(args.device)
     # environment setting
     if args.env_type == 'cartpole':
-        normalize = cartpole.normalize
-        unnormalize = cartpole.unnormalize
+        normalize = cart_pole.normalize
+        unnormalize = cart_pole.unnormalize
 
     cae = cae_identity
     mlp = MLP
