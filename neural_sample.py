@@ -30,7 +30,7 @@ def main(args):
     # load previously trained model if start epoch > 0
     model_path='kmpnet_epoch_%d.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
-        load_net_state(mpNet, os.path.join(args.model_path, model_path))
+        load_net_state(mpnet, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
         # set seed after loading
         torch.manual_seed(torch_seed)
@@ -68,14 +68,14 @@ def main(args):
             bi=to_var(bi)
             bt=to_var(bt)
             print('before training losses:')
-            print(mpNet.loss(mpNet(bi), bt))
-            mpNet.step(bi, bt)
+            print(mpnet.loss(mpnet(bi), bt))
+            mpnet.step(bi, bt)
             print('after training losses:')
-            print(mpNet.loss(mpNet(bi), bt))
+            print(mpnet.loss(mpnet(bi), bt))
         # Save the models
         if epoch > 0:
             model_path='kmpnet_epoch_%d.pkl' %(epoch)
-            save_state(mpNet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
+            save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
             # test
 
 parser = argparse.ArgumentParser()
