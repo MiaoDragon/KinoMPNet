@@ -8,13 +8,20 @@ from model.mlp import MLP
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
+from plan_utility import cartpole
 import argparse
 import numpy as np
 import random
 
+
 def main(args):
     if torch.cuda.is_available():
         torch.cuda.set_device(args.device)
+    # environment setting
+    if args.env_type == 'cartpole':
+        normalize = cartpole.normalize
+        unnormalize = cartpole.unnormalize
+
     cae = cae_identity
     mlp = MLP
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
@@ -90,8 +97,8 @@ parser.add_argument('--num_epochs', type=int, default=500)
 parser.add_argument('--batch_size', type=int, default=100, help='rehersal on how many data (not path)')
 parser.add_argument('--data_path', type=str, default='../data/simple/')
 parser.add_argument('--start_epoch', type=int, default=0)
-#parser.add_argument('--env_type', type=str, default='s2d', help='s2d for simple 2d, c2d for complex 2d')
-#parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')
+parser.add_argument('--env_type', type=str, default='cartpole', help='environment')
+parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')
 #parser.add_argument('--opt', type=str, default='Adagrad')
 args = parser.parse_args()
 print(args)
