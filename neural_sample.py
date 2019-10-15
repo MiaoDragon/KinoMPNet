@@ -41,7 +41,7 @@ def main(args):
 
     # load train and test data
     print('loading...')
-    obs, dataset, targets, env_indices = load_train_dataset(N=args.no_env, NP=args.no_motion_paths, folder=args.data_path)
+    obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths, folder=args.data_path)
     # Train the Models
     print('training...')
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
