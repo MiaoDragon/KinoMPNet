@@ -16,7 +16,7 @@ def load_train_dataset(N, NP, folder):
     targets = []
     env_indices = []
     for p in paths:
-        for i in range(len(p)):
+        for i in range(len(p)-1):
             dataset.append(np.concatenate([p[i], p[-1]]))
             targets.append(p[i+1])
             env_indices.append(0)
