@@ -7,7 +7,7 @@ this defines the MPNet to be used, which will utilize MLP and AE.
 """
 class KMPNet(nn.Module):
     def __init__(self, total_input_size, AE_input_size, mlp_input_size, output_size, CAE, MLP):
-        super(End2EndMPNet, self).__init__()
+        super(KMPNet, self).__init__()
         self.encoder = CAE.Encoder()
         self.mlp = MLP(mlp_input_size, output_size)
         self.mse = nn.MSELoss()
