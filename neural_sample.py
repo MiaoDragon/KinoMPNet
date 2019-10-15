@@ -49,8 +49,6 @@ def main(args):
     # load train and test data
     print('loading...')
     obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths, folder=args.data_path)
-    print('dataset shape:')
-    print(dataset.shape)
     # Train the Models
     print('training...')
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
@@ -61,7 +59,7 @@ def main(args):
             targets_i = targets[i:i+args.batch_size]
             env_indices_i = env_indices[i:i+args.batch_size]
             # record
-            bi = np.concatenate( (obs[env_indices_i], dataset_i), axis=1).astype(np.float32)
+            bi = np.concatenate( (obs[env_indices_i, :args.AE_input_size], dataset_i), axis=1).astype(np.float32)
             print('bi shape:')
             print(bi.shape)
             bt = targets_i
