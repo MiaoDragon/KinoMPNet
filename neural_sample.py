@@ -46,12 +46,13 @@ def main(args):
     print('training...')
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
         print('epoch' + str(epoch))
-        for i in range(0,len(path_data),args.batch_size):
+        for i in range(0,len(dataset),args.batch_size):
             print('epoch: %d, training... path: %d' % (epoch, i+1))
             dataset_i = dataset[i:i+args.batch_size]
-            targets_i = dataset[i:i+args.batch_size]
+            targets_i = targets[i:i+args.batch_size]
+            env_indices_i = env_indices[i:i+args.batch_size]
             # record
-            bi = np.concatenate( (obs[env_indices], dataset_i), axis=1).astype(np.float32)
+            bi = np.concatenate( (obs[env_indices_i], dataset_i), axis=1).astype(np.float32)
             bt = targets_i
             bi = torch.FloatTensor(bi)
             bt = torch.FloatTensor(bt)
