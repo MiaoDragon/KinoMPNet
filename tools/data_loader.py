@@ -2,6 +2,7 @@
 This implements data loader for both training and testing procedures.
 """
 import pickle
+import numpy as np
 def load_train_dataset(N, NP, folder):
     # obtain the generated paths, and transform into
     # (obs, dataset, targets, env_indices)
