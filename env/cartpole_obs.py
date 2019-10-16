@@ -40,7 +40,7 @@ class CartPoleObs(BaseSystem):
         BaseSystem.__init__(self)
         #super(CartPoleObs, self).__init__()
         self.obs = obstacle_list
-        self.collision_checker = IsInCollision
+        self.IsInCollision = IsInCollision
 
     def propagate(self, start_state, control, num_steps, integration_step):
         '''
