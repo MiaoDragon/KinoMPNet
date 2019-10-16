@@ -51,10 +51,6 @@ class CartPoleObs(BaseSystem):
         :param integration_step: dt of integration
         :return: new state of the system
         '''
-        control_v = np.array([control[0] * np.cos(control[1]), control[0] * np.sin(control[1])])
-        trajectory = start_state + np.arange(num_steps)[:, None]*integration_step*control_v
-        state = np.clip(trajectory[-1], [self.MIN_X, self.MIN_Y], [self.MAX_X, self.MAX_Y])
-
         state = np.array(start_state)
         for i in range(num_steps):
             # simulate forward transition by first order integration
