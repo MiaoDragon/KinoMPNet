@@ -91,12 +91,16 @@ class CartPoleObs(BaseSystem):
         '''
         Implements the collision checking function for the state.
         '''
+        # check if within boundary
+        if state[STATE_X] < MIN_X or state[STATE_X] > MAX_X:
+            return False
         # given the position of the middle point of the pole, use MPNet environment
         # rigidbody collision checker
         # since the cart has position (state[0], 0)
         # the end-point of the pole has position (state[0]+l*sin(theta), l*cos(theta))
         midpoint = np.array([state[STATE_X] + L * np.sin(state[STATE_THETA]), L * np.cos(state[STATE_THETA])])
         midpoint = midpoint / 2.
+        midpoint = np.concatenate([midpoint, state[STATE_THETA]])  # need the orientation as well
         res = self.IsInCollision(midpoint, self.obs)
         return not res
 
