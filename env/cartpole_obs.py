@@ -37,6 +37,7 @@ class CartPoleObs(BaseSystem):
         (x,y): the position of the middle point of the obstacles
         assume the cart has 0 y axis.
         '''
+        super(CartPoleObs, self).__init__()
         self.obs = obstacle_list
         self.collision_checker = IsInCollision
 
