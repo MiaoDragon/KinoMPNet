@@ -52,12 +52,14 @@ class CartPoleObs(BaseSystem):
         :return: new state of the system
         '''
         state = np.array(start_state)
+        print("inside propagate. number of steps: %d" % (num_steps))
         for i in range(num_steps):
             # simulate forward transition by first order integration
             deriv = self.update_derivative(state, control)
             # integrate to obtain next state
             state = state + integration_step*deriv
             state = self.enforce_bounds(state)
+            print('step %d: checking state validity' % (i))
             if not self.valid_state(state):
                 return None
         return state
