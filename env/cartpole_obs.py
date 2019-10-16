@@ -30,7 +30,7 @@ class CartPoleObs(BaseSystem):
     # obstacle information
     OBS_W = 4
 
-    def _init__(self, obstacle_list):
+    def __init__(self, obstacle_list):
         '''
         :obstacle_list: numpy array describing the list of rectangle obstacles
         each obstacle is described by 2 parameters.
