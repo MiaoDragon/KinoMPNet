@@ -98,7 +98,7 @@ class CartPoleObs(BaseSystem):
         # the end-point of the pole has position (state[0]+l*sin(theta), l*cos(theta))
         midpoint = np.array([state[self.STATE_X] + self.L * np.sin(state[self.STATE_THETA]), self.L * np.cos(state[self.STATE_THETA])])
         midpoint = midpoint / 2.
-        midpoint = np.concatenate([midpoint, state[self.STATE_THETA]])  # need the orientation as well
+        midpoint = np.append(midpoint, state[self.STATE_THETA])  # need the orientation as well
         res = self.IsInCollision(midpoint, self.obs)
         return not res
 
