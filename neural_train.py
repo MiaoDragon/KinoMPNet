@@ -49,7 +49,19 @@ def main(args):
 
     # load train and test data
     print('loading...')
-    obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths, folder=args.data_path)
+    obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths, folder=args.data_path, fname=args.data_file)
+    # randomize the dataset before training
+	data=list(zip(dataset,targets,env_indices))
+	random.shuffle(data)
+	dataset,targets,env_indices=list(zip(*data))
+	dataset = list(dataset)
+	targets = list(targets)
+	env_indices = list(env_indices)
+    dataset = np.array(dataset)
+    targets = np.array(targets)
+    env_indices = np.array(env_indices)
+
+
     # Train the Models
     print('training...')
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
@@ -99,6 +111,7 @@ parser.add_argument('--device', type=int, default=0, help='cuda device')
 parser.add_argument('--num_epochs', type=int, default=500)
 parser.add_argument('--batch_size', type=int, default=100, help='rehersal on how many data (not path)')
 parser.add_argument('--data_path', type=str, default='../data/simple/')
+parser.add_argument('--data_file', type=str, default='train.pkl')
 parser.add_argument('--start_epoch', type=int, default=0)
 parser.add_argument('--env_type', type=str, default='cartpole', help='environment')
 parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')

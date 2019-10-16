@@ -3,9 +3,10 @@ This implements data loader for both training and testing procedures.
 """
 import pickle
 import numpy as np
-def load_train_dataset(N, NP, folder):
+def load_train_dataset(N, NP, folder, fname):
     # obtain the generated paths, and transform into
     # (obs, dataset, targets, env_indices)
+    # return list NOT NUMPY ARRAY
     ## TODO: add different folders for obstacle information and path
     file = open(folder+'train.pkl', 'rb')
     paths = pickle.load(file)
@@ -20,9 +21,9 @@ def load_train_dataset(N, NP, folder):
             dataset.append(np.concatenate([p[i], p[-1]]))
             targets.append(p[i+1])
             env_indices.append(0)
-    dataset = np.array(dataset)
-    targets = np.array(targets)
-    env_indices = np.array(env_indices)
+    #dataset = np.array(dataset)
+    #targets = np.array(targets)
+    #env_indices = np.array(env_indices)
     return obs, dataset, targets, env_indices
 
 
