@@ -121,7 +121,7 @@ class CartPoleObs(BaseSystem):
         deriv[self.STATE_V] = ((self.I + self.m * self.L * self.L)* \
             (_a + self.m * self.L * _w * _w * np.sin(_theta)) + \
             self.m * self.m * self.L * self.L * np.cos(_theta) * np.sin(_theta) * self.g) * mass_term
-        deriv[self.STATE_W] = ((-self.m * self.L * cos(_theta)) * \
+        deriv[self.STATE_W] = ((-self.m * self.L * np.cos(_theta)) * \
             (_a + self.m * self.L * _w * _w * np.sin(_theta))+(self.M + self.m) * \
             (-self.m * self.g * self.L * np.sin(_theta))) * mass_term
         return deriv
