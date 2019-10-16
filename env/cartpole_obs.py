@@ -5,7 +5,7 @@ package way of describing a system.
 
 import numpy as np
 from sparse_rrt.systems.system_interface import BaseSystem
-from cartpole_cc import IsInCollision
+from env.cartpole_cc import IsInCollision
 
 class CartPoleObs(BaseSystem):
     '''
