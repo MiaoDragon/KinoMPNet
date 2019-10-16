@@ -59,7 +59,6 @@ class CartPoleObs(BaseSystem):
             # integrate to obtain next state
             state = state + integration_step*deriv
             state = self.enforce_bounds(state)
-            print('step %d: checking state validity' % (i))
             if not self.valid_state(state):
                 return None
         return state
