@@ -73,20 +73,20 @@ class CartPoleObs(BaseSystem):
         return a new state toward which the bound has been enforced
         '''
         new_state = np.array(state)
-        if state[STATE_V] < MIN_V:
-            new_state[STATE_V] = MIN_V
-        elif state[STATE_V] > MAX_V:
-            new_state[STATE_V] = MAX_V
+        if state[self.STATE_V] < self.MIN_V:
+            new_state[self.STATE_V] = self.MIN_V
+        elif state[self.STATE_V] > self.MAX_V:
+            new_state[self.STATE_V] = self.MAX_V
 
-        if state[STATE_THETA] < -np.pi:
-            new_state[STATE_THETA] += 2*np.pi
-        elif state[STATE_THETA] > np.pi:
-            new_state[STATE_THETA] -= 2*np.pi
+        if state[self.STATE_THETA] < -np.pi:
+            new_state[self.STATE_THETA] += 2*np.pi
+        elif state[self.STATE_THETA] > np.pi:
+            new_state[self.STATE_THETA] -= 2*np.pi
 
-        if state[STATE_W] < MIN_W:
-            new_state[STATE_W] = MIN_W
-        elif state[STATE_W] > MAX_W:
-            new_state[STATE_W] = MAX_W
+        if state[self.STATE_W] < self.MIN_W:
+            new_state[self.STATE_W] = self.MIN_W
+        elif state[self.STATE_W] > self.MAX_W:
+            new_state[self.STATE_W] = self.MAX_W
         return new_state
 
     def valid_state(self, state):
@@ -94,15 +94,15 @@ class CartPoleObs(BaseSystem):
         Implements the collision checking function for the state.
         '''
         # check if within boundary
-        if state[STATE_X] < MIN_X or state[STATE_X] > MAX_X:
+        if state[self.STATE_X] < self.MIN_X or state[self.STATE_X] > self.MAX_X:
             return False
         # given the position of the middle point of the pole, use MPNet environment
         # rigidbody collision checker
         # since the cart has position (state[0], 0)
         # the end-point of the pole has position (state[0]+l*sin(theta), l*cos(theta))
-        midpoint = np.array([state[STATE_X] + L * np.sin(state[STATE_THETA]), L * np.cos(state[STATE_THETA])])
+        midpoint = np.array([state[self.STATE_X] + self.L * np.sin(state[self.STATE_THETA]), self.L * np.cos(state[self.STATE_THETA])])
         midpoint = midpoint / 2.
-        midpoint = np.concatenate([midpoint, state[STATE_THETA]])  # need the orientation as well
+        midpoint = np.concatenate([midpoint, state[self.STATE_THETA]])  # need the orientation as well
         res = self.IsInCollision(midpoint, self.obs)
         return not res
 
@@ -111,18 +111,23 @@ class CartPoleObs(BaseSystem):
         implement the function x_dot = f(x,u)
         return the derivative w.r.t. x
         '''
-        _v = state[STATE_V]
-        _w = state[STATE_W]
-        _theta = state[STATE_THETA]
-        _a = control[CONTROL_A]
-        mass_term = (M + m)*(I + m * L * L) - m * m * L * L * np.cos(_theta) * np.cos(_theta)
+        _v = state[self.STATE_V]
+        _w = state[self.STATE_W]
+        _theta = state[self.STATE_THETA]
+        _a = control[self.CONTROL_A]
+        mass_term = (self.M + self.m)*(self.I + self.m * self.L * self.L) - \
+                self.m * self.m * self.L * self.L * np.cos(_theta) * np.cos(_theta)
 
         deriv = np.zeros(4)  # init derivative
-        deriv[STATE_X] = _v
-        deriv[STATE_THETA] = _w
+        deriv[self.STATE_X] = _v
+        deriv[self.STATE_THETA] = _w
         mass_term = (1.0 / mass_term)
-        deriv[STATE_V] = ((I + m * L * L)*(_a + m * L * _w * _w * np.sin(_theta)) + m * m * L * L * np.cos(_theta) * np.sin(_theta) * g) * mass_term
-        deriv[STATE_W] = ((-m * L * cos(_theta))*(_a + m * L * _w * _w * np.sin(_theta))+(M + m)*(-m * g * L * np.sin(_theta))) * mass_term
+        deriv[self.STATE_V] = ((self.I + self.m * self.L * self.L)* \
+            (_a + self.m * self.L * _w * _w * np.sin(_theta)) + \
+            self.m * self.m * self.L * self.L * np.cos(_theta) * np.sin(_theta) * self.g) * mass_term
+        deriv[self.STATE_W] = ((-self.m * self.L * cos(_theta)) * \
+            (_a + self.m * self.L * _w * _w * np.sin(_theta))+(self.M + self.m) * \
+            (-self.m * self.g * self.L * np.sin(_theta))) * mass_term
         return deriv
 
     def visualize_point(self, state):
@@ -140,10 +145,10 @@ class CartPoleObs(BaseSystem):
         Return bounds for the state space
         :return: list of (min, max) bounds for each coordinate in the state space
         '''
-        return [(MIN_X, MAX_X),
-                (MIN_V, MAX_V),
+        return [(self.MIN_X, self.MAX_X),
+                (self.MIN_V, self.MAX_V),
                 (-np.pi, np.pi),
-                (MIN_W, MAX_W)]
+                (self.MIN_W, self.MAX_W)]
 
     def get_control_bounds(self):
         '''
