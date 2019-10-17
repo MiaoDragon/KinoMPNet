@@ -70,7 +70,7 @@ class CartPoleVisualizer(Visualizer):
             while True:
                 traj.append(s)
                 s = self.system.propagate(s, action, 1, self.params['integration_step'])
-                if np.lianlg.norm(s-sT) == 0.:
+                if np.linalg.norm(s-sT) == 0.:
                     break
         traj = np.array(traj)
 
