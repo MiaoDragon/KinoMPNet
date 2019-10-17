@@ -50,8 +50,9 @@ def main(args):
                     sample = end
                     planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
                 else:
-                    #sample = np.random.uniform(low=low, high=high)
-                    planner.step(env, min_time_steps, max_time_steps, integration_step)
+                    sample = np.random.uniform(low=low, high=high)
+                    planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
+                    #planner.step(env, min_time_steps, max_time_steps, integration_step)
                 #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
                 solution = planner.get_solution()
                 if solution is not None:
