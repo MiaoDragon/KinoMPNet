@@ -53,6 +53,9 @@ def main(args):
                     #sample = np.random.uniform(low=low, high=high)
                     planner.step(env, min_time_steps, max_time_steps, integration_step)
                 #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
+                solution = planner.get_solution()
+                if solution is not None:
+                    break
             print('spent time: %f' % (time.time() - time0))
             solution = planner.get_solution()
             if solution is None:
