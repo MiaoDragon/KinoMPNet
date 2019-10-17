@@ -44,12 +44,13 @@ def main(args):
             )
             # generate a path by using SST to plan for some maximal iterations
             for iter in range(args.max_iter):
-                if iter % 100 == 0:
-                    # from time to time use the goal
-                    sample = end
-                else:
-                    sample = np.random.uniform(low=low, high=high)
-                planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
+                #if iter % 100 == 0:
+                #    # from time to time use the goal
+                #    sample = end
+                #else:
+                #    sample = np.random.uniform(low=low, high=high)
+                planner.step(env, min_time_steps, max_time_steps, integration_step)
+                #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
             solution = planner.get_solution()
             if solution is None:
                 continue
