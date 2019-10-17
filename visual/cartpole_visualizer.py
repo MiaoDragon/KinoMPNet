@@ -9,6 +9,7 @@ import matplotlib.animation as animation
 import matplotlib as mpl
 import matplotlib.patches as patches
 from IPython.display import HTML
+from visual.visualizer import Visualizer
 
 class CartPoleVisualizer(Visualizer):
     def __init__(self, system, params):
