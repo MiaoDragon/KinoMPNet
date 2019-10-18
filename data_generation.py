@@ -98,6 +98,8 @@ def main(args):
             high.append(state_bounds[j][1])
 
         paths = []
+        actions = []
+        costs = []
         for j in range(args.NP):
             # randomly sample collision-free start and goal
             while True:
@@ -149,16 +151,25 @@ def main(args):
                     continue
                 else:
                     print('path %d: succeeded.' % (j))
-                    path, controls, costs = solution
+                    path, controls, cost = solution
                     print(path)
                     path = np.array(path)
                     paths.append(path)
+                    controls = np.array(controls)
+                    actions.append(control)
+                    cost = np.array(cost)
+                    costs.append(cost)
                     break
         # store the paths to file
         # check if obstacle exists, if not, then directly store at path_folder
         if obs_list is None:
             file = open(args.path_folder+args.path_file, 'wb')
             pickle.dump(paths, file)
+            file = open(args.path_folder+args.action_file, 'wb')
+            pickle.dump(actions, file)
+            file = open(args.path_folder+args.cost_file, 'wb')
+            pickle.dump(costs, file)
+
         else:
             # create a new directory under path_folder
             dir = args.path_folder+str(i)+'/'
@@ -166,6 +177,11 @@ def main(args):
                 os.makedirs(dir)
             file = open(dir+args.path_file, 'wb')
             pickle.dump(paths, file)
+            file = open(dir+args.action_file, 'wb')
+            pickle.dump(actions, file)
+            file = open(dir+args.cost_file, 'wb')
+            pickle.dump(costs, file)
+
 
 
 if __name__ == "__main__":
@@ -177,6 +193,8 @@ if __name__ == "__main__":
     parser.add_argument('--max_iter', type=int, default=100000)
     parser.add_argument('--path_folder', type=str, default='./data/cartpole/')
     parser.add_argument('--path_file', type=str, default='path.pkl')
+    parser.add_argument('--action_file', type=str, default='action.pkl')
+    parser.add_argument('--cost_file', type=str, default='cost.pkl')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
     args = parser.parse_args()
