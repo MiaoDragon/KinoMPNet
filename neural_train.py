@@ -8,7 +8,7 @@ from model.mlp import MLP
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
-from plan_utility import cart_pole
+from plan_utility import cart_pole, cart_pole_obs
 import argparse
 import numpy as np
 import random
@@ -24,7 +24,8 @@ def main(args):
         obs_file = None
         obc_file = None
     elif args.env_type == 'cartpole_obs':
-        ## TODO: fill up normalize and unnormalize
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
         obs_file = args.obs_file
         obc_file = args.obc_file
 
@@ -56,7 +57,7 @@ def main(args):
     # load train and test data
     print('loading...')
     obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
-                                                                        p_folder=args.data_path, p_fname=args.data_file,
+                                                                        p_folder=args.path_folder, p_fname=args.path_file,
                                                                         obs_folder=obs_file, obc_f=obc_file)
     # randomize the dataset before training
 	data=list(zip(dataset,targets,env_indices))
@@ -118,8 +119,11 @@ parser.add_argument('--device', type=int, default=0, help='cuda device')
 
 parser.add_argument('--num_epochs', type=int, default=500)
 parser.add_argument('--batch_size', type=int, default=100, help='rehersal on how many data (not path)')
-parser.add_argument('--data_path', type=str, default='../data/simple/')
-parser.add_argument('--data_file', type=str, default='train.pkl')
+parser.add_argument('--path_folder', type=str, default='../data/simple/')
+parser.add_argument('--path_file', type=str, default='train.pkl')
+parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
+parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
+
 parser.add_argument('--start_epoch', type=int, default=0)
 parser.add_argument('--env_type', type=str, default='cartpole', help='environment')
 parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')

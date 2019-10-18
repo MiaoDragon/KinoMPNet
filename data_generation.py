@@ -58,7 +58,7 @@ def main(args):
                 obs_single.append(obs)
             obs_single = np.array(obs_single)
             obs_list.append(obs_single)
-        obs_list = np.array(os_list)
+        obs_list = np.array(obs_list)
         # convert from obs to point cloud
         obc_list = rectangle_pcd(obs_list, width, 1400)
     state_bounds = env.get_state_bounds()
