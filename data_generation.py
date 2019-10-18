@@ -26,6 +26,7 @@ def main(args):
         width = 4.
         H = 0.5
         L = 2.5
+        near = width * 1.2
         print('generating obs...')
         for i in range(args.N):
             obs_single = []
@@ -36,21 +37,30 @@ def main(args):
                 make sure the obstacle does not block the pole entirely
                 by making sure the fixed point of the pole is not in the obs
                 hence the valid range for y axis is:
-                H - low_h ~ H - width/2, H + width/2 ~ H + high_h
+                H + low_h ~ H - width/2, H + width/2 ~ H + high_h
                 '''
-                # first randomly see if it is left or right
-                side = np.random.randint(low=0, high=2)
-                # 0: left, 1: right
-                if side == 0:
-                    obs = np.random.uniform(low=[-20, H-low_h], high=[20, H-width/2])
-                else:
-                    obs = np.random.uniform(low=[-20, H+width/2], high=[20, H+high_h])
+                while True:
+                    # first randomly see if it is left or right
+                    side = np.random.randint(low=0, high=2)
+                    # 0: left, 1: right
+                    if side == 0:
+                        obs = np.random.uniform(low=[-20, H+low_h], high=[20, H-width/2])
+                    else:
+                        obs = np.random.uniform(low=[-20, H+width/2], high=[20, H+high_h])
+                    too_near = False
+                    for k in range(len(obs_single)):
+                        if np.linalg.norm(obs-obs_single[k]) < near:
+                            too_near = True
+                            break
+                    if not too_near:
+                        break
+
                 obs_single.append(obs)
-            obs_single = np.array(obs)
+            obs_single = np.array(obs_single)
             obs_list.append(obs_single)
         obs_list = np.array(os_list)
         # convert from obs to point cloud
-        obc_list = rectangle_pcd(obs_list, 4., 1400)
+        obc_list = rectangle_pcd(obs_list, width, 1400)
     state_bounds = env.get_state_bounds()
     min_time_steps = 10
     max_time_steps = 200
@@ -61,7 +71,6 @@ def main(args):
         low.append(state_bounds[i][0])
         high.append(state_bounds[i][1])
     ## TODO: add other env
-    paths = []
     # store the obstacles and obc first
     file = open(args.obs_file, 'wb')
     pickle.dump(obs_list, file)
@@ -73,8 +82,8 @@ def main(args):
         if args.env_name == 'cartpole':
             env = env_constr()
         elif args.env_name == 'cartpole_obs':
-            env = env_constr(obs_list[i], 4.)
-
+            env = env_constr(obs_list[i], width)
+        paths = []
         for j in range(args.NP):
             # randomly sample collision-free start and goal
             while True:
@@ -140,13 +149,15 @@ def main(args):
             dir = args.path_folder+str(i)+'/'
             if not os.path.exists(dir):
                 os.makedirs(dir)
+            file = open(dir+args.path_file, 'wb')
+            pickle.dump(paths, file)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', type=str, default='cartpole')
     parser.add_argument('--N', type=int, default=100)
-    parser.add_argument('--N_obs', type=int, default=4)
+    parser.add_argument('--N_obs', type=int, default=6)
     parser.add_argument('--NP', type=int, default=5000)
     parser.add_argument('--max_iter', type=int, default=100000)
     parser.add_argument('--path_folder', type=str, default='./data/cartpole/')

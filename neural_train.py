@@ -21,6 +21,12 @@ def main(args):
     if args.env_type == 'cartpole':
         normalize = cart_pole.normalize
         unnormalize = cart_pole.unnormalize
+        obs_file = None
+        obc_file = None
+    elif args.env_type == 'cartpole_obs':
+        ## TODO: fill up normalize and unnormalize
+        obs_file = args.obs_file
+        obc_file = args.obc_file
 
     cae = cae_identity
     mlp = MLP
@@ -49,7 +55,9 @@ def main(args):
 
     # load train and test data
     print('loading...')
-    obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths, folder=args.data_path, fname=args.data_file)
+    obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
+                                                                        p_folder=args.data_path, p_fname=args.data_file,
+                                                                        obs_folder=obs_file, obc_f=obc_file)
     # randomize the dataset before training
 	data=list(zip(dataset,targets,env_indices))
 	random.shuffle(data)
