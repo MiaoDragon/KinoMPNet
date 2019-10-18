@@ -1,6 +1,8 @@
 """
+Python version of CartPoleObs. This makes sure we can visualize.
 This describes a cartpole environment with Obstacles. This follows the SST
 package way of describing a system.
+
 """
 
 import numpy as np
@@ -17,6 +19,7 @@ class CartPoleObs(BaseSystem):
     M = 10
     m = 5
     g = 9.8
+    H = 0.5  # cart
     # define the name for each state index and action index
     STATE_X, STATE_V, STATE_THETA, STATE_W = 0, 1, 2, 3
     CONTROL_A = 0
@@ -97,7 +100,7 @@ class CartPoleObs(BaseSystem):
         # rigidbody collision checker
         # since the cart has position (state[0], 0)
         # the end-point of the pole has position (state[0]+l*sin(theta), l*cos(theta))
-        midpoint = np.array([state[self.STATE_X] + self.L * np.sin(state[self.STATE_THETA]), self.L * np.cos(state[self.STATE_THETA])])
+        midpoint = np.array([state[self.STATE_X] + self.L * np.sin(state[self.STATE_THETA]), self.H + self.L * np.cos(state[self.STATE_THETA])])
         midpoint = midpoint / 2.
         midpoint = np.append(midpoint, state[self.STATE_THETA])  # need the orientation as well
         res = self.IsInCollision(midpoint, self.obs)
