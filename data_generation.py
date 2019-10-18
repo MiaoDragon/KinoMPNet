@@ -19,6 +19,13 @@ def main(args):
         env_constr = standard_cpp_systems.CartPole
         obs_list = None
         obc_list = None
+        goal_radius=1.5
+        random_seed=0
+        sst_delta_near=2.
+        sst_delta_drain=1.2
+        min_time_steps = 10
+        max_time_steps = 200
+        integration_step = 0.002
     elif args.env_name == 'cartpole_obs':
         env_constr = standard_cpp_systems.CartPoleObs
         # randomly generate obstacle location
@@ -26,6 +33,13 @@ def main(args):
         width = 4.
         H = 0.5
         L = 2.5
+        goal_radius=1.5
+        random_seed=0
+        sst_delta_near=2.
+        sst_delta_drain=1.2
+        min_time_steps = 10
+        max_time_steps = 200
+        integration_step = 0.002
         near = width * 1.2
         print('generating obs...')
         for i in range(args.N):
@@ -61,15 +75,7 @@ def main(args):
         obs_list = np.array(obs_list)
         # convert from obs to point cloud
         obc_list = rectangle_pcd(obs_list, width, 1400)
-    state_bounds = env.get_state_bounds()
-    min_time_steps = 10
-    max_time_steps = 200
-    integration_step = 0.002
-    low = []
-    high = []
-    for i in range(len(state_bounds)):
-        low.append(state_bounds[i][0])
-        high.append(state_bounds[i][1])
+
     ## TODO: add other env
     # store the obstacles and obc first
     file = open(args.obs_file, 'wb')
@@ -83,6 +89,14 @@ def main(args):
             env = env_constr()
         elif args.env_name == 'cartpole_obs':
             env = env_constr(obs_list[i], width)
+
+        state_bounds = env.get_state_bounds()
+        low = []
+        high = []
+        for i in range(len(state_bounds)):
+            low.append(state_bounds[i][0])
+            high.append(state_bounds[i][1])
+
         paths = []
         for j in range(args.NP):
             # randomly sample collision-free start and goal
@@ -107,10 +121,10 @@ def main(args):
                     distance=env.distance_computer(),
                     start_state=start,
                     goal_state=end,
-                    goal_radius=1.5,
-                    random_seed=0,
-                    sst_delta_near=2.,
-                    sst_delta_drain=1.2
+                    goal_radius=goal_radius,
+                    random_seed=random_seed,
+                    sst_delta_near=sst_delta_near,
+                    sst_delta_drain=sst_delta_drain
                 )
                 # generate a path by using SST to plan for some maximal iterations
                 time0 = time.time()
