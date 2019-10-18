@@ -1,3 +1,4 @@
+# visualize the path
 """
 Given a list of states, render the environment
 """
@@ -10,6 +11,8 @@ import matplotlib as mpl
 import matplotlib.patches as patches
 from IPython.display import HTML
 from visual.visualizer import Visualizer
+
+
 
 class CartPoleVisualizer(Visualizer):
     def __init__(self, system, params):
@@ -50,12 +53,16 @@ class CartPoleVisualizer(Visualizer):
         ax.set_xlim(-40, 40)
         ax.set_ylim(-20, 20)
         state = self.states[i]
-        self.pole.set_xy((state[0]-self.params['pole_w']/2,self.params['cart_h']))
+        self.recs[0].set_xy((state[0]-self.params['pole_w']/2,self.params['cart_h']))
         t = mpl.transforms.Affine2D().rotate_deg_around(state[0], self.params['cart_h'], \
                                                         state[2]/np.pi * 180) + ax.transData
-        self.pole.set_transform(t)
-        self.cart.set_xy((state[0]-self.params['cart_w']/2,params['cart_h']))
+        self.recs[0].set_transform(t)
+        self.recs[1].set_xy((state[0]-self.params['cart_w']/2,params['cart_h']))
+        # print location of cart
         return self.recs
+
+
+
     def animate(self, states, actions, obstacles):
         '''
         given a list of states, actions and obstacles, animate the robot
@@ -69,14 +76,19 @@ class CartPoleVisualizer(Visualizer):
             # propogate until reaching next state
             while True:
                 traj.append(s)
+                #print("porpagating...")
+                #print(s)
+                #print('st:')
+                #print(sT)
                 s = self.system.propagate(s, action, 1, self.params['integration_step'])
                 if np.linalg.norm(s-sT) == 0.:
                     break
         traj = np.array(traj)
-
+        print("animating...")
         # animate
         self.states = traj
         self.obs = obstacles
         ani = animation.FuncAnimation(plt.gcf(), self._animate, range(1, len(self.states)),
-                                      interval=self.dt*1000, blit=True, init_func=self._init)
-        HTML(ani.to_html5_video())
+                                      interval=self.dt*100, blit=True, init_func=self._init,
+                                      repeat=True)
+        return ani

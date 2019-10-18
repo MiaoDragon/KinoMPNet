@@ -15,7 +15,7 @@ def main(args):
     if args.env_name == 'cartpole':
         env = standard_cpp_systems.CartPole()
     state_bounds = env.get_state_bounds()
-    min_time_steps = 20
+    min_time_steps = 10
     max_time_steps = 200
     integration_step = 0.002
     low = []
@@ -31,16 +31,22 @@ def main(args):
             print('trial')
             start = np.random.uniform(low=low, high=high)
             end = np.random.uniform(low=low, high=high)
+            # set the velocity terms to zero
+            if args.env_name == 'cartpole':
+                start[1] = 0.
+                start[3] = 0.
+                end[1] = 0.
+                end[3] = 0.
             planner = _sst_module.SSTWrapper(
                 state_bounds=env.get_state_bounds(),
                 control_bounds=env.get_control_bounds(),
                 distance=env.distance_computer(),
                 start_state=start,
                 goal_state=end,
-                goal_radius=0.5,
+                goal_radius=1.5,
                 random_seed=0,
-                sst_delta_near=0.4,
-                sst_delta_drain=0.2
+                sst_delta_near=2.,
+                sst_delta_drain=1.2
             )
             # generate a path by using SST to plan for some maximal iterations
             time0 = time.time()
@@ -75,8 +81,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', type=str, default='cartpole')
-    parser.add_argument('--N', type=int, default=40000)
-    parser.add_argument('--max_iter', type=int, default=1000)
+    parser.add_argument('--N', type=int, default=10000)
+    parser.add_argument('--max_iter', type=int, default=500000)
     parser.add_argument('--path_file', type=str, default='./data/cartpole/train.pkl')
     args = parser.parse_args()
     main(args)

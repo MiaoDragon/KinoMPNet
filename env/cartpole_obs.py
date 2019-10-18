@@ -59,6 +59,7 @@ class CartPoleObs(BaseSystem):
             state = state + integration_step*deriv
             state = self.enforce_bounds(state)
             if not self.valid_state(state):
+                print('in collision')
                 return None
         return state
 
