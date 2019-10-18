@@ -43,7 +43,7 @@ class CartPoleVisualizer(Visualizer):
             ax.add_patch(obs)
         # transform pole according to state
         t = mpl.transforms.Affine2D().rotate_deg_around(state[0], self.params['cart_h'], \
-                                                        state[2]/np.pi * 180) + ax.transData
+                                                        -state[2]/np.pi * 180) + ax.transData
         self.pole.set_transform(t)
         ax.add_patch(self.pole)
         ax.add_patch(self.cart)
@@ -55,7 +55,7 @@ class CartPoleVisualizer(Visualizer):
         state = self.states[i]
         self.recs[0].set_xy((state[0]-self.params['pole_w']/2,self.params['cart_h']))
         t = mpl.transforms.Affine2D().rotate_deg_around(state[0], self.params['cart_h'], \
-                                                        state[2]/np.pi * 180) + ax.transData
+                                                        -state[2]/np.pi * 180) + ax.transData
         self.recs[0].set_transform(t)
         self.recs[1].set_xy((state[0]-self.params['cart_w']/2,params['cart_h']))
         # print location of cart
@@ -70,6 +70,7 @@ class CartPoleVisualizer(Visualizer):
         # transform the waypoint states and actions into trajectory
         traj = []
         for i in range(len(states)-1):
+            print('state: %d, remaining: %d' % (i, len(states)-i))
             s = states[i]
             action = actions[i]
             sT = states[i+1]
@@ -88,7 +89,8 @@ class CartPoleVisualizer(Visualizer):
         # animate
         self.states = traj
         self.obs = obstacles
+        print(len(self.states))
         ani = animation.FuncAnimation(plt.gcf(), self._animate, range(1, len(self.states)),
-                                      interval=self.dt*100, blit=True, init_func=self._init,
+                                      interval=self.dt*20, blit=True, init_func=self._init,
                                       repeat=True)
         return ani
