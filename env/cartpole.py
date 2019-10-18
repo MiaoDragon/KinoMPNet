@@ -5,7 +5,7 @@ Python version of CartPole without obstacles for visualization.
 import numpy as np
 from sparse_rrt.systems.system_interface import BaseSystem
 
-class CartPoleObs(BaseSystem):
+class CartPole(BaseSystem):
     '''
     Python implementation of the CartPole environment with obstacles.
     '''
