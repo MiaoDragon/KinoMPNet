@@ -93,9 +93,9 @@ def main(args):
         state_bounds = env.get_state_bounds()
         low = []
         high = []
-        for i in range(len(state_bounds)):
-            low.append(state_bounds[i][0])
-            high.append(state_bounds[i][1])
+        for j in range(len(state_bounds)):
+            low.append(state_bounds[j][0])
+            high.append(state_bounds[j][1])
 
         paths = []
         for j in range(args.NP):
@@ -147,7 +147,7 @@ def main(args):
                 if solution is None:
                     continue
                 else:
-                    print('path %d: succeeded.' % (i))
+                    print('path %d: succeeded.' % (j))
                     path, controls, costs = solution
                     print(path)
                     path = np.array(path)
