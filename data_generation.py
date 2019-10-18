@@ -156,7 +156,7 @@ def main(args):
                     path = np.array(path)
                     paths.append(path)
                     controls = np.array(controls)
-                    actions.append(control)
+                    actions.append(controls)
                     cost = np.array(cost)
                     costs.append(cost)
                     break
