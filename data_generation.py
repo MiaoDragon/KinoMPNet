@@ -128,6 +128,7 @@ def main(args):
                 )
                 # generate a path by using SST to plan for some maximal iterations
                 time0 = time.time()
+                print('obs: %d, path: %d' % (i, j))
                 for iter in range(args.max_iter):
                     #if iter % 100 == 0:
                     #    # from time to time use the goal
