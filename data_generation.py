@@ -61,8 +61,9 @@ def main(args):
                 planner.step(env, min_time_steps, max_time_steps, integration_step)
                 #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
                 solution = planner.get_solution()
-                if solution is not None:
-                    break
+                # don't break the searching to find better solutions
+                #if solution is not None:
+                #    break
             print('spent time: %f' % (time.time() - time0))
             solution = planner.get_solution()
             if solution is None:
@@ -82,7 +83,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', type=str, default='cartpole')
     parser.add_argument('--N', type=int, default=10000)
-    parser.add_argument('--max_iter', type=int, default=500000)
+    parser.add_argument('--max_iter', type=int, default=100000)
     parser.add_argument('--path_file', type=str, default='./data/cartpole/train.pkl')
     args = parser.parse_args()
     main(args)
