@@ -24,7 +24,10 @@ def load_train_dataset(N, NP, p_folder, p_fname, obs_f=None, obc_f=None):
     targets = []
     env_indices = []
     for i in range(N):
-        file = open(p_folder+str(i)+'/'+p_fname, 'rb')
+        if obs_f is None:
+            file = open(p_folder+p_fname, 'rb')
+        else:
+            file = open(p_folder+str(i)+'/'+p_fname, 'rb')
         paths = pickle.load(file)
         for p in paths:
             for i in range(len(p)-1):
@@ -32,7 +35,7 @@ def load_train_dataset(N, NP, p_folder, p_fname, obs_f=None, obc_f=None):
                 targets.append(p[i+1])
                 env_indices.append(i)
     ## TODO: print out intermediate results to visualize
-    
+
     #dataset = np.array(dataset)
     #targets = np.array(targets)
     #env_indices = np.array(env_indices)
