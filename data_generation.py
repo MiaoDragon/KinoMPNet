@@ -102,8 +102,7 @@ def main(args):
 
 
     ####################################################################################
-
-    def plan_one_path(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
+    def plan_one_path_bvp(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
         planner = _sst_module.SSTWrapper(
             state_bounds=env.get_state_bounds(),
             control_bounds=env.get_control_bounds(),
@@ -119,7 +118,7 @@ def main(args):
         time0 = time.time()
         #print('obs: %d, path: %d' % (i, j))
         for iter in range(args.max_iter):
-            if iter % 500 == 0:
+            if iter % 1000 == 0:
                 print('still alive after %d iterations' % (iter))
             if iter % 100 == 0:
                 # from time to time use the goal
@@ -128,6 +127,53 @@ def main(args):
             else:
                 sample = np.random.uniform(low=low, high=high)
                 #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
+            #planner.step(env, min_time_steps, max_time_steps, integration_step)
+            planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
+            solution = planner.get_solution()
+            # don't break the searching to find better solutions
+            #if solution is not None:
+            #    break
+        plan_time = time.time() - time0
+        if solution is None:
+            out_queue.put(0)
+        else:
+            print('path succeeded.')
+            path, controls, cost = solution
+            print(path)
+            path = np.array(path)
+            controls = np.array(controls)
+            cost = np.array(cost)
+
+            file = open(path_file, 'wb')
+            pickle.dump(path, file)
+            file.close()
+            file = open(control_file, 'wb')
+            pickle.dump(controls, file)
+            file.close()
+            file = open(cost_file, 'wb')
+            pickle.dump(cost, file)
+            file.close()
+            file = open(time_file, 'wb')
+            pickle.dump(plan_time, file)
+            file.close()
+            out_queue.put(1)
+
+    def plan_one_path_sst(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
+        planner = _sst_module.SSTWrapper(
+            state_bounds=env.get_state_bounds(),
+            control_bounds=env.get_control_bounds(),
+            distance=env.distance_computer(),
+            start_state=start,
+            goal_state=end,
+            goal_radius=goal_radius,
+            random_seed=random_seed,
+            sst_delta_near=sst_delta_near,
+            sst_delta_drain=sst_delta_drain
+        )
+        # generate a path by using SST to plan for some maximal iterations
+        time0 = time.time()
+        #print('obs: %d, path: %d' % (i, j))
+        for iter in range(args.max_iter):
             planner.step(env, min_time_steps, max_time_steps, integration_step)
             #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
             solution = planner.get_solution()
@@ -182,39 +228,37 @@ def main(args):
         times = []
         suc_n = 0
         for j in range(args.NP):
-            # randomly sample collision-free start and goal
-            start = np.random.uniform(low=low, high=high)
-            end = np.random.uniform(low=low, high=high)
-            # set the velocity terms to zero
-            if args.env_name == 'cartpole':
-                start[1] = 0.
-                start[3] = 0.
-                end[1] = 0.
-                end[3] = 0.
-            elif args.env_name == 'cartpole_obs':
-                start[1] = 0.
-                start[3] = 0.
-                end[1] = 0.
-                end[3] = 0.
-            dir = args.path_folder+str(i)+'/'
-            if not os.path.exists(dir):
-                os.makedirs(dir)
-            path_file = dir+args.path_file+'_%d'%(j) + ".pkl"
-            control_file = dir+args.control_file+'_%d'%(j) + ".pkl"
-            cost_file = dir+args.cost_file+'_%d'%(j) + ".pkl"
-            time_file = dir+args.time_file+'_%d'%(j) + ".pkl"
-            p = Process(target=plan_one_path, args=(env, start, end, queue, path_file, control_file, cost_file, time_file))
-            p.start()
-            p.join()
-            res = queue.get()
-            print('obtained result:')
-            print(res)
-            if res:
-                suc_n += 1
-            print('current success rate: %f' % (float(suc_n) / (j+1)))
-
-
-        print('success rate: %f' % (float(suc_n) / args.NP))
+            while True:
+                # randomly sample collision-free start and goal
+                start = np.random.uniform(low=low, high=high)
+                end = np.random.uniform(low=low, high=high)
+                # set the velocity terms to zero
+                if args.env_name == 'cartpole':
+                    start[1] = 0.
+                    start[3] = 0.
+                    end[1] = 0.
+                    end[3] = 0.
+                elif args.env_name == 'cartpole_obs':
+                    start[1] = 0.
+                    start[3] = 0.
+                    end[1] = 0.
+                    end[3] = 0.
+                dir = args.path_folder+str(i)+'/'
+                if not os.path.exists(dir):
+                    os.makedirs(dir)
+                path_file = dir+args.path_file+'_%d'%(j) + ".pkl"
+                control_file = dir+args.control_file+'_%d'%(j) + ".pkl"
+                cost_file = dir+args.cost_file+'_%d'%(j) + ".pkl"
+                time_file = dir+args.time_file+'_%d'%(j) + ".pkl"
+                p = Process(target=plan_one_path_sst, args=(env, start, end, queue, path_file, control_file, cost_file, time_file))
+                p.start()
+                p.join()
+                res = queue.get()
+                print('obtained result:')
+                print(res)
+                if res:
+                    # plan successful
+                    break
 
 
 if __name__ == "__main__":
