@@ -8,7 +8,10 @@ this defines the MPNet to be used, which will utilize MLP and AE.
 class KMPNet(nn.Module):
     def __init__(self, total_input_size, AE_input_size, mlp_input_size, output_size, CAE, MLP):
         super(KMPNet, self).__init__()
-        self.encoder = CAE.Encoder(AE_input_size, mlp_input_size-(total_input_size-AE_input_size))
+        if CAE is None:
+            self.encoder = None
+        else:
+            self.encoder = CAE.Encoder(AE_input_size, mlp_input_size-(total_input_size-AE_input_size))
         self.mlp = MLP(mlp_input_size, output_size)
         self.mse = nn.MSELoss()
         self.opt = torch.optim.Adagrad(list(self.encoder.parameters())+list(self.mlp.parameters()))
@@ -22,20 +25,23 @@ class KMPNet(nn.Module):
         else:
             self.opt = opt(list(self.encoder.parameters())+list(self.mlp.parameters()), lr=lr, momentum=momentum)
 
-    def forward(self, x):
+    def forward(self, x, obs):
         # xobs is the input to encoder
         # x is the input to mlp
-        z = self.encoder(x[:,:self.AE_input_size])
-        mlp_in = torch.cat((z,x[:,self.AE_input_size:]), 1)    # keep the first dim the same (# samples)
+        if obs is not None:
+            z = self.encoder(obs)
+            mlp_in = torch.cat((z,x), 1)
+        else:
+            mlp_in = x
         return self.mlp(mlp_in)
 
     def loss(self, pred, truth):
         return self.mse(pred, truth)
 
-    def step(self, x, y):
+    def step(self, x, obs, y):
         # given a batch of data, optimize the parameters by one gradient descent step
         # assume here x and y are torch tensors, and have been
         self.zero_grad()
-        loss = self.loss(self.forward(x), y)
+        loss = self.loss(self.forward(x, obs), y)
         loss.backward()
         self.opt.step()

@@ -3,7 +3,7 @@ This implements data loader for both training and testing procedures.
 """
 import pickle
 import numpy as np
-def load_train_dataset(N, NP, p_folder, p_fname, obs_f=None, obc_f=None):
+def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -13,8 +13,8 @@ def load_train_dataset(N, NP, p_folder, p_fname, obs_f=None, obc_f=None):
 
     # load obs and obc (obc: obstacle point cloud)
     if obs_f is None:
-        obs = np.empty((1,1))
-        obc = np.empty((1,1))
+        obs = None
+        obc = None
     else:
         file = open(obs_f, 'rb')
         obs = pickle.load(file)
@@ -23,11 +23,15 @@ def load_train_dataset(N, NP, p_folder, p_fname, obs_f=None, obc_f=None):
     dataset = []
     targets = []
     env_indices = []
+
+
     for i in range(N):
-        if obs_f is None:
-            file = open(p_folder+p_fname, 'rb')
-        else:
-            file = open(p_folder+str(i)+'/'+p_fname, 'rb')
+        dir = p_folder+str(i)+'/'
+        path_file = dir+'path_%d'%(j) + ".pkl"
+        control_file = dir+'control_%d'%(j) + ".pkl"
+        cost_file = dir+args.'cost_%d'%(j) + ".pkl"
+        time_file = dir+args.'time_%d'%(j) + ".pkl"
+        file = open(path_file)
         paths = pickle.load(file)
         for p in paths:
             for i in range(len(p)-1):
@@ -39,7 +43,7 @@ def load_train_dataset(N, NP, p_folder, p_fname, obs_f=None, obc_f=None):
     #dataset = np.array(dataset)
     #targets = np.array(targets)
     #env_indices = np.array(env_indices)
-    return obc, dataset, targets, env_indices
+    return obs, dataset, targets, env_indices
 
 
 #def load_test_dataset(N, NP, folder):

@@ -8,7 +8,7 @@ from model.mlp import MLP
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
-from plan_utility import cart_pole, cart_pole_obs
+from plan_utility import cart_pole, cart_pole_obs, pendulum
 import argparse
 import numpy as np
 import random
@@ -18,7 +18,12 @@ def main(args):
     if torch.cuda.is_available():
         torch.cuda.set_device(args.device)
     # environment setting
-    if args.env_type == 'cartpole':
+    if args.env_type == 'pendulum':
+        normalize = pendulum.normalize
+        unnormalize = pendulum.unnormalize
+        obs_file = None
+        obc_file = None
+    elif args.env_type == 'cartpole':
         normalize = cart_pole.normalize
         unnormalize = cart_pole.unnormalize
         obs_file = None
@@ -57,7 +62,7 @@ def main(args):
     # load train and test data
     print('loading...')
     obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
-                                                                        p_folder=args.path_folder, p_fname=args.path_file,
+                                                                        p_folder=args.path_folder,
                                                                         obs_f=obs_file, obc_f=obc_file)
     # randomize the dataset before training
 	data=list(zip(dataset,targets,env_indices))
@@ -81,7 +86,7 @@ def main(args):
             targets_i = targets[i:i+args.batch_size]
             env_indices_i = env_indices[i:i+args.batch_size]
             # record
-            bi = np.concatenate( (obs[env_indices_i, :args.AE_input_size], dataset_i), axis=1).astype(np.float32)
+            bi = dataset_i.astype(np.float32)
             print('bi shape:')
             print(bi.shape)
             bt = targets_i
@@ -91,11 +96,17 @@ def main(args):
             mpnet.zero_grad()
             bi=to_var(bi)
             bt=to_var(bt)
+            if obs is None:
+                bobs = None
+            else:
+                bobs = obs[env_indices_i, :args.AE_input_size].astype(np.float32)
+                bobs = torch.FloatTensor(bobs)
+                bobs = to_var(bobs)
             print('before training losses:')
-            print(mpnet.loss(mpnet(bi), bt))
-            mpnet.step(bi, bt)
+            print(mpnet.loss(mpnet(bi, bobs), bt))
+            mpnet.step(bi, bobs, bt)
             print('after training losses:')
-            print(mpnet.loss(mpnet(bi), bt))
+            print(mpnet.loss(mpnet(bi, bobs), bt))
         # Save the models
         if epoch > 0:
             model_path='kmpnet_epoch_%d.pkl' %(epoch)
@@ -120,7 +131,7 @@ parser.add_argument('--device', type=int, default=0, help='cuda device')
 parser.add_argument('--num_epochs', type=int, default=500)
 parser.add_argument('--batch_size', type=int, default=100, help='rehersal on how many data (not path)')
 parser.add_argument('--path_folder', type=str, default='../data/simple/')
-parser.add_argument('--path_file', type=str, default='train.pkl')
+parser.add_argument('--path_file', type=str, default='train')
 parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
 parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
 
