@@ -13,8 +13,24 @@ import argparse
 import numpy as np
 import random
 import os
+import matplotlib.pyplot as plt
+#plt.ion()
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.set_autoscale_on(True)
+
+#hl, = ax.plot([], [])
+
+def update_line(h, ax, new_data):
+    h.set_xdata(np.append(h.get_xdata(), new_data[0]))
+    h.set_ydata(np.append(h.get_ydata(), new_data[1]))
+    ax.relim()
+    ax.autoscale_view()
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
 def main(args):
+    #global hl
     if torch.cuda.is_available():
         torch.cuda.set_device(args.device)
     # environment setting
@@ -65,21 +81,33 @@ def main(args):
                                                                         p_folder=args.path_folder,
                                                                         obs_f=obs_file, obc_f=obc_file)
     # randomize the dataset before training
-	data=list(zip(dataset,targets,env_indices))
-	random.shuffle(data)
-	dataset,targets,env_indices=list(zip(*data))
-	dataset = list(dataset)
-	targets = list(targets)
-	env_indices = list(env_indices)
+    data=list(zip(dataset,targets,env_indices))
+    random.shuffle(data)
+    dataset,targets,env_indices=list(zip(*data))
+    dataset = list(dataset)
+    targets = list(targets)
+    env_indices = list(env_indices)
     dataset = np.array(dataset)
     targets = np.array(targets)
     env_indices = np.array(env_indices)
 
+    # use 5% as validation dataset
+    val_len = int(len(dataset) * 0.05)
+    val_dataset = dataset[-val_len:]
+    val_targets = targets[-val_len:]
+    val_env_indices = env_indices[-val_len:]
+
+    dataset = dataset[:-val_len]
+    targets = targets[:-val_len]
+    env_indices = env_indices[:-val_len]
 
     # Train the Models
     print('training...')
+    train_losses = []
+    val_losses = []
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
         print('epoch' + str(epoch))
+        val_i = 0
         for i in range(0,len(dataset),args.batch_size):
             print('epoch: %d, training... path: %d' % (epoch, i+1))
             dataset_i = dataset[i:i+args.batch_size]
@@ -107,17 +135,61 @@ def main(args):
             mpnet.step(bi, bobs, bt)
             print('after training losses:')
             print(mpnet.loss(mpnet(bi, bobs), bt))
+            loss = mpnet.loss(mpnet(bi, bobs), bt)
+            #update_line(hl, ax, [i//args.batch_size, loss.data.numpy()])
+            train_losses.append(loss.data.numpy())
+
+            # validation
+            # calculate the corresponding batch in val_dataset
+            dataset_i = val_dataset[val_i:val_i+args.batch_size]
+            targets_i = val_targets[val_i:val_i+args.batch_size]
+            env_indices_i = val_env_indices[val_i:val_i+args.batch_size]
+            val_i = val_i + args.batch_size
+            if val_i > val_len:
+                val_i = 0
+            # record
+            bi = dataset_i.astype(np.float32)
+            print('bi shape:')
+            print(bi.shape)
+            bt = targets_i
+            bi = torch.FloatTensor(bi)
+            bt = torch.FloatTensor(bt)
+            bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
+            bi=to_var(bi)
+            bt=to_var(bt)
+            if obs is None:
+                bobs = None
+            else:
+                bobs = obs[env_indices_i, :args.AE_input_size].astype(np.float32)
+                bobs = torch.FloatTensor(bobs)
+                bobs = to_var(bobs)
+            loss = mpnet.loss(mpnet(bi, bobs), bt)
+            print('validation loss: %f' % (loss.data))
+
+            #update_line(hl, ax, [i//args.batch_size, loss.data.numpy()])
+            val_losses.append(loss.data.numpy())
+
         # Save the models
         if epoch > 0:
             model_path='kmpnet_epoch_%d.pkl' %(epoch)
             save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
             # test
+            plt.clf()
+            plt.plot(list(range(len(train_losses))), train_losses)
+            plt.savefig('train_loss_epoch_%d.png' % (epoch))
+            plt.clf()
+            plt.plot(list(range(len(val_losses))), val_losses)
+            plt.savefig('val_loss_epoch_%d.png' % (epoch))
+            train_losses = []
+            val_losses = []
 
 parser = argparse.ArgumentParser()
 # for training
 parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
 parser.add_argument('--no_env', type=int, default=100,help='directory for obstacle images')
 parser.add_argument('--no_motion_paths', type=int,default=4000,help='number of optimal paths in each environment')
+parser.add_argument('--no_val_paths', type=int,default=50,help='number of optimal paths in each environment')
+
 # Model parameters
 parser.add_argument('--total_input_size', type=int, default=2800+4, help='dimension of total input')
 parser.add_argument('--AE_input_size', type=int, default=2800, help='dimension of input to AE')
