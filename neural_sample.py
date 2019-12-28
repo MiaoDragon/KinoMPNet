@@ -63,7 +63,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
         max_iter = 200
         min_time_steps = 20
-        max_time_steps = 2000
+        max_time_steps = 200
         integration_step = 0.002
         goal_radius=0.1
         random_seed=0
@@ -240,8 +240,8 @@ def main(args):
                     print('sst accuracy: %f' % (float(sst_suc_n) / (j+1)))
                     sample = planner.step_with_sample(system, sample, min_time_steps, max_time_steps, 0.002)
                     #planner.step_bvp(system, 10, 200, 0.002)
-                    im = planner.visualize_tree(system)
-                    show_image(im, 'tree', wait=False)
+                    im = planner.visualize_nodes(system)
+                    show_image(im, 'nodes', wait=False)
                 new_sample = planner.step_with_sample(system, end, min_time_steps, max_time_steps, 0.002)
 
 

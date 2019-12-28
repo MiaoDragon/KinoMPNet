@@ -5,7 +5,7 @@ from torch.autograd import Variable
 
 
 class Encoder(nn.Module):
-    def __init__(self, input_size, output_size):
+    def __init__(self):
         super(Encoder, self).__init__()
     def forward(self, x):
         return x

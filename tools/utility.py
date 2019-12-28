@@ -19,14 +19,23 @@ def save_state(net, torch_seed, np_seed, py_seed, fname):
     torch.save(states, fname)
 
 def load_net_state(net, fname):
-    checkpoint = torch.load(fname, map_location='cuda:%d' % (torch.cuda.current_device()))
+    if torch.cuda.is_available():
+        checkpoint = torch.load(fname, map_location='cuda:%d' % (torch.cuda.current_device()))
+    else:
+        checkpoint = torch.load(fname, map_location='cpu')
     net.load_state_dict(checkpoint['state_dict'])
 
 def load_opt_state(net, fname):
-    checkpoint = torch.load(fname, map_location='cuda:%d' % (torch.cuda.current_device()))
+    if torch.cuda.is_available():
+        checkpoint = torch.load(fname, map_location='cuda:%d' % (torch.cuda.current_device()))
+    else:
+        checkpoint = torch.load(fname, map_location='cpu')
     net.opt.load_state_dict(checkpoint['optimizer'])
 
 def load_seed(fname):
     # load both torch random seed, and numpy random seed
-    checkpoint = torch.load(fname, map_location='cuda:%d' % (torch.cuda.current_device()))
+    if torch.cuda.is_available():
+        checkpoint = torch.load(fname, map_location='cuda:%d' % (torch.cuda.current_device()))
+    else:
+        checkpoint = torch.load(fname, map_location='cpu')
     return checkpoint['torch_seed'], checkpoint['np_seed'], checkpoint['py_seed']

@@ -1,3 +1,6 @@
 data/**
 deps/**
 *.pyc
+results/**
+*.png
+*.mp4
