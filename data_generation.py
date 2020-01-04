@@ -26,10 +26,10 @@ def main(args):
         max_time_steps = 200
         integration_step = 0.002
         max_iter = 1000
-        goal_radius=1e-3
+        goal_radius=0.1
         random_seed=0
-        sst_delta_near=1e-4
-        sst_delta_drain=1e-5
+        sst_delta_near=0.02
+        sst_delta_drain=0.01
     elif args.env_name == 'cartpole':
         env_constr = standard_cpp_systems.PSOPTCartPole
         obs_list = None
