@@ -233,6 +233,9 @@ def main(args):
                 start = np.random.uniform(low=low, high=high)
                 end = np.random.uniform(low=low, high=high)
                 # set the velocity terms to zero
+                if args.env_name == 'pendulum':
+                    #start[1] = 0.
+                    end[1] = 0.
                 if args.env_name == 'cartpole':
                     start[1] = 0.
                     start[3] = 0.
