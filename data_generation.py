@@ -253,6 +253,7 @@ def main(args):
                 control_file = dir+args.control_file+'_%d'%(j) + ".pkl"
                 cost_file = dir+args.cost_file+'_%d'%(j) + ".pkl"
                 time_file = dir+args.time_file+'_%d'%(j) + ".pkl"
+                sg_file = dir+args.sg_file+'_%d'%(j)+".pkl"
                 p = Process(target=plan_one_path_sst, args=(env, start, end, queue, path_file, control_file, cost_file, time_file))
                 p.start()
                 p.join()
@@ -261,6 +262,10 @@ def main(args):
                 print(res)
                 if res:
                     # plan successful
+                    file = open(sg_file, 'wb')
+                    sg = [start, end]
+                    pickle.dump(sg, file)
+                    file.close()
                     break
 
 
@@ -276,6 +281,7 @@ if __name__ == "__main__":
     parser.add_argument('--control_file', type=str, default='control')
     parser.add_argument('--cost_file', type=str, default='cost')
     parser.add_argument('--time_file', type=str, default='time')
+    parser.add_argument('--sg_file', type=str, default='start_goal')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
     args = parser.parse_args()
