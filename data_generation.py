@@ -28,8 +28,8 @@ def main(args):
         max_iter = 1000
         goal_radius=0.1
         random_seed=0
-        sst_delta_near=0.05
-        sst_delta_drain=0.02
+        sst_delta_near=0.02
+        sst_delta_drain=0.01
     elif args.env_name == 'cartpole':
         env_constr = standard_cpp_systems.PSOPTCartPole
         obs_list = None
