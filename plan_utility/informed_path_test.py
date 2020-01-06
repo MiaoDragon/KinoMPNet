@@ -1,4 +1,5 @@
 import sys
+import jax
 sys.path.append('../deps/sparse_rrt')
 sys.path.append('..')
 
@@ -63,6 +64,22 @@ def dynamics(x, u):
     #    res[0] -= 2 * np.pi
     #res = np.clip(res, [MIN_ANGLE, MIN_W], [MAX_ANGLE, MAX_W])
     return res
+def jax_dynamics(x, u):
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    MIN_W, MAX_W = -7., 7
+
+    MIN_TORQUE, MAX_TORQUE = -1., 1.
+
+    LENGTH = 1.
+    MASS = 1.
+    DAMPING = .05
+    gravity_coeff = MASS*9.81*LENGTH*0.5
+    integration_coeff = 3. / (MASS*LENGTH*LENGTH)
+    #res = jax.numpy.zeros(2)
+    #res[0] = x[1]
+    #res[1] = integration_coeff * (u[0] - gravity_coeff*jax.numpy.cos(x[0]) - DAMPING*x[1])
+    return jax.numpy.asarray([x[1],integration_coeff * (u[0] - gravity_coeff*jax.numpy.cos(x[0]) - DAMPING*x[1])])
+
 def informer(env, x0, xG, direction):
     # here we use a simple version, just output start or goal based on direction
     res = Node(xG.x)
@@ -74,4 +91,7 @@ start = Node(state[0])
 goal = Node(state[-1])
 goal.S1 = np.identity(2)
 goal.rho1 = 0.01
+
+jac_A = jax.jacfwd(jax_dynamics, argnums=0)
+jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 target_reached = plan(None, state[0], state[-1], informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH=1000)
