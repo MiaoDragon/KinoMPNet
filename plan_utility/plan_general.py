@@ -33,7 +33,7 @@ def traj_opt(x0, x1, solver):
     xs, us, ts = solver.solve(x0, x1)
     return xs, us, ts
 
-def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direciton, step_sz=0.02):
+def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.02):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
