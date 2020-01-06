@@ -1,7 +1,9 @@
-from ctypes import *
+import sys
+sys.path.append('../deps/sparse_rrt')
+#from ctypes import *
 #ctypes.cdll.LoadLibrary('')
-lib1 = CDLL("/home/yinglong/Documents/kinodynamic/sparse_rrt/deps/trajopt/build/lib/libsco.so")
-lib2 = CDLL("/home/yinglong/Documents/kinodynamic/sparse_rrt/deps/trajopt/build/lib/libutils.so")
+#lib1 = CDLL("/home/yinglong/Documents/kinodynamic/sparse_rrt/deps/trajopt/build/lib/libsco.so")
+#lib2 = CDLL("/home/yinglong/Documents/kinodynamic/sparse_rrt/deps/trajopt/build/lib/libutils.so")
 
 from sparse_rrt.planners import SST
 from env.cartpole_obs import CartPoleObs
