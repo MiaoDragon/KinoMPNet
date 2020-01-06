@@ -20,7 +20,7 @@ def propagate(x, us, dts, dynamics, step_sz=None):
             x = x + step_sz*dynamics(x, u)
             new_xs.append(x)
             new_us.append(u)
-            new_dts.append(dt)
+            new_dts.append(step_sz)
         x = x + last_step*dynamics(x, u)
         new_xs.append(x)
         new_us.append(u)
@@ -35,7 +35,7 @@ def traj_opt(x0, x1, solver):
     xs, us, ts = solver.solve(x0, x1)
     return xs, us, ts
 
-def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.02):
+def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.002):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
@@ -43,32 +43,86 @@ def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.0
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
         xs, us, dts = traj_opt(x0.x, x1.x)
+        """
+            print('----------------forward----------------')
+            print('trajectory opt:')
+            print('start:')
+            print(x0.x)
+            print('end:')
+            print(x1.x)
+            print('xs[0]:')
+            print(xs[0])
+            print('xs[-1]:')
+            print(xs[-1])
+            print('us:')
+            print(us)
+            print('dts:')
+            print(dts)
+        """
         # ensure us and dts have length 1 less than xs
         if len(us) == len(xs):
             us = us[:-1]
         xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, step_sz=step_sz)
+        """
+            print('propagation result:')
+            print('xs[0]:')
+            print(xs[0])
+            print('xs[-1]:')
+            print(xs[-1])
+            print('us:')
+            print(us)
+            print('dts:')
+            print(dts)
+        """
         edge_dt = np.sum(dts)
         start = x0
         goal = Node(xs[-1])
         x1 = goal
     else:
         xs, us, dts = traj_opt(x1.x, x0.x)
+        """
+            print('----------------backward----------------')
+            print('trajectory opt:')
+            print('start:')
+            print(x1.x)
+            print('end:')
+            print(x0.x)
+            print('xs[0]:')
+            print(xs[0])
+            print('xs[-1]:')
+            print(xs[-1])
+            print('us:')
+            print(us)
+            print('dts:')
+            print(dts)
+        """
         if len(us) == len(xs):
             us = us[:-1]
-        us.reverse()
-        dts.reverse()
+        us = np.flip(us, axis=0)
+        dts = np.flip(dts, axis=0)
         # reversely propagate the system
-        xs, us, dts = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), interpolation=interpolation)
-        xs.reverse()
-        us.reverse()
-        dts.reverse()
+        xs, us, dts = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), step_sz=step_sz)
+        xs = np.flip(xs, axis=0)
+        us = np.flip(us, axis=0)
+        dts = np.flip(dts, axis=0)
+        """
+            print('propagation result:')
+            print('xs[0]:')
+            print(xs[0])
+            print('xs[-1]:')
+            print(xs[-1])
+            print('us:')
+            print(us)
+            print('dts:')
+            print(dts)
+        """
         edge_dt = np.sum(dts)
-        start = Node(xs[-1])
+        start = Node(xs[0])  # after flipping, the first in xs is the start
         goal = x0
         x1 = start
 
     controller, xtraj, utraj, S = tvlqr(xs, us, dts, dynamics, jac_A, jac_B)
-
+    
     # notice that controller time starts from 0, hence locally need to shift the time by minusing t0_edges
     # start from 0
     time_knot = np.cumsum(dts)
@@ -98,7 +152,8 @@ def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.0
         xtraj = start.edge.xtraj
         utraj = start.edge.utraj
         S = start.edge.S
-        start.S0 = S
+        start.S0 = S(0).reshape((len(upper_x),len(upper_x)))
+        print('time_knot: %d' % (len(time_knot)))
         # reversely construct the funnel
         for i in range(len(time_knot)-1, 0, -1):
             t0 = time_knot[i-1]
@@ -117,7 +172,10 @@ def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.0
             B1 = np.asarray(B1)
             S0 = S(t0).reshape(len(x0),len(x0))
             S1 = S(t1).reshape(len(x0),len(x0))
-            rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50)
+            Q = np.identity(len(x0))
+            R = np.identity(len(u0))
+            ##TODO: check the output of sample_tv_verify
+            rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, numSample=1000)
             upper_rho = rho0
             upper_x = x0
             upper_S = S0
@@ -145,7 +203,7 @@ def funnelSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direciton, step_sz=0
         xtraj = start.edge.xtraj
         utraj = start.edge.utraj
         S = start.edge.S
-        start.S0 = S
+        start.S0 = S(0).reshape((len(upper_x),len(upper_x)))
         # reversely construct the funnel
         for i in range(len(time_knot)-1, 0, -1):
             t0 = time_knot[i-1]

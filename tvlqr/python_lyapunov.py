@@ -96,11 +96,13 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
                 continue
             if goingdown:
                 # still trying to find the first successul one
-                while rho0 <= rho_step:
-                    rho_step = rho_step / 2  # smaller rho_step
-                rho0 = rho0 - rho_step
-                continue
+                if rho0 > rho_step:                    
+                    #while rho0 <= rho_step:
+                    #    rho_step = rho_step / 2  # smaller rho_step
+                    rho0 = rho0 - rho_step
+                    continue
         # if none of the above conditions, then it is time to return the value
+        #print('rho0 = %f, rho1 = %f' % (prev_rho0, prev_rho1))
         return prev_rho0, prev_rho1
 
 def sample_ti_verify(xG, uG, S, K, func, numSample=50):

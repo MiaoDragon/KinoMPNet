@@ -86,18 +86,24 @@ def jax_dynamics(x, u):
     return jax.numpy.asarray([x[1],integration_coeff * (u[0] - gravity_coeff*jax.numpy.cos(x[0]) - DAMPING*x[1])])
 
 def informer(env, x0, xG, direction):
-    # here we use a simple version, just output start or goal based on direction
-    res = Node(xG.x)
+    # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
+    dif = np.linalg.norm(x0.x - state, axis=1)
+    max_d_i = np.argmin(dif)
+    if direction == 0:
+        # forward
+        res = Node(state[max_d_i+1])
+    else:
+        res = Node(state[max_d_i-1])
     return res
 
 traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)
 
 start = Node(state[0])
 goal = Node(state[-1])
-goal.S1 = np.identity(2)
-goal.rho1 = 0.01
+goal.S0 = np.identity(2)
+goal.rho0 = 1.0
 print(jax.jacfwd(jax_dynamics, argnums=0)(np.array(state[0]),np.array([0.])))
 jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 print(jac_A(state[0],np.array([0.])))
-target_reached = plan(None, start, goal, informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH=1000)
+target_reached = plan(None, start, goal, informer, dynamics, traj_opt, jac_A, jac_B, step_sz=0.002, MAX_LENGTH=1000)
