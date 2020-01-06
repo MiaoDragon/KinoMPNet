@@ -16,7 +16,7 @@ import pickle
 from plan_utility.informed_path import *
 from plan_utility.plan_general import *
 from plan_utility.data_structure import *
-_system = sparse_rrt._sst_module.PSOPTPendulum()
+_system = _sst_module.PSOPTPendulum()
 bvp_solver = _sst_module.PSOPTBVPWrapper(_system, 2, 1, 0)
 
 low = []
