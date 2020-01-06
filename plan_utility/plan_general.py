@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 import numpy as np
 from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify

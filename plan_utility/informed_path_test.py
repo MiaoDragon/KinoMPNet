@@ -1,5 +1,7 @@
 import sys
 sys.path.append('../deps/sparse_rrt')
+sys.path.append('..')
+
 #from ctypes import *
 #ctypes.cdll.LoadLibrary('')
 #lib1 = CDLL("/home/yinglong/Documents/kinodynamic/sparse_rrt/deps/trajopt/build/lib/libsco.so")

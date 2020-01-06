@@ -1,3 +1,6 @@
+import sys
+sys.path.append('..')
+
 import numpy as np
 from plan_utility.plan_general import *
 # this one predicts one individual path using informer and trajopt
