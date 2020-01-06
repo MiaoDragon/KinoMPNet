@@ -8,7 +8,9 @@ from plan_utility.data_structure import *
 def propagate(x, us, dts, dynamics, step_sz=None):
     # use the dynamics to interpolate the state x
     # can implement different interpolation method for this
-    xs = [x]
+    new_xs = [x]
+    new_us = []
+    new_dts = []
     for i in range(len(us)):
         dt = dts[i]
         u = us[i]
@@ -20,13 +22,13 @@ def propagate(x, us, dts, dynamics, step_sz=None):
             us.append(u)
             dts.append(dt)
         x = x + last_step*dynamics(x, u)
-        xs.append(x)
-        us.append(u)
-        dts.append(last_step)
-    xs = np.array(xs)
-    us = np.array(us)
-    dts = np.array(dts)
-
+        new_xs.append(x)
+        new_us.append(u)
+        new_dts.append(last_step)
+    new_xs = np.array(new_xs)
+    new_us = np.array(new_us)
+    new_dts = np.array(new_dts)
+    return new_xs, new_us, new_dts
 def traj_opt(x0, x1, solver):
     # use trajectory optimization method to compute trajectory between x0 and x1
     # load the dynamics function corresponding to the envname
