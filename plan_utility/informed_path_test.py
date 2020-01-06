@@ -63,6 +63,10 @@ def dynamics(x, u):
     #    res[0] -= 2 * np.pi
     #res = np.clip(res, [MIN_ANGLE, MIN_W], [MAX_ANGLE, MAX_W])
     return res
+def informer(env, x0, xG, direction):
+    # here we use a simple version, just output start or goal based on direction
+    res = Node(xG.x)
+    return res
 
 traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)
 
