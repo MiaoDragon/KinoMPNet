@@ -3,12 +3,9 @@ this implements the lyapunov analysis for TVLQR using the following two methods:
 1. linearization
 2. sampling-based method
 """
-from cvxopt import matrix, solvers
 from scipy.optimize import NonlinearConstraint
 import numpy as np
 from scipy.optimize import minimize, Bounds, linprog
-import jax
-import control
 import scipy
 def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
     # sample points at t0 and t1, make sure that d(x^TSx)/dt <= rho_dot
