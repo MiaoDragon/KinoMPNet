@@ -27,13 +27,13 @@ for i in range(len(state_bounds)):
     high.append(state_bounds[i][1])
 
 
-f = open('data/pendulum/0/path_%d.pkl' % (0), 'rb')
+f = open('../data/pendulum/0/path_%d.pkl' % (0), 'rb')
 state = pickle.load(f)
 
-f = open('data/pendulum/0/control_%d.pkl' % (0), 'rb')
+f = open('../data/pendulum/0/control_%d.pkl' % (0), 'rb')
 control = pickle.load(f)
 
-f = open('data/pendulum/0/cost_%d.pkl' % (0), 'rb')
+f = open('../data/pendulum/0/cost_%d.pkl' % (0), 'rb')
 times = pickle.load(f)
 
 
