@@ -94,4 +94,4 @@ goal.rho1 = 0.01
 
 jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
-target_reached = plan(None, state[0], state[-1], informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH=1000)
+target_reached = plan(None, start, goal, informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH=1000)
