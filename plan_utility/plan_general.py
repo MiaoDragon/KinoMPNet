@@ -14,7 +14,7 @@ def propagate(x, us, dts, dynamics, step_sz=None):
         u = us[i]
         num_steps = int(dt / step_sz)
         last_step = dt - num_steps*step_sz
-        for k in range(len(num_steps)):
+        for k in range(num_steps):
             x = x + step_sz*dynamics(x, u)
             xs.append(x)
             us.append(u)
