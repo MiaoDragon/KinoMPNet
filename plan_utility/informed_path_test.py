@@ -28,13 +28,19 @@ for i in range(len(state_bounds)):
 
 
 f = open('../data/pendulum/0/path_%d.pkl' % (0), 'rb')
-state = pickle.load(f)
+p = pickle._Unpickler(f)
+p.encoding = 'latin1'
+state = p.load()
 
 f = open('../data/pendulum/0/control_%d.pkl' % (0), 'rb')
-control = pickle.load(f)
+p = pickle._Unpickler(f)
+p.encoding = 'latin1'
+control = p.load()
 
 f = open('../data/pendulum/0/cost_%d.pkl' % (0), 'rb')
-times = pickle.load(f)
+p = pickle._Unpickler(f)
+p.encoding = 'latin1'
+times = p.load()
 
 
 def dynamics(x, u):
