@@ -91,7 +91,8 @@ start = Node(state[0])
 goal = Node(state[-1])
 goal.S1 = np.identity(2)
 goal.rho1 = 0.01
-
+print(jax.jacfwd(jax_dynamics, argnums=0)(np.array(state[0]),np.array([0.])))
 jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
+print(jac_A(state[0],np.array([0.])))
 target_reached = plan(None, start, goal, informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH=1000)
