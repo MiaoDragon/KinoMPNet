@@ -1,5 +1,7 @@
+import numpy as np
+from plan_utility.plan_general import *
 # this one predicts one individual path using informer and trajopt
-def plan(env, x0, xG, informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH):
+def plan(env, x0, xG, informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
     # jac_A: given (x, u) -> linearization A
     # jac B: given (x, u) -> linearization B
@@ -33,9 +35,10 @@ def plan(env, x0, xG, informer, dynamics, traj_opt, jac_A, jac_B, MAX_LENGTH):
             xG = x
             tree=0
         xG_, e_ = pathSteerTo(x0, xG, dynamics=dynamics, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, direction=0)
-        target_reached = nearby(xG_, xG)
+        target_reached = nearby(xG_, xG)  # check the funnel if can connect
     if target_reached:
         # connect the lsat node
         xG_.next = xG
         e_.next = xG
         xG_.edge = e_
+    return target_reached

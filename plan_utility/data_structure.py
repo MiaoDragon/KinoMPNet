@@ -7,7 +7,8 @@ class Node:
         self.t = None
         self.rho0 = None
         self.rho1 = None
-        self.S = None
+        self.S0 = None
+        self.S1 = None
 class Edge:
     ## TODO: function implmentation
     def __init__(self, xtraj, utraj, time_knot, dt, S, controller, rho0, rho1):
@@ -16,13 +17,19 @@ class Edge:
         self.xtraj = xtraj
         self.utraj = utraj
         self.time_knot = time_knot
+        self.dt = dt
+        self.S = S
         self.controller = controller
         self.rho0 = rho0
         self.rho1 = rho1
-        self.dt = dt
         self.next = None
     def __init__(self, xtraj, utraj, time_knot, dt, S, controller):
         self.dt = dt
+        self.xtraj = xtraj
+        self.utraj = utraj
+        self.time_knot = time_knot
+        self.dt = dt
+        self.S = S
         self.controller = controller
         self.rho0 = None
         self.rho1 = None
