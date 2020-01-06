@@ -1,3 +1,8 @@
+from ctypes import *
+#ctypes.cdll.LoadLibrary('')
+lib1 = CDLL("../deps/sparse_rrt/deps/trajopt/build/lib/libsco.so")
+lib2 = CDLL("../deps/sparse_rrt/deps/trajopt/build/lib/libutils.so")
+
 import sys
 import jax
 sys.path.append('../deps/sparse_rrt')

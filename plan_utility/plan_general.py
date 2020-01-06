@@ -18,9 +18,9 @@ def propagate(x, us, dts, dynamics, step_sz=None):
         last_step = dt - num_steps*step_sz
         for k in range(num_steps):
             x = x + step_sz*dynamics(x, u)
-            xs.append(x)
-            us.append(u)
-            dts.append(dt)
+            new_xs.append(x)
+            new_us.append(u)
+            new_dts.append(dt)
         x = x + last_step*dynamics(x, u)
         new_xs.append(x)
         new_us.append(u)
@@ -43,6 +43,9 @@ def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.0
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
         xs, us, dts = traj_opt(x0.x, x1.x)
+        # ensure us and dts have length 1 less than xs
+        if len(us) == len(xs):
+            us = us[:-1]
         xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, step_sz=step_sz)
         edge_dt = np.sum(dts)
         start = x0
@@ -50,6 +53,8 @@ def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.0
         x1 = goal
     else:
         xs, us, dts = traj_opt(x1.x, x0.x)
+        if len(us) == len(xs):
+            us = us[:-1]
         us.reverse()
         dts.reverse()
         # reversely propagate the system
@@ -126,7 +131,7 @@ def pathSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direction, step_sz=0.0
         start.rho0 = rho0
         start = start.prev
         goal = goal.prev
-    return res_x1, res_edge
+    return res_x, res_edge
 
 def funnelSteerTo(x0, x1, dynamics, jac_A, jac_B, traj_opt, direciton, step_sz=0.02):
     start = x0
@@ -179,6 +184,9 @@ def nearby(x0, x1):
     # using the S and rho stored by the node to determine distance
     # if x0 lies in x1, and within the boundary of x1 (S, rho0)
     S = x1.S0
+    print(x0.x)
+    print(S)
+    print(x1.rho0)
     if x0.x.T@S@x0.x <= x1.rho0:
         return True
     else:
