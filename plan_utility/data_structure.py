@@ -23,14 +23,14 @@ class Edge:
         self.rho0 = rho0
         self.rho1 = rho1
         self.next = None
-    def __init__(self, xtraj, utraj, time_knot, dt, S, controller):
-        self.dt = dt
-        self.xtraj = xtraj
-        self.utraj = utraj
+    def __init__(self, xs, us, dts, time_knot, dt):
+        self.xs = xs
+        self.us = us
+        self.xtraj = None
+        self.utraj = None
+        self.dts = dts
         self.time_knot = time_knot
         self.dt = dt
-        self.S = S
-        self.controller = controller
         self.rho0 = None
         self.rho1 = None
         self.next = None

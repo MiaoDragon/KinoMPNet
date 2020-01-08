@@ -8,7 +8,7 @@ from scipy.optimize import NonlinearConstraint
 import numpy as np
 from scipy.optimize import minimize, Bounds, linprog
 import jax
-import control
+#import control
 import scipy
 def linear_tv_verify(t0, t1, rho_upper, S0, S1, A0, A1, B0, B1, R, Q):
     print("RVLQR verification using linear method")
@@ -1174,7 +1174,7 @@ def jaxfunc(x, u):
     return jax.numpy.asarray(jax_f(x, u))
 
 
-
+"""
 if __name__ == "__main__":
 
     # read the data obtained from sparse_rrt
@@ -1281,3 +1281,4 @@ if __name__ == "__main__":
     S0 = S(t0).reshape(len(x0),len(x0))
     S1 = S(t1).reshape(len(x0),len(x0))
     #rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, dynamics, numSample=1000)
+"""

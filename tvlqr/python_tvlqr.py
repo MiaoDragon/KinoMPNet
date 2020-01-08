@@ -17,7 +17,7 @@ import scipy
 from scipy.interpolate import CubicHermiteSpline, PPoly, interp1d
 from scipy.integrate import solve_ivp, ode, odeint
 import numpy as np
-def tvlqr(x, u, dt, func, jac_A, jac_B):
+def tvlqr(x, u, dt, func, jac_A, jac_B, Qf=None):
     # len(x) = len(u)+1=len(dt)+1
     # interpolation of x
     t = [0.]
@@ -53,7 +53,11 @@ def tvlqr(x, u, dt, func, jac_A, jac_B):
         res = -(Q - S_ @ B @ B.T @ S_ + S_ @ A + A.T @ S_)
         res = res.flatten()
         return res
-    S_0 = 1*np.identity(len(x[0])).flatten()
+    if Qf is None:
+        S_0 = 1*np.identity(len(x[0])).flatten()
+    else:
+        # maybe we are using Qf to connect to the next funnel
+        S_0 = Qf.flatten()
     t_0 = t[-1]
     # use solve_ivp
     sol = solve_ivp(fun=ricartti_f, t_span=[t[-1],0.], y0=S_0, dense_output=True)
