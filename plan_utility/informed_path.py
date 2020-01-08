@@ -33,6 +33,14 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
             print('after forward steering:')
             print('state:')
             print(x.x)
+            node = xG
+            while node is not None:
+                target_reached = nearby(x0, node)
+                if target_reached:
+                    xG = node
+                    break
+                node = node.next
+
         else:
             x, e = pathSteerTo(xG, informer(env, xG, x0, direction=1), dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=1, compute_funnel=True)
             x.next = xG
@@ -44,10 +52,20 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
             print('after backward steering:')
             print('state:')
             print(x.x)
+            node = x0
+            while node is not None:
+                target_reached = nearby(node, xG)
+                if target_reached:
+                    x0 = node
+                    break
+                node = node.prev
+
 
         #xG_, e_ = pathSteerTo(x0, xG, dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=0, compute_funnel=False)
-        # check if x0 can connect to xG directly, if so, no need to construct a controller from x0 to xG
-        target_reached = nearby(x0, xG)  # check the funnel if can connect
+        # check if x0 can connect to one node in the backward tree directly, if so, no need to construct a controller from x0 to the node
+        # version one: only check endpoint
+        #target_reached = nearby(x0, xG)  # check the funnel if can connect
+        # version two: new node in start tree: check all goal tree, and otherwise conversely
     if target_reached:
         # it is near enough, so we connect in the node data structure from x0 to xG, although the endpoint of x0.edge
         # in state is still xG_

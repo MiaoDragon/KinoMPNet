@@ -344,7 +344,8 @@ def nearby(x0, x1):
         delta_x[0] = delta_x[0] + 2*np.pi
     xTSx = delta_x.T@S@delta_x
     print('xTSx: %f' % (xTSx))
-    if xTSx <= x1.rho0:
+    # notice that we define rho to be ||S^{1/2}x||
+    if xTSx <= x1.rho0*x1.rho0:
         return True
     else:
         return False
