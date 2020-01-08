@@ -55,16 +55,20 @@ class CartPoleObs(BaseSystem):
         :return: new state of the system
         '''
         state = np.array(start_state)
+        res_state = None
         for i in range(num_steps):
             # simulate forward transition by first order integration
             deriv = self.update_derivative(state, control)
             # integrate to obtain next state
             state = state + integration_step*deriv
             state = self.enforce_bounds(state)
-            if not self.valid_state(state):
+            if self.valid_state(state):
+                # remember the state
+                res_state = state
+            else:
                 print('in collision')
-                return None
-        return state
+                return res_state
+        return res_state
 
     def enforce_bounds(self, state):
         '''
