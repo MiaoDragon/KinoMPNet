@@ -27,7 +27,7 @@ def start_goal_gen(low, high, width, obs, obs_recs):
                     break
         if cf:
             break
-    print('generated start point')
+    #print('generated start point')
 
     while True:
         start[1] = np.random.uniform(low=low[1], high=high[1])
@@ -46,7 +46,7 @@ def start_goal_gen(low, high, width, obs, obs_recs):
             break
     # start endpoint
     while True:
-        print('generated endpoint')
+        #print('generated endpoint')
         while True:
             end[0] = np.random.uniform(low=low[0], high=high[0])
             # make sure start midpoint
@@ -87,7 +87,7 @@ def start_goal_gen(low, high, width, obs, obs_recs):
         start_sign = np.array([x2_start, y2_start]) >= 0
         end_sign = np.array([x2_goal, y2_goal]) >= 0
         if start_sign[0] != end_sign[0] or start_sign[1] != end_sign[1]:
-            print('sg generated.')
+            #print('sg generated.')
             break
 
 
