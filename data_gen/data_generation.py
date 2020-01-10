@@ -2,7 +2,7 @@
 using SST* to generate near-optimal paths in specified environment
 """
 import sys
-sys.path.append('deps/sparse_rrt')
+sys.path.append('../deps/sparse_rrt')
 sys.path.append('..')
 import argparse
 from sparse_rrt import _sst_module
@@ -60,10 +60,12 @@ def main(args):
         obs_list, obc_list = cartpole_obs_gen.obs_gen(args.N, args.N_obs, N_pc=1400, width=width)
         ## TODO: add other env
         # store the obstacles and obc first
-        file = open(args.obs_file, 'wb')
-        pickle.dump(obs_list, file)
-        file = open(args.obc_file, 'wb')
-        pickle.dump(obc_list, file)
+        for i in range(len(obs_list)):
+            file = open(args.path_folder+'obs_%d.pkl' % (i+args.s), 'wb')
+            pickle.dump(obs_list[i], file)
+            file = open(args.path_folder+'obc_%d.pkl' % (i+args.s), 'wb')
+            pickle.dump(obc_list[i], file)
+
     elif args.env_name == 'acrobot_obs':
         env_constr = standard_cpp_systems.RectangleObs
         # randomly generate obstacle location
@@ -83,10 +85,11 @@ def main(args):
         obs_list, obc_list = acrobot_obs_gen.obs_gen(args.N, args.N_obs, N_pc=1400, width=width)
         ## TODO: add other env
         # store the obstacles and obc first
-        file = open(args.obs_file, 'wb')
-        pickle.dump(obs_list, file)
-        file = open(args.obc_file, 'wb')
-        pickle.dump(obc_list, file)
+        for i in range(len(obs_list)):
+            file = open(args.path_folder+'obs_%d.pkl' % (i+args.s), 'wb')
+            pickle.dump(obs_list[i], file)
+            file = open(args.path_folder+'obc_%d.pkl' % (i+args.s), 'wb')
+            pickle.dump(obc_list[i], file)
 
     ####################################################################################
     def plan_one_path_bvp(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
@@ -208,13 +211,10 @@ def main(args):
         obs_recs = []
         for k in range(len(obs_list[i])):
             # for each obs setting
-            obs_rec = []
-            for j in range(len(obs_list[i])):
-                obs_rec.append([[obs_list[i][k][j][0]-width/2,obs_list[i][k][j][1]-width/2],
-                                [obs_list[i][k][j][0]-width/2,obs_list[i][k][j][1]+width/2],
-                                [obs_list[i][k][j][0]+width/2,obs_list[i][k][j][1]+width/2],
-                                [obs_list[i][k][j][0]+width/2,obs_list[i][k][j][1]-width/2]])
-            obs_recs.append(obs_rec)
+            obs_recs.append([[obs_list[i][k][0]-width/2,obs_list[i][k][1]-width/2],
+                             [obs_list[i][k][0]-width/2,obs_list[i][k][1]+width/2],
+                             [obs_list[i][k][0]+width/2,obs_list[i][k][1]+width/2],
+                             [obs_list[i][k][0]+width/2,obs_list[i][k][1]-width/2]])
 
         state_bounds = env.get_state_bounds()
         low = []
@@ -230,6 +230,7 @@ def main(args):
         suc_n = 0
 
         for j in range(args.NP):
+            plan_start = time.time()
             while True:
                 # randomly sample collision-free start and goal
                 #start = np.random.uniform(low=low, high=high)
@@ -251,11 +252,11 @@ def main(args):
                 dir = args.path_folder+str(i)+'/'
                 if not os.path.exists(dir):
                     os.makedirs(dir)
-                path_file = dir+args.path_file+'_%d'%(j) + ".pkl"
-                control_file = dir+args.control_file+'_%d'%(j) + ".pkl"
-                cost_file = dir+args.cost_file+'_%d'%(j) + ".pkl"
-                time_file = dir+args.time_file+'_%d'%(j) + ".pkl"
-                sg_file = dir+args.sg_file+'_%d'%(j)+".pkl"
+                path_file = dir+args.path_file+'_%d'%(j+args.sp) + ".pkl"
+                control_file = dir+args.control_file+'_%d'%(j+args.sp) + ".pkl"
+                cost_file = dir+args.cost_file+'_%d'%(j+args.sp) + ".pkl"
+                time_file = dir+args.time_file+'_%d'%(j+args.sp) + ".pkl"
+                sg_file = dir+args.sg_file+'_%d'%(j+args.sp)+".pkl"
                 p = Process(target=plan_one_path_sst, args=(env, start, end, queue, path_file, control_file, cost_file, time_file))
                 p.start()
                 p.join()
@@ -269,13 +270,15 @@ def main(args):
                     pickle.dump(sg, file)
                     file.close()
                     break
-
+            print('path planning time: %f' % (time.time() - plan_start))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--env_name', type=str, default='cartpole')
     parser.add_argument('--N', type=int, default=1)
     parser.add_argument('--N_obs', type=int, default=6)
+    parser.add_argument('--s', type=int, default=0)
+    parser.add_argument('--sp', type=int, default=0)
     parser.add_argument('--NP', type=int, default=5000)
     parser.add_argument('--max_iter', type=int, default=10000)
     parser.add_argument('--path_folder', type=str, default='./data/cartpole/')

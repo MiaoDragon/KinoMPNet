@@ -6,7 +6,7 @@ def start_goal_gen(low, high, width, obs, obs_recs):
     # using obs information and bound, to generate good start and goal
     LENGTH = 20.
     near = width * 1.2
-    s_g_dis_threshold = LENGTH * 1.5
+    s_g_dis_threshold = LENGTH * 1.6
     start = np.zeros(4)
     end = np.zeros(4)
     while True:
@@ -79,12 +79,15 @@ def start_goal_gen(low, high, width, obs, obs_recs):
                         cf = False
                         break
             # add endpoint length constraint
-            if cf and np.linalg.norm(np.array([x2_goal,y2_goal])-np.array([x2_start,y2_start])) >= s_g_dis_threshold:
+            if cf:
                 break
         # need to be in different phase, i.e. at least one sign need to be different
+        if np.linalg.norm(np.array([x2_goal,y2_goal])-np.array([x2_start,y2_start])) < s_g_dis_threshold:
+            continue
         start_sign = np.array([x2_start, y2_start]) >= 0
         end_sign = np.array([x2_goal, y2_goal]) >= 0
         if start_sign[0] != end_sign[0] or start_sign[1] != end_sign[1]:
+            print('sg generated.')
             break
 
 

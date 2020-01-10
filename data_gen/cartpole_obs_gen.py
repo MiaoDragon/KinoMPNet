@@ -5,7 +5,8 @@ import numpy as np
 def obs_gen(N, N_obs, N_pc=1400, width=4):
     H = 0.5
     L = 2.5
-    near = width * 1.2
+    near = width * 1.5
+    obs_list = []
     for i in range(N):
         obs_single = []
         for j in range(N_obs):
@@ -15,14 +16,14 @@ def obs_gen(N, N_obs, N_pc=1400, width=4):
             make sure the obstacle does not block the pole entirely
             by making sure the fixed point of the pole is not in the obs
             hence the valid range for y axis is:
-            H + low_h ~ H - width/2, H + width/2 ~ H + high_h
+            H + low_h ~ - width/2, H + width/2 ~ H + high_h
             '''
             while True:
                 # first randomly see if it is left or right
                 side = np.random.randint(low=0, high=2)
                 # 0: left, 1: right
                 if side == 0:
-                    obs = np.random.uniform(low=[-20, H+low_h], high=[20, H-width/2])
+                    obs = np.random.uniform(low=[-20, H+low_h], high=[20, -width/2])
                 else:
                     obs = np.random.uniform(low=[-20, H+width/2], high=[20, H+high_h])
                 too_near = False

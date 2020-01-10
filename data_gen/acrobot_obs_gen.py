@@ -5,7 +5,8 @@ import numpy as np
 def obs_gen(N, N_obs, N_pc=1400, width=4):
     # generate one obs in each phase
     LENGTH = 20.
-    near = width * 1.2
+    near = LENGTH * 1.2
+    obs_list = []
     for i in range(N):
         obs_single = []
         for j in range(N_obs):
@@ -29,7 +30,7 @@ def obs_gen(N, N_obs, N_pc=1400, width=4):
                     # make sure it does not block (0,0)
                     alpha = np.random.uniform(low=0.8, high=1.)
                     obs_ = alpha * obs
-                    if np.abs(obs_).max() > LENGTH/2:
+                    if np.abs(obs_).max() > width/2:
                         obs = obs_
                         break
                 # see if it is cluttered enough by making sure obstacles can't be
@@ -52,3 +53,4 @@ def obs_gen(N, N_obs, N_pc=1400, width=4):
     obs_list = np.array(obs_list)
     # convert from obs to point cloud
     obc_list = rectangle_pcd(obs_list, width, N_pc)
+    return obs_list, obc_list
