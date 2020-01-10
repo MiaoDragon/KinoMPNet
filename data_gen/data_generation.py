@@ -3,6 +3,7 @@ using SST* to generate near-optimal paths in specified environment
 """
 import sys
 sys.path.append('deps/sparse_rrt')
+sys.path.append('..')
 import argparse
 from sparse_rrt import _sst_module
 from sparse_rrt.systems import standard_cpp_systems
@@ -13,9 +14,8 @@ from sparse_rrt.systems.acrobot import Acrobot, AcrobotDistance
 from sparse_rrt.systems.point import Point
 import os
 import gc
-from tools.pcd_generation import rectangle_pcd
 from multiprocessing import Process, Queue
-
+from data_gen import cartpole_obs_gen, acrobot_obs_gen, cartpole_sg_gen, acrobot_sg_gen
 
 
 def main(args):
@@ -42,7 +42,7 @@ def main(args):
         max_time_steps = 200
         integration_step = 0.002
     elif args.env_name == 'cartpole_obs':
-        env_constr = standard_cpp_systems.CartPoleObs
+        env_constr = standard_cpp_systems.RectangleObs
         # randomly generate obstacle location
         obs_list = []
         width = 4.
@@ -57,49 +57,36 @@ def main(args):
         integration_step = 0.002
         near = width * 1.2
         print('generating obs...')
-
-
-        for i in range(args.N):
-            obs_single = []
-            for j in range(args.N_obs):
-                low_h = - width/2 - L
-                high_h = width/2 + L
-                '''
-                make sure the obstacle does not block the pole entirely
-                by making sure the fixed point of the pole is not in the obs
-                hence the valid range for y axis is:
-                H + low_h ~ H - width/2, H + width/2 ~ H + high_h
-                '''
-                while True:
-                    # first randomly see if it is left or right
-                    side = np.random.randint(low=0, high=2)
-                    # 0: left, 1: right
-                    if side == 0:
-                        obs = np.random.uniform(low=[-20, H+low_h], high=[20, H-width/2])
-                    else:
-                        obs = np.random.uniform(low=[-20, H+width/2], high=[20, H+high_h])
-                    too_near = False
-                    for k in range(len(obs_single)):
-                        if np.linalg.norm(obs-obs_single[k]) < near:
-                            too_near = True
-                            break
-                    if not too_near:
-                        break
-
-                obs_single.append(obs)
-            obs_single = np.array(obs_single)
-            obs_list.append(obs_single)
-        obs_list = np.array(obs_list)
-        # convert from obs to point cloud
-        obc_list = rectangle_pcd(obs_list, width, 1400)
-
+        obs_list, obc_list = cartpole_obs_gen.obs_gen(args.N, args.N_obs, N_pc=1400, width=width)
         ## TODO: add other env
         # store the obstacles and obc first
         file = open(args.obs_file, 'wb')
         pickle.dump(obs_list, file)
         file = open(args.obc_file, 'wb')
         pickle.dump(obc_list, file)
-
+    elif args.env_name == 'acrobot_obs':
+        env_constr = standard_cpp_systems.RectangleObs
+        # randomly generate obstacle location
+        obs_list = []
+        LENGTH = 20.
+        width = 4.
+        near = width * 1.2
+        s_g_dis_threshold = LENGTH * 1.5
+        goal_radius=2.0
+        random_seed=0
+        sst_delta_near=1.0
+        sst_delta_drain=0.5
+        min_time_steps = 5
+        max_time_steps = 20
+        integration_step = 0.02
+        print('generating obs...')
+        obs_list, obc_list = acrobot_obs_gen.obs_gen(args.N, args.N_obs, N_pc=1400, width=width)
+        ## TODO: add other env
+        # store the obstacles and obc first
+        file = open(args.obs_file, 'wb')
+        pickle.dump(obs_list, file)
+        file = open(args.obc_file, 'wb')
+        pickle.dump(obc_list, file)
 
     ####################################################################################
     def plan_one_path_bvp(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
@@ -176,10 +163,11 @@ def main(args):
         for iter in range(args.max_iter):
             planner.step(env, min_time_steps, max_time_steps, integration_step)
             #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
-            solution = planner.get_solution()
+            #solution = planner.get_solution()
             # don't break the searching to find better solutions
             #if solution is not None:
             #    break
+        solution = planner.get_solution()
         plan_time = time.time() - time0
         if solution is None:
             out_queue.put(0)
@@ -213,7 +201,20 @@ def main(args):
         elif args.env_name == 'cartpole':
             env = env_constr()
         elif args.env_name == 'cartpole_obs':
-            env = env_constr(obs_list[i], width)
+            env = env_constr(obs_list[i], width, 'cartpole')
+        elif args.env_name == 'acrobot_obs':
+            env = env_constr(obs_list[i], width, 'acrobot')
+        # generate rec representation of obs
+        obs_recs = []
+        for k in range(len(obs_list[i])):
+            # for each obs setting
+            obs_rec = []
+            for j in range(len(obs_list[i])):
+                obs_rec.append([[obs_list[i][k][j][0]-width/2,obs_list[i][k][j][1]-width/2],
+                                [obs_list[i][k][j][0]-width/2,obs_list[i][k][j][1]+width/2],
+                                [obs_list[i][k][j][0]+width/2,obs_list[i][k][j][1]+width/2],
+                                [obs_list[i][k][j][0]+width/2,obs_list[i][k][j][1]-width/2]])
+            obs_recs.append(obs_rec)
 
         state_bounds = env.get_state_bounds()
         low = []
@@ -227,25 +228,26 @@ def main(args):
         costs = []
         times = []
         suc_n = 0
+
         for j in range(args.NP):
             while True:
                 # randomly sample collision-free start and goal
-                start = np.random.uniform(low=low, high=high)
-                end = np.random.uniform(low=low, high=high)
+                #start = np.random.uniform(low=low, high=high)
+                #end = np.random.uniform(low=low, high=high)
+
+
                 # set the velocity terms to zero
                 if args.env_name == 'pendulum':
                     #start[1] = 0.
+                    start = np.random.uniform(low=low, high=high)
+                    end = np.random.uniform(low=low, high=high)
                     end[1] = 0.
-                if args.env_name == 'cartpole':
-                    start[1] = 0.
-                    start[3] = 0.
-                    end[1] = 0.
-                    end[3] = 0.
+                elif args.env_name == 'cartpole':
+                    start, end = cartpole_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
                 elif args.env_name == 'cartpole_obs':
-                    start[1] = 0.
-                    start[3] = 0.
-                    end[1] = 0.
-                    end[3] = 0.
+                    start, end = cartpole_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
+                elif args.env_name == 'acrobot_obs':
+                    start, end = acrobot_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
                 dir = args.path_folder+str(i)+'/'
                 if not os.path.exists(dir):
                     os.makedirs(dir)
