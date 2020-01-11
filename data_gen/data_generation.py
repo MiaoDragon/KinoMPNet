@@ -71,15 +71,18 @@ def main(args):
         # randomly generate obstacle location
         obs_list = []
         LENGTH = 20.
-        width = 4.
+        width = 6.
         near = width * 1.2
         s_g_dis_threshold = LENGTH * 1.5
         goal_radius=2.0
         random_seed=0
         sst_delta_near=1.0
         sst_delta_drain=0.5
+        #min_time_steps = 10
+        #max_time_steps = 200
+        #integration_step = 0.002
         min_time_steps = 5
-        max_time_steps = 20
+        max_time_steps = 100
         integration_step = 0.02
         print('generating obs...')
         obs_list, obc_list = acrobot_obs_gen.obs_gen(args.N, args.N_obs, N_pc=1400, width=width)

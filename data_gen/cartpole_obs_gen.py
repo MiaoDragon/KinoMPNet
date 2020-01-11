@@ -5,13 +5,17 @@ import numpy as np
 def obs_gen(N, N_obs, N_pc=1400, width=4):
     H = 0.5
     L = 2.5
-    near = width * 1.5
+    low_h = - width/2 - L
+    high_h = width/2 + L
+    # predefined y values
+    y_up = H + width/2 + L/4
+    y_down = H - width/2 - L/4
+    near = width * 1.2
     obs_list = []
     for i in range(N):
         obs_single = []
         for j in range(N_obs):
-            low_h = - width/2 - L
-            high_h = width/2 + L
+
             '''
             make sure the obstacle does not block the pole entirely
             by making sure the fixed point of the pole is not in the obs
@@ -23,9 +27,11 @@ def obs_gen(N, N_obs, N_pc=1400, width=4):
                 side = np.random.randint(low=0, high=2)
                 # 0: left, 1: right
                 if side == 0:
-                    obs = np.random.uniform(low=[-20, H+low_h], high=[20, -width/2])
+                    #obs = np.random.uniform(low=[-15, H+low_h], high=[15, -width/2])
+                    obs = np.random.uniform(low=[-17, y_down], high=[17, y_down])
                 else:
-                    obs = np.random.uniform(low=[-20, H+width/2], high=[20, H+high_h])
+                    #obs = np.random.uniform(low=[-15, H+width/2], high=[15, H+high_h])
+                    obs = np.random.uniform(low=[-17, y_up], high=[17, y_up])
                 too_near = False
                 for k in range(len(obs_single)):
                     if np.linalg.norm(obs-obs_single[k]) < near:

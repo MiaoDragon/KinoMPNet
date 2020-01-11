@@ -7,6 +7,8 @@ def start_goal_gen(low, high, width, obs, obs_recs):
     width = 4.
     H = 0.5
     L = 2.5
+
+
     while True:
         start = np.random.uniform(low=low, high=high)
         # set the position to be within smaller bound
@@ -39,7 +41,7 @@ def start_goal_gen(low, high, width, obs, obs_recs):
                         break
             if cf:
                 break
-        if np.abs(start[0] - end[0]) >= width*2:
+        if np.abs(start[0] - end[0]) >= width*6:
             break
     start[1] = 0.
     start[3] = 0.

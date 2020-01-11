@@ -7,6 +7,7 @@ def obs_gen(N, N_obs, N_pc=1400, width=4):
     LENGTH = 20.
     near = LENGTH * 1.2
     obs_list = []
+    bottom_threshold = width / 10
     for i in range(N):
         obs_single = []
         for j in range(N_obs):
@@ -30,6 +31,12 @@ def obs_gen(N, N_obs, N_pc=1400, width=4):
                     # make sure it does not block (0,0)
                     alpha = np.random.uniform(low=0.8, high=1.)
                     obs_ = alpha * obs
+                    # make sure that when the obstacle is below x-axis, it does not intersect with the pole
+                    if j % 4 == 1:
+                        obs_[0] = min(obs_[0], -width/2-bottom_threshold)
+                    if j % 4 == 2:
+                        obs_[0] = max(obs_[0], width/2+bottom_threshold)
+
                     if np.abs(obs_).max() > width/2:
                         obs = obs_
                         break
