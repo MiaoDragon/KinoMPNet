@@ -26,7 +26,7 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
             obs = pickle.load(file)
             file = open(data_folder+'obc_%d.pkl' % (i), 'rb')
             obc = pickle.load(file)
-            obc = pointcloud_to_voxel(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
+            obc = pcd_to_voxel2d(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
             obs_list.append(obs)
             obc_list.append(obc)
     dataset = []
