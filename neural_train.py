@@ -73,7 +73,7 @@ def main(args):
     # load train and test data
     print('loading...')
     obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
-                                                                        data_folder=args.path_folder,
+                                                                        data_folder=args.path_folder, obs_f=True,
                                                                         direction=args.direction)
     # randomize the dataset before training
     data=list(zip(dataset,targets,env_indices))

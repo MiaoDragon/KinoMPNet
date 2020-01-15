@@ -3,7 +3,7 @@ This implements data loader for both training and testing procedures.
 """
 import pickle
 import numpy as np
-def load_train_dataset(N, NP, data_folder, direction=0):
+def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
