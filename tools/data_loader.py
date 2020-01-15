@@ -84,7 +84,7 @@ def load_test_dataset(N, NP, data_folder, s=0, sp=0):
             obs = pickle.load(file)
             file = open(data_folder+'obc_%d.pkl' % (i), 'rb')
             obc = pickle.load(file)
-            obc = pointcloud_to_voxel(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
+            obc = pcd_to_voxel2d(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
             obs_list.append(obs)
             obc_list.append(obc)
     path_env = []
@@ -109,7 +109,7 @@ def load_test_dataset(N, NP, data_folder, s=0, sp=0):
 
 
 def pcd_to_voxel2d(points, voxel_size=(24, 24), padding_size=(32, 32)):
-    voxels = [voxelize(points[i], voxel_size, padding_size) for i in range(len(points))]
+    voxels = [voxelize2d(points[i], voxel_size, padding_size) for i in range(len(points))]
     # return size: BxV*V*V
     return np.array(voxels)
 
