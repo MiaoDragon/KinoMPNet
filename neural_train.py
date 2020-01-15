@@ -4,7 +4,7 @@ to generate random samples, that will guide the SST algorithm.
 """
 import torch
 import model.AE.identity as cae_identity
-#from model.mlp import MLP
+from model.mlp import MLP
 from model import mlp_acrobot
 from model.AE import CAE_acrobot_voxel_2d
 from model.mpnet import KMPNet
