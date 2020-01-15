@@ -49,9 +49,10 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
             cost_file = dir+'cost_%d' %(j) + ".pkl"
             time_file = dir+'time_%d' %(j) + ".pkl"
             file = open(path_file)
-            p = pickle._Unpickler(file)
-            p.encoding = 'latin1'
-            p = p.load()
+            p = pickle.load(file, encoding='latin1')
+            #p = pickle._Unpickler(file)
+            #p.encoding = 'latin1'
+            #p = p.load()
             if direction == 1:
                 # backward
                 p = np.flip(p, axis=0)
