@@ -3,7 +3,7 @@ This implements data loader for both training and testing procedures.
 """
 import pickle
 import numpy as np
-def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None, direction=0):
+def load_train_dataset(N, NP, data_folder, direction=0):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -16,12 +16,19 @@ def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None, direction=0):
     if obs_f is None:
         obs = None
         obc = None
+        obs_list = None
+        obc_list = None
     else:
-        file = open(obs_f, 'rb')
-        obs = pickle.load(file)
-        file = open(obc_f, 'rb')
-        obc = pickle.load(file)
-        obc = pointcloud_to_voxel(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
+        obs_list = []
+        obc_list = []
+        for i in range(N):
+            file = open(data_folder+'obs_%d.pkl' % (i), 'rb')
+            obs = pickle.load(file)
+            file = open(data_folder+'obc_%d.pkl' % (i), 'rb')
+            obc = pickle.load(file)
+            obc = pointcloud_to_voxel(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
+            obs_list.append(obs)
+            obc_list.append(obc)
     dataset = []
     targets = []
     env_indices = []
@@ -29,7 +36,7 @@ def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None, direction=0):
 
     for i in range(N):
         for j in range(NP):
-            dir = p_folder+str(i)+'/'
+            dir = data_folder+str(i)+'/'
             path_file = dir+'path_%d' %(j) + ".pkl"
             control_file = dir+'control_%d' %(j) + ".pkl"
             cost_file = dir+'cost_%d' %(j) + ".pkl"
@@ -49,7 +56,7 @@ def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None, direction=0):
     #dataset = np.array(dataset)
     #targets = np.array(targets)
     #env_indices = np.array(env_indices)
-    return obs, dataset, targets, env_indices
+    return obc_list, dataset, targets, env_indices
 
 
 #def load_test_dataset(N, NP, folder):
@@ -57,7 +64,7 @@ def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None, direction=0):
 
 
 
-def load_test_dataset(N, NP, p_folder, s=0, sp=0, obs_f=None, obc_f=None):
+def load_test_dataset(N, NP, data_folder, s=0, sp=0):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -70,17 +77,23 @@ def load_test_dataset(N, NP, p_folder, s=0, sp=0, obs_f=None, obc_f=None):
         obs = None
         obc = None
     else:
-        file = open(obs_f, 'rb')
-        obs = pickle.load(file)
-        file = open(obc_f, 'rb')
-        obc = pickle.load(file)
+        obs_list = []
+        obc_list = []
+        for i in range(N):
+            file = open(data_folder+'obs_%d.pkl' % (i), 'rb')
+            obs = pickle.load(file)
+            file = open(data_folder+'obc_%d.pkl' % (i), 'rb')
+            obc = pickle.load(file)
+            obc = pointcloud_to_voxel(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
+            obs_list.append(obs)
+            obc_list.append(obc)
     path_env = []
     path_length_env = []
     for i in range(s,N+s):
         paths = []
         path_lengths = []
         for j in range(sp,NP+sp):
-            dir = p_folder+str(i)+'/'
+            dir = data_folder+str(i)+'/'
             path_file = dir+'path_%d' %(j) + ".pkl"
             control_file = dir+'control_%d' %(j) + ".pkl"
             cost_file = dir+'cost_%d' %(j) + ".pkl"
