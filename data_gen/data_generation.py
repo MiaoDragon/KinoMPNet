@@ -252,7 +252,7 @@ def main(args):
                     start, end = cartpole_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
                 elif args.env_name == 'acrobot_obs':
                     start, end = acrobot_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
-                dir = args.path_folder+str(i)+'/'
+                dir = args.path_folder+str(i+args.s)+'/'
                 if not os.path.exists(dir):
                     os.makedirs(dir)
                 path_file = dir+args.path_file+'_%d'%(j+args.sp) + ".pkl"
