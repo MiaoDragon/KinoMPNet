@@ -3,13 +3,14 @@ This implements data loader for both training and testing procedures.
 """
 import pickle
 import numpy as np
-def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None):
+def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None, direction=0):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
     ## TODO: add different folders for obstacle information and path
     # transform paths into dataset and targets
     # (xt, xT), x_{t+1}
+    # direction: 0 -- forward;  1 -- backward
 
     # load obs and obc (obc: obstacle point cloud)
     if obs_f is None:
@@ -34,6 +35,9 @@ def load_train_dataset(N, NP, p_folder, obs_f=None, obc_f=None):
             time_file = dir+'time_%d' %(j) + ".pkl"
             file = open(path_file)
             p = pickle.load(file)
+            if direction == 1:
+                # backward
+                p = np.flip(p, axis=0)
             for k in range(len(p)-1):
                 for l in range(k+1, len(p)):
                     dataset.append(np.concatenate([p[k], p[l]]))

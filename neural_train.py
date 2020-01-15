@@ -4,36 +4,27 @@ to generate random samples, that will guide the SST algorithm.
 """
 import torch
 import model.AE.identity as cae_identity
-from model.mlp import MLP
+#from model.mlp import MLP
+from model import mlp_acrobot
+from model.AE import CAE_acrobot_voxel_2d
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
-from plan_utility import cart_pole, cart_pole_obs, pendulum
+from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs
 import argparse
 import numpy as np
 import random
 import os
-import matplotlib.pyplot as plt
-#plt.ion()
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.set_autoscale_on(True)
 
-#hl, = ax.plot([], [])
-
-def update_line(h, ax, new_data):
-    h.set_xdata(np.append(h.get_xdata(), new_data[0]))
-    h.set_ydata(np.append(h.get_ydata(), new_data[1]))
-    ax.relim()
-    ax.autoscale_view()
-    fig.canvas.draw()
-    fig.canvas.flush_events()
+from tensorboardX import SummaryWriter
 
 def main(args):
     #global hl
     if torch.cuda.is_available():
         torch.cuda.set_device(args.device)
     # environment setting
+    cae = cae_identity
+    mlp = MLP
     if args.env_type == 'pendulum':
         normalize = pendulum.normalize
         unnormalize = pendulum.unnormalize
@@ -49,14 +40,20 @@ def main(args):
         unnormalize = cart_pole_obs.unnormalize
         obs_file = args.obs_file
         obc_file = args.obc_file
+    elif args.env_type == 'acrobot_obs':
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        obs_file = args.obs_file
+        obc_file = args.obc_file
+        mlp = mlp_acrobot.MLP
+        cae = CAE_acrobot_voxel_2d
 
-    cae = cae_identity
-    mlp = MLP
+
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
     # load net
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
         load_net_state(mpnet, os.path.join(args.model_path, model_path))
@@ -70,8 +67,14 @@ def main(args):
         mpnet.cuda()
         mpnet.mlp.cuda()
         mpnet.encoder.cuda()
-        # here we use Adagrad because previous MPNet performs well under it
-        mpnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+        if args.opt == 'Adagrad':
+            mpNet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+        elif args.opt == 'Adam':
+            mpNet.set_opt(torch.optim.Adam, lr=args.learning_rate)
+        elif args.opt == 'SGD':
+            mpNet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
+        elif args.opt == 'ASGD':
+            mpNet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
     if args.start_epoch > 0:
         load_opt_state(mpnet, os.path.join(args.model_path, model_path))
 
@@ -79,7 +82,7 @@ def main(args):
     print('loading...')
     obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
                                                                         p_folder=args.path_folder,
-                                                                        obs_f=obs_file, obc_f=obc_file)
+                                                                        obs_f=obs_file, obc_f=obc_file, direction=arg.direction)
     # randomize the dataset before training
     data=list(zip(dataset,targets,env_indices))
     random.shuffle(data)
@@ -103,6 +106,9 @@ def main(args):
 
     # Train the Models
     print('training...')
+    writer_fname = 'cont_%s_%f_%s_direction_%d' % (args.env_type, args.learning_rate, args.opt, args.direction)
+    writer = SummaryWriter('./runs/'+writer_fname)
+    record_i = 0
     train_losses = []
     val_losses = []
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
@@ -137,6 +143,8 @@ def main(args):
             print(mpnet.loss(mpnet(bi, bobs), bt))
             loss = mpnet.loss(mpnet(bi, bobs), bt)
             #update_line(hl, ax, [i//args.batch_size, loss.data.numpy()])
+            record_i += 1
+            writer.add_scalar('train_loss', loss.data, record_i)
             train_losses.append(loss.data.numpy())
 
             # validation
@@ -165,24 +173,16 @@ def main(args):
                 bobs = to_var(bobs)
             loss = mpnet.loss(mpnet(bi, bobs), bt)
             print('validation loss: %f' % (loss.data))
-
+            writer.add_scalar('val_loss', loss.data, val_record_i)
             #update_line(hl, ax, [i//args.batch_size, loss.data.numpy()])
             val_losses.append(loss.data.numpy())
 
         # Save the models
         if epoch > 0:
-            model_path='kmpnet_epoch_%d.pkl' %(epoch)
+            model_path='kmpnet_epoch_%d_direction_%d.pkl' %(epoch, args.direction)
             save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
-            # test
-            plt.clf()
-            plt.plot(list(range(len(train_losses))), train_losses)
-            plt.savefig('train_loss_epoch_%d.png' % (epoch))
-            plt.clf()
-            plt.plot(list(range(len(val_losses))), val_losses)
-            plt.savefig('val_loss_epoch_%d.png' % (epoch))
-            train_losses = []
-            val_losses = []
-
+    writer.export_scalars_to_json("./all_scalars.json")
+    writer.close()
 parser = argparse.ArgumentParser()
 # for training
 parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
@@ -210,6 +210,8 @@ parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
 parser.add_argument('--start_epoch', type=int, default=0)
 parser.add_argument('--env_type', type=str, default='cartpole', help='environment')
 parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')
+parser.add_argument('--opt', type=str, default='Adagrad')
+parser.add_argument('--direction', type=int, default=0, help='0: forward, 1: backward')
 #parser.add_argument('--opt', type=str, default='Adagrad')
 args = parser.parse_args()
 print(args)
