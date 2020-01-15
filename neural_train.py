@@ -68,13 +68,13 @@ def main(args):
         mpnet.mlp.cuda()
         mpnet.encoder.cuda()
         if args.opt == 'Adagrad':
-            mpNet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+            mpnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
         elif args.opt == 'Adam':
-            mpNet.set_opt(torch.optim.Adam, lr=args.learning_rate)
+            mpnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
         elif args.opt == 'SGD':
-            mpNet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
+            mpnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
         elif args.opt == 'ASGD':
-            mpNet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
+            mpnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
     if args.start_epoch > 0:
         load_opt_state(mpnet, os.path.join(args.model_path, model_path))
 
