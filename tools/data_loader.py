@@ -24,9 +24,15 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
         obc_list = []
         for i in range(N):
             file = open(data_folder+'obs_%d.pkl' % (i), 'rb')
-            obs = pickle.load(file)
+            p = pickle._Unpickler(f)
+            p.encoding = 'latin1'
+            obs = p.load()
+            #obs = pickle.load(file)
             file = open(data_folder+'obc_%d.pkl' % (i), 'rb')
-            obc = pickle.load(file)
+            #obc = pickle.load(file)
+            p = pickle._Unpickler(f)
+            p.encoding = 'latin1'
+            obc = p.load()
             obc = pcd_to_voxel2d(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
             obs_list.append(obs)
             obc_list.append(obc)
@@ -43,7 +49,9 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
             cost_file = dir+'cost_%d' %(j) + ".pkl"
             time_file = dir+'time_%d' %(j) + ".pkl"
             file = open(path_file)
-            p = pickle.load(file)
+            p = pickle._Unpickler(f)
+            p.encoding = 'latin1'
+            p = p.load()
             if direction == 1:
                 # backward
                 p = np.flip(p, axis=0)
