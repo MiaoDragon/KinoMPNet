@@ -7,16 +7,31 @@ import pickle
 from torch.autograd import Variable
 import math
 import time
-from plan_general import *
+from plan_utility.plan_general import *
 
 import matplotlib.pyplot as plt
 fig = plt.figure()
 
-def eval_tasks(mpNet, bvp_solver, test_data, filename, IsInCollision, normalize_func = lambda x:x, unnormalize_func=lambda x: x, time_flag=False):
+
+def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None):
+    # data_type: seen or unseen
     obc, obs, paths, path_lengths = test_data
     if obs is not None:
-        obs = obs.astype(np.float32)
-        obs = torch.from_numpy(obs)
+        obc = obc.astype(np.float32)
+        obc = torch.from_numpy(obc)
+    if torch.cuda.is_available():
+        obc = obc.cuda()
+    def informer(env, x0, xG, direction):
+        if direction == 0:
+            x = torch.cat([x0,xG], dim=0)
+        else:
+            x = torch.cat([xG,x0], dim=0)
+        if torch.cuda.is_available():
+            x = x.cuda()   
+        res = mpNet(x, env).cpu().data.numpy()
+        res = Node(res)
+        return res
+    
     fes_env = []   # list of list
     valid_env = []
     time_env = []
@@ -27,6 +42,18 @@ def eval_tasks(mpNet, bvp_solver, test_data, filename, IsInCollision, normalize_
         valid_path = []      # if the feasibility is valid or not
         # save paths to different files, indicated by i
         # feasible paths for each env
+        if env_type == 'pendulum':
+            system = standard_cpp_systems.PSOPTPendulum()
+            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)            
+        elif env_type == 'cartpole_obs':
+            system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)            
+        elif env_type == 'acrobot_obs':
+            system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)            
         for j in range(len(paths[0])):
             time0 = time.time()
             time_norm = 0.
@@ -47,9 +74,12 @@ def eval_tasks(mpNet, bvp_solver, test_data, filename, IsInCollision, normalize_
                 path = [paths[i][j][0], paths[i][j][path_lengths[i][j]-1]]
                 # plot the entire path
                 plt.plot(paths[i][j][:,0], paths[i][j][:,1])
-
-
-
+                
+                start = Node(path[0])
+                goal = Node(path[-1])
+                goal.S0 = np.identity(2)
+                goal.rho0 = 1.0    # change this later
+                
                 control = []
                 time_step = []
                 step_sz = DEFAULT_STEP
@@ -61,19 +91,9 @@ def eval_tasks(mpNet, bvp_solver, test_data, filename, IsInCollision, normalize_
                     obs_i = obs[i]
                     obc_i = obc[i]
                 for t in range(MAX_NEURAL_REPLAN):
-                # adaptive step size on replanning attempts
-                    if (t == 2):
-                        step_sz = 1.2
-                    elif (t == 3):
-                        step_sz = 0.5
-                    elif (t > 3):
-                        step_sz = 0.1
-                    if time_flag:
-                        res, path, control, time_step, time_norm = neural_replan(mpNet, bvp_solver, path, control, time_step, obc_i, obs_i, IsInCollision, \
-                                            normalize_func, unnormalize_func, t==0, step_sz=step_sz, time_flag=time_flag)
-                    else:
-                        res, path, control, time_step = neural_replan(mpNet, bvp_solver, path, control, time_step, obc_i, obs_i, IsInCollision, \
-                                            normalize_func, unnormalize_func, t==0, step_sz=step_sz, time_flag=time_flag)
+                    # adaptive step size on replanning attempts
+                    res, path_list = plan(obc[i], start, goal, informer, dynamics, \
+                               enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000)
                     #print('after neural replan:')
                     #print(path)
                     #path = lvc(path, obc[i], IsInCollision, step_sz=step_sz)
@@ -94,12 +114,12 @@ def eval_tasks(mpNet, bvp_solver, test_data, filename, IsInCollision, normalize_
                 time_path.append(time1)
                 print('test time: %f' % (time1))
                 # write the path
-                print('planned path:')
-                print(path)
-                path = np.array(path)
-                np.savetxt('results/path_%d.txt' % (j), path)
-                np.savetxt('results/control_%d.txt' % (j), np.array(control))
-                np.savetxt('results/timestep_%d.txt' % (j), np.array(time_step))
+                #print('planned path:')
+                #print(path)
+                #path = np.array(path)
+                #np.savetxt('results/path_%d.txt' % (j), path)
+                #np.savetxt('results/control_%d.txt' % (j), np.array(control))
+                #np.savetxt('results/timestep_%d.txt' % (j), np.array(time_step))
 
             fes_path.append(fp)
 
@@ -109,7 +129,7 @@ def eval_tasks(mpNet, bvp_solver, test_data, filename, IsInCollision, normalize_
         fes_env.append(fes_path)
         valid_env.append(valid_path)
         print('accuracy up to now: %f' % (float(np.sum(fes_env)) / np.sum(valid_env)))
-    if filename is not None:
-        pickle.dump(time_env, open(filename, "wb" ))
+        time_path = save_dir + 'mpnet_%s_time.pkl' % (data_type)
+        pickle.dump(time_env, open(time_path, "wb" ))
         #print(fp/tp)
     return np.array(fes_env), np.array(valid_env)

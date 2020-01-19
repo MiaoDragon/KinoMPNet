@@ -13,6 +13,8 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
     target_reached=0
     tree=0
     time_norm = 0.
+    start = x0
+    goal = xG
     while target_reached==0 and itr<MAX_LENGTH:
         itr=itr+1  # prevent the path from being too long
         print('iter: %d' % (itr))
@@ -66,6 +68,7 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
         # version one: only check endpoint
         #target_reached = nearby(x0, xG)  # check the funnel if can connect
         # version two: new node in start tree: check all goal tree, and otherwise conversely
+            
     if target_reached:
         # it is near enough, so we connect in the node data structure from x0 to xG, although the endpoint of x0.edge
         # in state is still xG_
@@ -83,4 +86,16 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
     else:
         x0.next = None
         x0.edge = None
-    return target_reached
+
+    # construct a list of the path
+    path_list = []
+    node = start
+    while node is not None:
+        path_list.append(node.x)
+        node = node.next
+    if not target_reached:
+        # xG is the first in the goal tree
+        while xG is not None:
+            path_list.append(xG.x)
+            xG = xG.next
+    return target_reached, path_list

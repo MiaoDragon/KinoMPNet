@@ -35,7 +35,7 @@ from plan_utility import pendulum
 from sparse_rrt.systems import standard_cpp_systems
 from sparse_rrt import _sst_module
 from tools import data_loader
-
+import jax
 
 def main(args):
     # set seed
@@ -59,6 +59,7 @@ def main(args):
         obc_file = None
         dynamics = pendulum.dynamics
         jax_dynamics = pendulum.jax_dynamics
+        enforce_bounds = pendulum.enforce_bounds
         cae = cae_identity
         mlp = MLP
         obs_f = False
@@ -72,6 +73,7 @@ def main(args):
         obc_file = None
         dynamics = cartpole.dynamics
         jax_dynamics = cartpole.jax_dynamics
+        enforce_bounds = cartpole.enforce_bounds
         cae = CAE_acrobot_voxel_2d
         mlp = mlp_acrobot.MLP
         obs_f = True
@@ -85,13 +87,15 @@ def main(args):
         obc_file = None
         dynamics = acrobot.dynamics
         jax_dynamics = acrobot.jax_dynamics
+        enforce_bounds = acrobot.enforce_bounds
         cae = CAE_acrobot_voxel_2d
         mlp = mlp_acrobot.MLP
         obs_f = True
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
 
-                
+    jac_A = jax.jacfwd(jax_dynamics, argnums=0)
+    jac_B = jax.jacfwd(jax_dynamics, argnums=1)                
     mpNet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
     # load previously trained model if start epoch > 0
@@ -139,15 +143,14 @@ def main(args):
         # seen
         if args.seen_N > 0:
             time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
-            
-            fes_path_, valid_path_ = eval_tasks(mpNet, bvp_solver, seen_test_data, time_file, IsInCollision, normalize_func, unnormalize_func, True)
+            fes_path_, valid_path_ = eval_tasks(mpNet, env_name, seen_test_data, args.model_path, 'seen', IsInCollision, normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             seen_test_suc_rate += fes_path.sum() / valid_path.sum()
         # unseen
         if args.unseen_N > 0:
             time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet, bvp_solver, unseen_test_data, time_file, IsInCollision, normalize_func, unnormalize_func, True)
+            fes_path_, valid_path_ = eval_tasks(mpNet, env_name, unseen_test_data, args.model_path, 'unseen', IsInCollision, normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             unseen_test_suc_rate += fes_path.sum() / valid_path.sum()
@@ -184,7 +187,6 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=int, default=0, help='cuda device')
     parser.add_argument('--path_folder', type=str, default='./data/pendulum/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
-    parser.add_argument('--obs_width', type=float, default=4.0)
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
     parser.add_argument('--start_epoch', type=int, default=9)
     parser.add_argument('--env_type', type=str, default='pendulum', help='s2d for simple 2d, c2d for complex 2d')
