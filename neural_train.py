@@ -45,11 +45,15 @@ def main(args):
                    cae, mlp)
     # load net
     # load previously trained model if start epoch > 0
+    model_dir = args.model_dir
+    model_dir = model_dir+args.env_type+"_lr%f_%s/" % (args.learning_rate, args.opt)
     model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
-        load_net_state(mpnet, os.path.join(args.model_path, model_path))
-        torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
+        #load_net_state(mpnet, os.path.join(args.model_path, model_path))
+        load_net_state(mpnet, os.path.join(model_dir, model_path))
+        #torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
+        torch_seed, np_seed, py_seed = load_seed(model_dir, model_path))
         # set seed after loading
         torch.manual_seed(torch_seed)
         np.random.seed(np_seed)
@@ -68,7 +72,8 @@ def main(args):
         elif args.opt == 'ASGD':
             mpnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
     if args.start_epoch > 0:
-        load_opt_state(mpnet, os.path.join(args.model_path, model_path))
+        #load_opt_state(mpnet, os.path.join(args.model_path, model_path))
+        load_opt_state(mpnet, os.path.join(model_dir, model_path))
 
     # load train and test data
     print('loading...')
@@ -101,6 +106,7 @@ def main(args):
     writer_fname = 'cont_%s_%f_%s_direction_%d' % (args.env_type, args.learning_rate, args.opt, args.direction)
     writer = SummaryWriter('./runs/'+writer_fname)
     record_i = 0
+    val_record_i = 0
     train_losses = []
     val_losses = []
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
@@ -125,7 +131,7 @@ def main(args):
             if obs is None:
                 bobs = None
             else:
-                bobs = obs[env_indices_i, :args.AE_input_size].astype(np.float32)
+                bobs = obs[env_indices_i].astype(np.float32)
                 bobs = torch.FloatTensor(bobs)
                 bobs = to_var(bobs)
             print('before training losses:')
@@ -135,9 +141,9 @@ def main(args):
             print(mpnet.loss(mpnet(bi, bobs), bt))
             loss = mpnet.loss(mpnet(bi, bobs), bt)
             #update_line(hl, ax, [i//args.batch_size, loss.data.numpy()])
+            writer.add_scalar('train_loss', loss.cpu().data, record_i)
             record_i += 1
-            writer.add_scalar('train_loss', loss.data, record_i)
-            train_losses.append(loss.data.numpy())
+            train_losses.append(loss.cpu().data.numpy())
 
             # validation
             # calculate the corresponding batch in val_dataset
@@ -160,24 +166,27 @@ def main(args):
             if obs is None:
                 bobs = None
             else:
-                bobs = obs[env_indices_i, :args.AE_input_size].astype(np.float32)
+                bobs = obs[env_indices_i].astype(np.float32)
                 bobs = torch.FloatTensor(bobs)
                 bobs = to_var(bobs)
             loss = mpnet.loss(mpnet(bi, bobs), bt)
-            print('validation loss: %f' % (loss.data))
-            writer.add_scalar('val_loss', loss.data, val_record_i)
+            print('validation loss: %f' % (loss.cpu().data))
+            writer.add_scalar('val_loss', loss.cpu().data, val_record_i)
+            val_record_i += 1
             #update_line(hl, ax, [i//args.batch_size, loss.data.numpy()])
-            val_losses.append(loss.data.numpy())
+            val_losses.append(loss.cpu().data.numpy())
 
         # Save the models
         if epoch > 0:
             model_path='kmpnet_epoch_%d_direction_%d.pkl' %(epoch, args.direction)
-            save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
+            #save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
+            save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(model_dir,model_path))
     writer.export_scalars_to_json("./all_scalars.json")
     writer.close()
 parser = argparse.ArgumentParser()
 # for training
 parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
+parser.add_argument('--model_dir', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/',help='path for saving trained models')
 parser.add_argument('--no_env', type=int, default=100,help='directory for obstacle images')
 parser.add_argument('--no_motion_paths', type=int,default=4000,help='number of optimal paths in each environment')
 parser.add_argument('--no_val_paths', type=int,default=50,help='number of optimal paths in each environment')

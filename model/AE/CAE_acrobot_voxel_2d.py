@@ -39,7 +39,7 @@ class Encoder(nn.Module):
         #x1, x2, x3 = self.encoder1(x1),self.encoder2(x2),self.encoder3(x3)
         #x1, x2, x3 = x1.view(x1.size(0), -1), x2.view(x2.size(0), -1), x3.view(x3.size(0), -1)
         x = self.encoder(x)
-        x = self.view(x.size(0), -1)
+        x = x.view(x.size(0), -1)
         # cat x1 x2 x3 into x
         #x = torch.cat([x1, x2, x3], dim=1)
         x = self.head(x)

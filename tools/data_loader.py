@@ -33,9 +33,13 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
             obc = p.load()
-            obc = pcd_to_voxel2d(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
+            # concatenate on the first direction (each obs has a different index)            
+            obc = obc.reshape(-1, 2)
             obs_list.append(obs)
             obc_list.append(obc)
+    obc_list = np.array(obc_list)
+    obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
+
     dataset = []
     targets = []
     env_indices = []
@@ -63,9 +67,11 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
                     env_indices.append(i)
     ## TODO: print out intermediate results to visualize
 
-    #dataset = np.array(dataset)
-    #targets = np.array(targets)
-    #env_indices = np.array(env_indices)
+    dataset = np.array(dataset)
+    targets = np.array(targets)
+    env_indices = np.array(env_indices)
+    obs_list = np.array(obs_list)
+    obc_list = np.array(obc_list)
     return obc_list, dataset, targets, env_indices
 
 
@@ -74,7 +80,7 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
 
 
 
-def load_test_dataset(N, NP, data_folder, s=0, sp=0):
+def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -91,12 +97,22 @@ def load_test_dataset(N, NP, data_folder, s=0, sp=0):
         obc_list = []
         for i in range(N):
             file = open(data_folder+'obs_%d.pkl' % (i), 'rb')
-            obs = pickle.load(file)
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            obs = p.load()
+            #obs = pickle.load(file)
             file = open(data_folder+'obc_%d.pkl' % (i), 'rb')
-            obc = pickle.load(file)
-            obc = pcd_to_voxel2d(obc, voxel_size=[32,32]).reshape(-1,1,32,32)
+            #obc = pickle.load(file)
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            obc = p.load()
+            # concatenate on the first direction (each obs has a different index)            
+            obc = obc.reshape(-1, 2)
             obs_list.append(obs)
             obc_list.append(obc)
+    obc_list = np.array(obc_list)
+    obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
+
     path_env = []
     path_length_env = []
     for i in range(s,N+s):
@@ -114,7 +130,9 @@ def load_test_dataset(N, NP, data_folder, s=0, sp=0):
             path_lengths.append(len(p))
         path_env.append(paths)
         path_length_env.append(path_lengths)
-    return obc, obs, path_env, path_length_env
+    obs_list = np.array(obs_list)
+    obc_list = np.array(obc_list)
+    return obc_list, obs_list, path_env, path_length_env
 
 
 
