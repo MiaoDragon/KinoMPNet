@@ -31,9 +31,9 @@ import os
 import gc
 import random
 from tools.utility import *
-from plan_utility import pendulum
-from sparse_rrt.systems import standard_cpp_systems
-from sparse_rrt import _sst_module
+from plan_utility import pendulum, acrobot_obs
+#from sparse_rrt.systems import standard_cpp_systems
+#from sparse_rrt import _sst_module
 from tools import data_loader
 import jax
 
@@ -80,14 +80,14 @@ def main(args):
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
     elif args.env_type == 'acrobot_obs':
-        IsInCollision =acrobot.IsInCollision
-        normalize = acrobot.normalize
-        unnormalize = acrobot.unnormalize
+        IsInCollision =acrobot_obs.IsInCollision
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
-        dynamics = acrobot.dynamics
-        jax_dynamics = acrobot.jax_dynamics
-        enforce_bounds = acrobot.enforce_bounds
+        dynamics = acrobot_obs.dynamics
+        jax_dynamics = acrobot_obs.jax_dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d
         mlp = mlp_acrobot.MLP
         obs_f = True
@@ -95,11 +95,11 @@ def main(args):
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
 
     jac_A = jax.jacfwd(jax_dynamics, argnums=0)
-    jac_B = jax.jacfwd(jax_dynamics, argnums=1)                
+    jac_B = jax.jacfwd(jax_dynamics, argnums=1)
     mpNet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -124,14 +124,15 @@ def main(args):
     # load data
     print('loading...')
     if args.seen_N > 0:
-        seen_test_data = data_loader.load_test_dataset(args.seen_N, args.seen_NP, 
-                                  args.data_folder, obs_f, args.seen_s, args.seen_sp)    
+        seen_test_data = data_loader.load_test_dataset(args.seen_N, args.seen_NP,
+                                  args.data_folder, obs_f, args.seen_s, args.seen_sp)
     if args.unseen_N > 0:
-        unseen_test_data = data_loader.load_test_dataset(args.unseen_N, args.unseen_NP, 
+        unseen_test_data = data_loader.load_test_dataset(args.unseen_N, args.unseen_NP,
                                   args.data_folder, obs_f, args.unseen_s, args.unseen_sp)
-    
     # test
     # testing
+
+
     print('testing...')
     seen_test_suc_rate = 0.
     unseen_test_suc_rate = 0.
@@ -143,14 +144,14 @@ def main(args):
         # seen
         if args.seen_N > 0:
             time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet, env_name, seen_test_data, args.model_path, 'seen', IsInCollision, normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
+            fes_path_, valid_path_ = eval_tasks(mpNet, args.env_type, seen_test_data, args.model_path, 'seen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             seen_test_suc_rate += fes_path.sum() / valid_path.sum()
         # unseen
         if args.unseen_N > 0:
             time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet, env_name, unseen_test_data, args.model_path, 'unseen', IsInCollision, normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
+            fes_path_, valid_path_ = eval_tasks(mpNet, args.env_type, unseen_test_data, args.model_path, 'unseen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             unseen_test_suc_rate += fes_path.sum() / valid_path.sum()
@@ -168,7 +169,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
+    parser.add_argument('--model_path', type=str, default='./results/KMPnet_res/acrobot_obs/',help='path for saving trained models')
     parser.add_argument('--seen_N', type=int, default=1)
     parser.add_argument('--seen_NP', type=int, default=10)
     parser.add_argument('--seen_s', type=int, default=0)
@@ -180,17 +181,17 @@ if __name__ == '__main__':
     parser.add_argument('--grad_step', type=int, default=1, help='number of gradient steps in continual learning')
     # Model parameters
     parser.add_argument('--total_input_size', type=int, default=4, help='dimension of total input')
-    parser.add_argument('--AE_input_size', nargs='+', type=int, default=0, help='dimension of input to AE')
-    parser.add_argument('--mlp_input_size', type=int , default=4, help='dimension of the input vector')
-    parser.add_argument('--output_size', type=int , default=2, help='dimension of the input vector')
+    parser.add_argument('--AE_input_size', nargs='+', type=int, default=32, help='dimension of input to AE')
+    parser.add_argument('--mlp_input_size', type=int , default=136, help='dimension of the input vector')
+    parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--device', type=int, default=0, help='cuda device')
-    parser.add_argument('--path_folder', type=str, default='./data/pendulum/')
+    parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=9)
-    parser.add_argument('--env_type', type=str, default='pendulum', help='s2d for simple 2d, c2d for complex 2d')
-    parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 7.0], help='boundary of world')
+    parser.add_argument('--start_epoch', type=int, default=99)
+    parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
+    parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
 
     args = parser.parse_args()

@@ -7,13 +7,16 @@ import pickle
 from torch.autograd import Variable
 import math
 import time
-from plan_utility.plan_general import *
+from sparse_rrt.systems import standard_cpp_systems
+from sparse_rrt import _sst_module
+from plan_utility.informed_path import *
 
-import matplotlib.pyplot as plt
-fig = plt.figure()
+#import matplotlib.pyplot as plt
+#fig = plt.figure()
 
 
 def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None):
+    DEFAULT_STEP=0.02
     # data_type: seen or unseen
     obc, obs, paths, path_lengths = test_data
     if obs is not None:
@@ -22,16 +25,21 @@ def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func =
     if torch.cuda.is_available():
         obc = obc.cuda()
     def informer(env, x0, xG, direction):
+        x0 = torch.from_numpy(x0.x).type(torch.FloatTensor)
+        xG = torch.from_numpy(xG.x).type(torch.FloatTensor)
+        if torch.cuda.is_available():
+            x0 = x0.cuda()
+            xG = xG.cuda()
         if direction == 0:
             x = torch.cat([x0,xG], dim=0)
         else:
             x = torch.cat([xG,x0], dim=0)
         if torch.cuda.is_available():
-            x = x.cuda()   
-        res = mpNet(x, env).cpu().data.numpy()
+            x = x.cuda()
+        res = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data.numpy()[0]
         res = Node(res)
         return res
-    
+
     fes_env = []   # list of list
     valid_env = []
     time_env = []
@@ -41,19 +49,23 @@ def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func =
         fes_path = []   # 1 for feasible, 0 for not feasible
         valid_path = []      # if the feasibility is valid or not
         # save paths to different files, indicated by i
+        #print(obs, flush=True)
+
         # feasible paths for each env
         if env_type == 'pendulum':
             system = standard_cpp_systems.PSOPTPendulum()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)            
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 20, 0.002)
         elif env_type == 'cartpole_obs':
-            system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+            #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+            system = _sst_module.CartPole()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)            
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
         elif env_type == 'acrobot_obs':
-            system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+            #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+            system = _sst_module.PSOPTAcrobot()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)            
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
         for j in range(len(paths[0])):
             time0 = time.time()
             time_norm = 0.
@@ -73,13 +85,13 @@ def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func =
                 #paths[i][j][path_lengths[i][j]-1][1] = 0.
                 path = [paths[i][j][0], paths[i][j][path_lengths[i][j]-1]]
                 # plot the entire path
-                plt.plot(paths[i][j][:,0], paths[i][j][:,1])
-                
+                #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
+
                 start = Node(path[0])
                 goal = Node(path[-1])
                 goal.S0 = np.identity(2)
                 goal.rho0 = 1.0    # change this later
-                
+
                 control = []
                 time_step = []
                 step_sz = DEFAULT_STEP

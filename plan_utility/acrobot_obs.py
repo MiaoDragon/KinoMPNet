@@ -1,5 +1,6 @@
 import torch
-
+import jax
+import numpy as np
 def normalize(x, bound):
     # normalize to -1 ~ 1  (bound can be a tensor)
     #return x
@@ -53,7 +54,7 @@ def dynamics(state, control):
     I2 = 1.0
     l = 1.0
     g = 9.81
-    
+
     theta2 = state[STATE_THETA_2]
     theta1 = state[STATE_THETA_1] - np.pi/2
     theta1dot = state[STATE_V_1]
@@ -108,8 +109,8 @@ def enforce_bounds(state):
 
     state[2:] = np.clip(
         state[2:],
-        [self.MIN_V_1, self.MIN_V_2],
-        [self.MAX_V_1, self.MAX_V_2])
+        [MIN_V_1, MIN_V_2],
+        [MAX_V_1, MAX_V_2])
     return state
 
 def jax_dynamics(state, control):
@@ -129,7 +130,7 @@ def jax_dynamics(state, control):
     I2 = 1.0
     l = 1.0
     g = 9.81
-    
+
     theta2 = state[STATE_THETA_2]
     theta1 = state[STATE_THETA_1] - np.pi/2
     theta1dot = state[STATE_V_1]
@@ -164,3 +165,8 @@ def jax_dynamics(state, control):
     deriv[STATE_V_1] = theta1dot_dot
     deriv[STATE_V_2] = theta2dot_dot
     return deriv
+
+
+
+def IsInCollision(x, obc):
+    return False

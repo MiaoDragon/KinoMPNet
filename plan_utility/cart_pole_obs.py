@@ -180,3 +180,6 @@ def jax_dynamics(state, control):
         (_a + m * L * _w * _w * jax.numpy.sin(_theta))+(M + m) * \
         (-m * g * L * jax.numpy.sin(_theta))) * mass_term
     return jax.numpy.asarray(deriv)
+
+def IsInCollision(x, obc):
+    return False

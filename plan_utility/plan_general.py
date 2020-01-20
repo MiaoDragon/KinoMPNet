@@ -143,8 +143,8 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         return x1, edge
     # the values to return: new node, new edge
     res_x = x1
-    res_edge = edge    
-    # if the upper is defined, then we can backpropagate the tvlqr and funnel computation    
+    res_edge = edge
+    # if the upper is defined, then we can backpropagate the tvlqr and funnel computation
     while start is not None:
         # assuming we haven't computed tvlqr for start->goal
         edge = start.edge
@@ -165,7 +165,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         #print("xs (which is used to construct xtraj):")
         #print(xs)
         #print('xtraj.x:')
-        #print(xtraj.x)        
+        #print(xtraj.x)
         upper_x = goal.x
         upper_S = goal.S0
         upper_rho = goal.rho0  # the rho0 of goal will be come the upper_rho currently
@@ -261,7 +261,7 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
         #print("xs (which is used to construct xtraj):")
         #print(xs)
         #print('xtraj.x:')
-        #print(xtraj.x)        
+        #print(xtraj.x)
         upper_x = goal.x
         upper_S = goal.S0
         upper_rho = goal.rho0  # the rho0 of goal will be come the upper_rho currently
