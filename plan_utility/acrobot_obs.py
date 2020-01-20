@@ -164,9 +164,7 @@ def jax_dynamics(state, control):
     theta2dot_dot = (d11 * (u2 - c2 - g2) - d21 * (u1 - c1 - g1)) / (d11 * d22 - d12 * d21)
     deriv[STATE_V_1] = theta1dot_dot
     deriv[STATE_V_2] = theta2dot_dot
-    return deriv
-
-
+    return jax.numpy.asarray(deriv)
 
 def IsInCollision(x, obc):
     return False

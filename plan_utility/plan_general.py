@@ -45,22 +45,20 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
         xs, us, dts = traj_opt(x0.x, x1.x)
-        """
-            print('----------------forward----------------')
-            print('trajectory opt:')
-            print('start:')
-            print(x0.x)
-            print('end:')
-            print(x1.x)
-            print('xs[0]:')
-            print(xs[0])
-            print('xs[-1]:')
-            print(xs[-1])
-            print('us:')
-            print(us)
-            print('dts:')
-            print(dts)
-        """
+        print('----------------forward----------------')
+        print('trajectory opt:')
+        print('start:')
+        print(x0.x)
+        print('end:')
+        print(x1.x)
+        print('xs[0]:')
+        print(xs[0])
+        print('xs[-1]:')
+        print(xs[-1])
+        print('us:')
+        print(us)
+        print('dts:')
+        print(dts)
         # ensure us and dts have length 1 less than xs
         if len(us) == len(xs):
             us = us[:-1]
@@ -82,22 +80,20 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         x1 = goal
     else:
         xs, us, dts = traj_opt(x1.x, x0.x)
-        """
-            print('----------------backward----------------')
-            print('trajectory opt:')
-            print('start:')
-            print(x1.x)
-            print('end:')
-            print(x0.x)
-            print('xs[0]:')
-            print(xs[0])
-            print('xs[-1]:')
-            print(xs[-1])
-            print('us:')
-            print(us)
-            print('dts:')
-            print(dts)
-        """
+        print('----------------backward----------------')
+        print('trajectory opt:')
+        print('start:')
+        print(x1.x)
+        print('end:')
+        print(x0.x)
+        print('xs[0]:')
+        print(xs[0])
+        print('xs[-1]:')
+        print(xs[-1])
+        print('us:')
+        print(us)
+        print('dts:')
+        print(dts)
         if len(us) == len(xs):
             us = us[:-1]
         us = np.flip(us, axis=0)
@@ -122,6 +118,10 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         start = Node(xs[0])  # after flipping, the first in xs is the start
         goal = x0
         x1 = start
+
+
+    # after trajopt, make actions of dimension 2
+    us = us.reshape(len(us), -1)
 
     # notice that controller time starts from 0, hence locally need to shift the time by minusing t0_edges
     # start from 0
@@ -154,7 +154,9 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         Qf = goal.S0
         if Qf is not None:
             Qf = np.array(Qf)
+        print('before tvlqr...')
         controller, xtraj, utraj, S = tvlqr(xs, us, dts, dynamics, jac_A, jac_B, Qf=Qf)
+        print('after tvlqr.')
         start.S0 = S(0).reshape((len(start.x),len(start.x)))
         edge.xtraj = xtraj
         edge.utraj = utraj
@@ -181,6 +183,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         S = start.edge.S
         print('time_knot: %d' % (len(time_knot)))
         #todo: to add rho0s and rho1s list to edge
+        print("before constructing funnel")
         # reversely construct the funnel
         for i in range(len(time_knot)-1, 0, -1):
             t0 = time_knot[i-1]
@@ -225,6 +228,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
                 start.edge.rho1 = rho1
                 goal.rho1 = rho1
                 goal.S1 = S1
+        print("after constructing funnel")
         start.edge.rho0 = rho0
         start.rho0 = rho0
         start = start.prev
@@ -327,7 +331,7 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
         goal = goal.prev
 
 
-def nearby(x0, x1):
+def nearby(x0, x1, system):
     # using the S and rho stored by the node to determine distance
     # if x0 lies in x1, and within the boundary of x1 (S, rho0)
     # notice that for circulating state, needs to map the angle
@@ -338,10 +342,14 @@ def nearby(x0, x1):
     print(x1.rho0)
     delta_x = x0.x - x1.x
     # this is pendulum specific. For other envs, need to do similar things
-    if delta_x[0] > np.pi:
-        delta_x[0] = delta_x[0] - 2*np.pi
-    if delta_x[0] < -np.pi:
-        delta_x[0] = delta_x[0] + 2*np.pi
+    circular = system.is_circular_topology()
+    for i in range(len(delta_x)):
+        if circular[i]:
+            # if it is angle
+            if delta_x[i] > np.pi:
+                delta_x[i] = delta_x[i] - 2*np.pi
+            if delta_x[i] < -np.pi:
+                delta_x[i] = delta_x[i] + 2*np.pi
     xTSx = delta_x.T@S@delta_x
     print('xTSx: %f' % (xTSx))
     # notice that we define rho to be ||S^{1/2}x||

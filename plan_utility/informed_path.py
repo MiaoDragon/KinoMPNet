@@ -4,7 +4,7 @@ sys.path.append('..')
 import numpy as np
 from plan_utility.plan_general import *
 # this one predicts one individual path using informer and trajopt
-def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
+def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
     # jac_A: given (x, u) -> linearization A
     # jac B: given (x, u) -> linearization B
@@ -25,7 +25,14 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
             # the edge information is stored at the endpoint
             # here direciton=0 means we are computing forward steer, and 1 means
             # we are computing backward
+            print('before path_steerTo, forward')
+            print('x0:')
+            print(x0.x)
+            print('xG:')
+            print(xG.x)
             x, e = pathSteerTo(x0, informer(env, x0, xG, direction=0), dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=0, compute_funnel=True)
+            print('after path_steerTo, forward')
+
             x0.next = x
             x.prev = x0
             e.next = x
@@ -37,14 +44,21 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
             print(x.x)
             node = xG
             while node is not None:
-                target_reached = nearby(x0, node)
+                target_reached = nearby(x0, node, system)
                 if target_reached:
                     xG = node
                     break
                 node = node.next
 
         else:
+            print('before path_steerTo, backward')
+            print('x0:')
+            print(x0.x)
+            print('xG:')
+            print(xG.x)
             x, e = pathSteerTo(xG, informer(env, xG, x0, direction=1), dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=1, compute_funnel=True)
+            print('after path_steerTo, backward')
+
             x.next = xG
             xG.prev = x
             e.next = xG
@@ -56,7 +70,7 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
             print(x.x)
             node = x0
             while node is not None:
-                target_reached = nearby(node, xG)
+                target_reached = nearby(node, xG, system)
                 if target_reached:
                     x0 = node
                     break
@@ -68,8 +82,9 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
         # version one: only check endpoint
         #target_reached = nearby(x0, xG)  # check the funnel if can connect
         # version two: new node in start tree: check all goal tree, and otherwise conversely
-            
+
     if target_reached:
+        print('target reached.')
         # it is near enough, so we connect in the node data structure from x0 to xG, although the endpoint of x0.edge
         # in state is still xG_
         x0 = x0.prev  # since the x0 can directly connect to xG, we only need to set the next state of the previous x to xG
@@ -79,7 +94,10 @@ def plan(env, x0, xG, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B
         # connect the lsat node
         # construct the funnel later
         # connect from x0 to xG, the endpoint of x0 is xG_, but it is near xG
+        print('before funnelsteerto')
         funnelSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direciton=0, step_sz=step_sz)
+        print('after funnelsteerto')
+
         #xG_.next = xG
         #e_.next = xG
         #xG_.edge = e_

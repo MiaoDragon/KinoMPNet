@@ -61,11 +61,16 @@ def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func =
             system = _sst_module.CartPole()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
             traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+            goal_S0 = np.identity(4)
+            goal_rho0 = 1.0
         elif env_type == 'acrobot_obs':
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
             system = _sst_module.PSOPTAcrobot()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
             traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+            goal_S0 = np.identity(4)
+            goal_rho0 = 1.0
+
         for j in range(len(paths[0])):
             time0 = time.time()
             time_norm = 0.
@@ -89,8 +94,8 @@ def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func =
 
                 start = Node(path[0])
                 goal = Node(path[-1])
-                goal.S0 = np.identity(2)
-                goal.rho0 = 1.0    # change this later
+                goal.S0 = goal_S0
+                goal.rho0 = goal_rho0    # change this later
 
                 control = []
                 time_step = []
@@ -104,8 +109,8 @@ def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func =
                     obc_i = obc[i]
                 for t in range(MAX_NEURAL_REPLAN):
                     # adaptive step size on replanning attempts
-                    res, path_list = plan(obc[i], start, goal, informer, dynamics, \
-                               enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000)
+                    res, path_list = plan(obc[i], start, goal, informer, system, dynamics, \
+                               enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.002, MAX_LENGTH=1000)
                     #print('after neural replan:')
                     #print(path)
                     #path = lvc(path, obc[i], IsInCollision, step_sz=step_sz)
