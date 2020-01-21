@@ -44,6 +44,11 @@ def main(args):
         unnormalize = acrobot_obs.unnormalize
         mlp = mlp_acrobot.MLP_2
         cae = CAE_acrobot_voxel_2d_2
+    elif args.env_type == 'acrobot_obs_3':
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        mlp = mlp_acrobot.MLP_3
+        cae = CAE_acrobot_voxel_2d_2
 
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
@@ -183,7 +188,7 @@ def main(args):
             val_losses.append(loss.cpu().data.numpy())
 
         # Save the models
-        if epoch > 0:
+        if epoch > 0 and epoch % 50 == 0:
             model_path='kmpnet_epoch_%d_direction_%d.pkl' %(epoch, args.direction)
             #save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
             save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(model_dir,model_path))

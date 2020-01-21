@@ -23,10 +23,24 @@ class MLP(nn.Module):
 
 class MLP2(nn.Module):
     def __init__(self, input_size, output_size):
-        super(MLP, self).__init__()
+        super(MLP2, self).__init__()
         self.fc = nn.Sequential(
                     nn.Linear(input_size, 512), nn.PReLU(), nn.Dropout(),
                     nn.Linear(512, 256), nn.PReLU(), nn.Dropout(),
+                    nn.Linear(256, 128), nn.PReLU(), nn.Dropout(),
+                    nn.Linear(128, 64), nn.PReLU(), nn.Dropout(),
+                    nn.Linear(64, 32), nn.PReLU(),
+                    nn.Linear(32, output_size))
+
+    def forward(self, x):
+        out = self.fc(x)
+        return out
+
+class MLP3(nn.Module):
+    def __init__(self, input_size, output_size):
+        super(MLP3, self).__init__()
+        self.fc = nn.Sequential(
+                    nn.Linear(input_size, 256), nn.PReLU(), nn.Dropout(),
                     nn.Linear(256, 128), nn.PReLU(), nn.Dropout(),
                     nn.Linear(128, 64), nn.PReLU(), nn.Dropout(),
                     nn.Linear(64, 32), nn.PReLU(),
