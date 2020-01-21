@@ -64,7 +64,7 @@ def main(args):
         #load_net_state(mpnet, os.path.join(args.model_path, model_path))
         load_net_state(mpnet, os.path.join(model_dir, model_path))
         #torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
-        torch_seed, np_seed, py_seed = load_seed(model_dir, model_path))
+        torch_seed, np_seed, py_seed = load_seed(model_dir, model_path)
         # set seed after loading
         torch.manual_seed(torch_seed)
         np.random.seed(np_seed)
