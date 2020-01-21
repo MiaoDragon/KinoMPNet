@@ -34,3 +34,8 @@ class Edge:
         self.rho0 = None
         self.rho1 = None
         self.next = None
+        self.S = None
+        self.t0 = 0.
+        self.t1 = time_knot[-1]
+        self.i0 = 0  # start indices
+        self.i1 = len(time_knot)-1

@@ -239,6 +239,8 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         print('time_knot: %d' % (len(time_knot)))
         #todo: to add rho0s and rho1s list to edge
         # reversely construct the funnel
+        rho0s = []
+        rho1s = []
         for i in range(len(time_knot)-1, 0, -1):
             t0 = time_knot[i-1]
             t1 = time_knot[i]
@@ -273,6 +275,8 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
             #print("upper_S:")
             #print(upper_S)
             rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, numSample=100)
+            rho0s.append(rho0)
+            rho1s.append(rho1)
             upper_rho = rho0
             upper_x = x0
             upper_S = S0
@@ -283,6 +287,10 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
                 goal.rho1 = rho1
                 goal.S1 = S1
         start.edge.rho0 = rho0
+        rho0s.reverse()
+        rho1s.reverse()
+        start.edge.rho0s = rho0s
+        start.edge.rho1s = rho1s
         start.rho0 = rho0
         start = start.prev
         goal = goal.prev
@@ -336,6 +344,8 @@ def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz
         S = start.edge.S
         print('time_knot: %d' % (len(time_knot)))
         #todo: to add rho0s and rho1s list to edge
+        rho0s = []
+        rho1s = []
         # reversely construct the funnel
         for i in range(len(time_knot)-1, 0, -1):
             t0 = time_knot[i-1]
@@ -377,6 +387,8 @@ def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz
             upper_rho = rho0
             upper_x = x0
             upper_S = S0
+            rho0s.append(rho0)
+            rho1s.append(rho1)
             #tvlqr_rhos.append([rho0, rho1, t0, t1])
             if i == len(time_knot)-1:
                 # the endpoint
@@ -384,6 +396,10 @@ def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz
                 goal.rho1 = rho1
                 goal.S1 = S1
         start.edge.rho0 = rho0
+        rho0s.reverse()
+        rho1s.reverse()
+        start.edge.rho0s = rho0s
+        start.edge.rho1s = rho1s
         start.rho0 = rho0
         start = start.prev
         goal = goal.prev
@@ -436,6 +452,8 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
         print('time_knot: %d' % (len(time_knot)))
         #todo: to add rho0s and rho1s list to edge
         # reversely construct the funnel
+        rho0s = []
+        rho1s = []
         for i in range(len(time_knot)-1, 0, -1):
             t0 = time_knot[i-1]
             t1 = time_knot[i]
@@ -470,6 +488,8 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
             #print("upper_S:")
             #print(upper_S)
             rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, numSample=100)
+            rho0s.append(rho0)
+            rho1s.append(rho1)
             upper_rho = rho0
             upper_x = x0
             upper_S = S0
@@ -480,43 +500,84 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
                 goal.rho1 = rho1
                 goal.S1 = S1
         start.edge.rho0 = rho0
+        rho0s.reverse()
+        rho1s.reverse()
+        start.edge.rho0s = rho0s
+        start.edge.rho1s = rho1s
         start.rho0 = rho0
         start = start.prev
         goal = goal.prev
 
 
+        
+def node_nearby(x0, x1, S, rho, system):
+    # state x0 to state x1
+    delta_x = x0 - x1
+    circular = system.is_circular_topology()
+    for i in range(len(delta_x)):
+        if circular[i]:
+            # if it is angle
+            if delta_x[i] > np.pi:
+                delta_x[i] = delta_x[i] - 2*np.pi
+            if delta_x[i] < -np.pi:
+                delta_x[i] = delta_x[i] + 2*np.pi
+
+    xTSx = delta_x.T@S@delta_x
+    if xTSx <= 4.:
+        print('nearby:')
+        print('S:')
+        print(S)
+        print('xTSx: %f' % (xTSx))
+        print('rho^2: %f' % (rho*rho))
+    if xTSx <= rho*rho:
+         return True
+    return False
+
+def line_nearby(x0, x1, system):
+    # state x0 to line starting from node x1
+    e = x1.edge
+    xs = e.xs
+    us = e.us
+    ts = e.time_knot
+    for k in range(len(ts)-1):
+        S = e.S(ts[k]).reshape((len(x0), len(x0)))
+        rho = e.rho0s[k]
+        if node_nearby(x0, xs[k], S, rho, system):
+            return True, k
+    return False, 0
+
 def nearby(x0, x1, system):
     # using the S and rho stored by the node to determine distance
     # if x0 lies in x1, and within the boundary of x1 (S, rho0)
     # notice that for circulating state, needs to map the angle
-    S = x1.S0
-    print('nearby')
-    print(x0.x)
-    print(S)
-    print(x1.rho0)
-    delta_x = x0.x - x1.x
-    # this is pendulum specific. For other envs, need to do similar things
-    circular = system.is_circular_topology()
-    for i in range(len(delta_x)):
-        if circular[i]:
-            # if it is angle
-            if delta_x[i] > np.pi:
-                delta_x[i] = delta_x[i] - 2*np.pi
-            if delta_x[i] < -np.pi:
-                delta_x[i] = delta_x[i] + 2*np.pi
-    xTSx = delta_x.T@S@delta_x
-    print('xTSx: %f' % (xTSx))
-    # notice that we define rho to be ||S^{1/2}x||
-    if xTSx <= x1.rho0*x1.rho0:
-        return True
+    # if edge is defined on xG, then use edge
+    if x0.edge is not None:
+        e = x0.edge
+        xs = e.xs
+        us = e.us
+        ts = e.time_knot
+        for k in range(len(ts)-1):
+            if x1.edge is not None:
+                line_near, k1 = line_nearby(xs[k], x1, system)
+                if line_near:
+                    # near the line, with node index k1
+                    return True, k, k1
+            else:
+                if node_nearby(xs[k], x1.x, x1.S0, x1.rho0, system):
+                    return True, k, 0
     else:
-        return False
-def h_nearby(node, xG, S, rho, system):
-    # if xG does not have S0 defined, then use the S and rho arguments
-    if xG.S0 is not None:
-        S = xG.S0
-        rho = xG.rho0
-    delta_x = node.x - xG.x
+        if x1.edge is not None:
+            line_near, k1 = line_nearby(x0.x, x1, system)
+            if line_near:
+                return True, 0, k1
+        else:
+            if node_nearby(x0.x, x1.x, x1.S0, x1.rho0, system):
+                return True, 0, 0
+    return False, 0, 0
+
+def node_h_nearby(x0, x1, S, rho, system):
+    # given two nodes, S and rho, check if x0 is near x1
+    delta_x = x0 - x1
     # this is pendulum specific. For other envs, need to do similar things
     circular = system.is_circular_topology()
     for i in range(len(delta_x)):
@@ -527,14 +588,66 @@ def h_nearby(node, xG, S, rho, system):
             if delta_x[i] < -np.pi:
                 delta_x[i] = delta_x[i] + 2*np.pi
     xTSx = delta_x.T@S@delta_x
-    print('xTSx: %f' % (xTSx))
-    # notice that we define rho to be ||S^{1/2}x||
-    print('rho^2: %f' % (rho*rho))
+    if xTSx <= 4.:
+        print('delta_x:')
+        print(delta_x)
+        print('S:')
+        print(S)
+        print('xTSx: %f' % (xTSx))
+        # notice that we define rho to be ||S^{1/2}x||
+        print('rho^2: %f' % (rho*rho))
     if xTSx <= rho*rho:
         return True
     else:
         return False
-
+def line_h_nearby(x0, xG, S, rho, system):
+    # check state x0 against line starting from node xG
+    e2 = xG.edge
+    xs2 = e2.xs
+    us2 = e2.us
+    ts2 = e2.time_knot
+    for k2 in range(len(ts2)-1):
+        if e2.S is not None:
+            S = e2.S(ts2[k2]).reshape((len(x0), len(x0)))
+            rho = e2.rho0s[k2]
+        elif xG.S0 is not None:
+            S = xG.S0
+            rho = xG.rho0
+        if node_h_nearby(x0, xs2[k2], S, rho, system):
+            return True
+    return False
+def h_nearby(node, xG, S, rho, system):
+    # check if the edge starting from node and the edge starting from xG has intersection
+    if node.edge is not None:
+        e1 = node.edge
+        xs1 = e1.xs
+        us1 = e1.us
+        ts1 = e1.time_knot
+        for k1 in range(len(ts1)-1):
+            if xG.edge is not None:
+                if line_h_nearby(xs1[k1], xG, S, rho, system):
+                    return True
+            else:
+                if xG.S0 is not None:
+                    S = xG.S0
+                    rho = xG.rho0
+                if node_h_nearby(xs1[k1], xG.x, S, rho, system):
+                    return True
+    else:
+        if xG.edge is not None:
+            if line_h_nearby(node.x, xG, S, rho, system):
+                return True
+        else:
+            if xG.S0 is not None:
+                S = xG.S0
+                rho = xG.rho0
+            if node_h_nearby(node.x, xG.x, S, rho, system):
+                return True            
+    return False
+                
+                
+                
+                
 def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, data, step_sz=0.02, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
     # jac_A: given (x, u) -> linearization A
@@ -603,7 +716,8 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
             x, e = pathSteerTo(x0, xnext, dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=0, compute_funnel=False)
 
             for i in range(len(e.xs)):
-                update_line(hl_for, ax, e.xs[i])     
+                update_line(hl_for, ax, e.xs[i])    
+            ax.scatter(e.xs[:,0], e.xs[:,1], c='g')
             draw_update_line(ax)
             plt.waitforbuttonpress()
             x0.next = x
@@ -627,9 +741,35 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
                 if node.S0 is None:
                     lazyFunnel(node, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz)    
                     goal = node
-                target_reached = nearby(x0, node, system)
+                target_reached, node_i0, node_i1 = nearby(x0, node, system)
                 if target_reached:
-                    xG = node
+                    # if node_i0 and node_i1 are subsets of the line, then update the edge info
+                    if x0.edge is not None:
+                        # need to extract subset of x0.edge
+                        edge = x0.edge
+                        edge.xs = edge.xs[:node_i0]
+                        edge.us = edge.us[:node_i0]
+                        edge.dts = edge.dts[:node_i0]
+                        edge.time_knot = edge.time_knot[:node_i0]
+                        edge.dt = edge.time_knot[-1]
+                        # add a new node
+                        x0_next = Node(edge.xs[-1])
+                        edge.next = x0_next
+                    if x1.edge is not None:
+                        # need to extract subset of x1.edge
+                        # change the t0 of edge starting from node to be time_knot[node_i] (use subset of edge)
+                        edge = node.edge
+                        edge.t0 = node.edge.time_knot[node_i1]
+                        edge.i0 = node_i1
+                        # change the node to be xs[node_i], S0 to be S(time_knot[node_i]), rho0 to be rho0s[node_i]
+                        new_node = Node(node.edge.xs[node_i1])
+                        new_node.S0 = node.edge.S(edge.t0)
+                        new_node.rho0 = node.edge.rho0s[node_i1]
+                        new_node.edge = edge
+                        new_node.next = node.next
+                        node = new_node
+
+                    xG = node                    
                     break
                 node = node.next
 
@@ -647,6 +787,7 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
             x, e = pathSteerTo(xG, informer(env, xG, x0, direction=1), dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=1, compute_funnel=False)
             for i in range(len(e.xs)-1, -1, -1):
                 update_line(hl_back, ax, e.xs[i])
+            ax.scatter(e.xs[:,0], e.xs[:,1], c='r')
             draw_update_line(ax)
             plt.waitforbuttonpress()
             x.next = xG
@@ -668,8 +809,34 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
                 if xG.S0 is None:
                     lazyFunnel(xG, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz)
                     goal = xG  # update the last node that we have computed funnel
-                target_reached = nearby(node, xG, system)
+
+                target_reached, node_i0, node_i1 = nearby(node, xG, system)
                 if target_reached:
+                    # if node_i0 and node_i1 are subsets of the line, then update the edge info
+                    if node.edge is not None:
+                        # need to extract subset of x0.edge
+                        edge = node.edge
+                        edge.xs = edge.xs[:node_i0]
+                        edge.us = edge.us[:node_i0]
+                        edge.dts = edge.dts[:node_i0]
+                        edge.time_knot = edge.time_knot[:node_i0]
+                        edge.dt = edge.time_knot[-1]
+                        # add a new node
+                        node_next = Node(edge.xs[-1])
+                        edge.next = node_next
+                    if x1.edge is not None:
+                        # need to extract subset of x1.edge
+                        # change the t0 of edge starting from node to be time_knot[node_i] (use subset of edge)
+                        edge = xG.edge
+                        edge.t0 = xG.edge.time_knot[node_i1]
+                        edge.i0 = node_i1
+                        # change the node to be xs[node_i], S0 to be S(time_knot[node_i]), rho0 to be rho0s[node_i]
+                        new_node = Node(xG.edge.xs[node_i1])
+                        new_node.S0 = xG.edge.S(edge.t0)
+                        new_node.rho0 = xG.edge.rho0s[node_i1]
+                        new_node.edge = edge
+                        new_node.next = xG.next
+                        xG = new_node
                     x0 = node
                     break
                 node = node.prev
