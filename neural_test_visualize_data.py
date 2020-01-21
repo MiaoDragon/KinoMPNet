@@ -36,6 +36,29 @@ from plan_utility import pendulum, acrobot_obs
 #from sparse_rrt import _sst_module
 from tools import data_loader
 import jax
+import matplotlib
+#matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
+
+
+import torch.nn as nn
+from torch.autograd import Variable
+import math
+import time
+from sparse_rrt.systems import standard_cpp_systems
+from sparse_rrt import _sst_module
+from plan_utility.informed_path import *
+
+import matplotlib.pyplot as plt
+#fig = plt.figure()
+
+import sys
+sys.path.append('..')
+
+import numpy as np
+#from tvlqr.python_tvlqr import tvlqr
+#from tvlqr.python_lyapunov import sample_tv_verify
+from plan_utility.data_structure import *
 
 def main(args):
     # set seed
@@ -100,7 +123,6 @@ def main(args):
                    cae, mlp)
     mpNet1 = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
-
     # load previously trained model if start epoch > 0
     model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
@@ -122,10 +144,8 @@ def main(args):
             mpNet0.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
     if args.start_epoch > 0:
         load_opt_state(mpNet0, os.path.join(args.model_path, model_path))
-
-
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet1, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -145,8 +165,7 @@ def main(args):
             mpNet1.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
     if args.start_epoch > 0:
         load_opt_state(mpNet1, os.path.join(args.model_path, model_path))
-        
-        
+
 
     # load data
     print('loading...')
@@ -163,42 +182,67 @@ def main(args):
     print('testing...')
     seen_test_suc_rate = 0.
     unseen_test_suc_rate = 0.
-    T = 1
-    for _ in range(T):
-        # unnormalize function
-        normalize_func=lambda x: normalize(x, args.world_size)
-        unnormalize_func=lambda x: unnormalize(x, args.world_size)
-        # seen
-        if args.seen_N > 0:
-            time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, seen_test_data, args.model_path, 'seen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
-            valid_path = valid_path_.flatten()
-            fes_path = fes_path_.flatten()   # notice different environments are involved
-            seen_test_suc_rate += fes_path.sum() / valid_path.sum()
-        # unseen
-        if args.unseen_N > 0:
-            time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, unseen_test_data, args.model_path, 'unseen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
-            valid_path = valid_path_.flatten()
-            fes_path = fes_path_.flatten()   # notice different environments are involved
-            unseen_test_suc_rate += fes_path.sum() / valid_path.sum()
-    if args.seen_N > 0:
-        seen_test_suc_rate = seen_test_suc_rate / T
-        f = open(os.path.join(args.model_path,'seen_accuracy_epoch_%d.txt' % (args.start_epoch)), 'w')
-        f.write(str(seen_test_suc_rate))
-        f.close()
-    if args.unseen_N > 0:
-        unseen_test_suc_rate = unseen_test_suc_rate / T    # Save the models
-        f = open(os.path.join(args.model_path,'unseen_accuracy_epoch_%d.txt' % (args.start_epoch)), 'w')
-        f.write(str(unseen_test_suc_rate))
-        f.close()
+    
+    # find path
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_autoscale_on(True)
+    hl, = ax.plot([], [], 'b')
+    
+    #hl_real, = ax.plot([], [], 'r')
+    def update_line(h, ax, new_data):
+        h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
+        #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
+        #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
 
+
+    def draw_update_line(ax):
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+ 
+
+    # randomly pick up a point in the data, and find similar data in the dataset
+    # plot the next point
+    obc, obs, paths, path_lengths = seen_test_data
+    for i in range(10):
+        # randomly pick up a path
+        p_i = np.random.randint(low=0, high=len(paths[0]))
+        # randomly pick up a point
+        node_i = np.random.randint(low=0, high=path_lengths[0][p_i]-1)
+        node = paths[0][p_i][node_i]
+        plot_nodes = np.zeros((1,len(node)))
+        for j in range(len(paths[0])):
+            dif = paths[0][j] - node
+            norms = np.linalg.norm(dif, axis=1)
+            similar_indices = np.where(norms<=1e-1)
+            similar_indices = similar_indices[0]
+            print(similar_indices)
+            if len(similar_indices) == 0:
+                continue
+            similar_indices = similar_indices[0]
+            plot_indices = similar_indices + 1
+            #print((norms<=1e-1).shape)
+            #print(norms<=1e-1)
+            ax.plot([paths[0][j][plot_indices][0], paths[0][j][-1][0]], [paths[0][j][plot_indices][1], paths[0][j][-1][1]], c='blue')
+            #plot_nodes = np.append(plot_nodes, paths[0][j][plot_indices], axis=0)
+        print(node)
+        ax.plot([node[0], paths[0][p_i][-1][0]], [node[1], paths[0][p_i][-1][1]], c='yellow')
+        plt.scatter(node[0], node[1], c='yellow')
+        #plt.scatter(plot_nodes[:,0], plot_nodes[:,1], c='blue')
+        plt.waitforbuttonpress()
+        plt.cla()
+        
+    
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs/',help='path for saving trained models')
+    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr005_SGD/',help='path for saving trained models')
     parser.add_argument('--seen_N', type=int, default=1)
-    parser.add_argument('--seen_NP', type=int, default=10)
+    parser.add_argument('--seen_NP', type=int, default=700)
     parser.add_argument('--seen_s', type=int, default=0)
     parser.add_argument('--seen_sp', type=int, default=0)
     parser.add_argument('--unseen_N', type=int, default=0)

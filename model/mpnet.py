@@ -14,8 +14,6 @@ class KMPNet(nn.Module):
             self.encoder = CAE.Encoder(AE_input_size, mlp_input_size-output_size*2)
         self.mlp = MLP(mlp_input_size, output_size)
         self.mse = nn.MSELoss()
-        print(self.encoder.parameters())
-        print(list(self.encoder.parameters()))
         self.opt = torch.optim.Adagrad(list(self.encoder.parameters())+list(self.mlp.parameters()))
         self.total_input_size = total_input_size
         self.AE_input_size = AE_input_size

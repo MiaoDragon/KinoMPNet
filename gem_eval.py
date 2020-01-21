@@ -9,13 +9,11 @@ import math
 import time
 from sparse_rrt.systems import standard_cpp_systems
 from sparse_rrt import _sst_module
-from plan_utility.informed_path import *
 
 #import matplotlib.pyplot as plt
 #fig = plt.figure()
 
-
-def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None):
+def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None):
     DEFAULT_STEP=0.02
     # data_type: seen or unseen
     obc, obs, paths, path_lengths = test_data
@@ -32,8 +30,10 @@ def eval_tasks(mpNet, env_type, test_data, save_dir, data_type, normalize_func =
             xG = xG.cuda()
         if direction == 0:
             x = torch.cat([x0,xG], dim=0)
+            mpNet = mpNet0
         else:
             x = torch.cat([xG,x0], dim=0)
+            mpNet = mpNet1
         if torch.cuda.is_available():
             x = x.cuda()
         res = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data.numpy()[0]

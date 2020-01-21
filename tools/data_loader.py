@@ -124,10 +124,16 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             control_file = dir+'control_%d' %(j) + ".pkl"
             cost_file = dir+'cost_%d' %(j) + ".pkl"
             time_file = dir+'time_%d' %(j) + ".pkl"
+            sg_file = dir+'start_goal_%d' % (j) + '.pkl'
+            file = open(sg_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            sg = p.load()       
             file = open(path_file, 'rb')
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
-            p = p.load()
+            p = p.load()      
+            p = np.append(p, [sg[1]], axis=0)
             paths.append(p)
             path_lengths.append(len(p))
         path_env.append(paths)

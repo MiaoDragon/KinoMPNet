@@ -3,6 +3,7 @@ sys.path.append('..')
 
 import numpy as np
 from plan_utility.plan_general import *
+import matplotlib.pyplot as plt
 # this one predicts one individual path using informer and trajopt
 def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
@@ -15,6 +16,7 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
     time_norm = 0.
     start = x0
     goal = xG
+
     while target_reached==0 and itr<MAX_LENGTH:
         itr=itr+1  # prevent the path from being too long
         print('iter: %d' % (itr))
