@@ -42,12 +42,12 @@ def main(args):
     elif args.env_type == 'acrobot_obs_2':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
-        mlp = mlp_acrobot.MLP_2
+        mlp = mlp_acrobot.MLP2
         cae = CAE_acrobot_voxel_2d_2
     elif args.env_type == 'acrobot_obs_3':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
-        mlp = mlp_acrobot.MLP_3
+        mlp = mlp_acrobot.MLP3
         cae = CAE_acrobot_voxel_2d_2
 
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
