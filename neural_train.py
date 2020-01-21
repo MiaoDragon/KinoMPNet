@@ -6,7 +6,7 @@ import torch
 import model.AE.identity as cae_identity
 from model.mlp import MLP
 from model import mlp_acrobot
-from model.AE import CAE_acrobot_voxel_2d
+from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
@@ -39,7 +39,11 @@ def main(args):
         unnormalize = acrobot_obs.unnormalize
         mlp = mlp_acrobot.MLP
         cae = CAE_acrobot_voxel_2d
-
+    elif args.env_type == 'acrobot_obs_2':
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        mlp = mlp_acrobot.MLP_2
+        cae = CAE_acrobot_voxel_2d_2
 
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
@@ -47,6 +51,8 @@ def main(args):
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
     model_dir = model_dir+args.env_type+"_lr%f_%s/" % (args.learning_rate, args.opt)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
     model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
