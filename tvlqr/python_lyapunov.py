@@ -271,7 +271,7 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     rho_alpha = 0.2
     prev_rho1 = 1e-6
     upper_rho_threshold = 1e-10
-    rho_step = upper_rho / 20.
+    rho_step = upper_rho / 10.
     rho0 = upper_rho-upper_rho_threshold
     initial = True
     goingdown = False
@@ -325,7 +325,7 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
             #print("rho0 = %f, rho1 = %f" % (rho0, rho1))
             #print('upper_rho: %f' % (upper_rho))
             if initial:
-                rho_step = rho_step / 5 # use small step for stepping up
+                #rho_step = rho_step / 5 # use small step for stepping up
                 rho0 = rho0 + rho_step
                 goingdown = False
                 initial = False
