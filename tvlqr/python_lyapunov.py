@@ -266,10 +266,10 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
 
     K0 = np.linalg.pinv(R)@B0.T@S0
     K1 = np.linalg.pinv(R)@B1.T@S1
-    prev_rho0 = 1e-3
-    rho0 = 1e-3
+    prev_rho0 = 1e-6
+    rho0 = 1e-6
     rho_alpha = 0.2
-    prev_rho1 = 1e-3
+    prev_rho1 = 1e-6
     upper_rho_threshold = 1e-10
     rho_step = upper_rho / 20.
     rho0 = upper_rho-upper_rho_threshold
@@ -278,12 +278,12 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
 
     while True:
         rho0_violate = False
-        rho1 = 1e-3
+        rho1 = 1e-6
         rho1_grid = np.linspace(upper_rho-upper_rho_threshold, rho1, num=101)
         # find a rho1 in (0, upper_rho] that can make sure the constraints are valid
         # varify the constraints are true
         valid_rho1_found = False  # if one valid rho1 is found
-        valid_rho1 = 1e-3
+        valid_rho1 = 1e-6
         #print('searching... current rho0: %f' % (rho0))
         for k in range(len(rho1_grid)):
             rho1 = rho1_grid[k]
