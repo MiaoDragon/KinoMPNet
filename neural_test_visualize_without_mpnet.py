@@ -521,8 +521,8 @@ def node_nearby(x0, x1, S, rho, system):
                 delta_x[i] = delta_x[i] - 2*np.pi
             if delta_x[i] < -np.pi:
                 delta_x[i] = delta_x[i] + 2*np.pi
-
-    xTSx = delta_x.T@S@delta_x
+    #lam_S = np.linalg.eigvals(S).max()
+    xTSx = delta_x.T@S@delta_x# / lam_S
     if xTSx <= 4.:
         print('nearby:')
         print('S:')
@@ -587,8 +587,9 @@ def node_h_nearby(x0, x1, S, rho, system):
                 delta_x[i] = delta_x[i] - 2*np.pi
             if delta_x[i] < -np.pi:
                 delta_x[i] = delta_x[i] + 2*np.pi
-    xTSx = delta_x.T@S@delta_x
-    if xTSx <= 4.:
+    #lam_S = np.linalg.eigvals(S).max()
+    xTSx = delta_x.T@S@delta_x# / lam_S
+    if xTSx <= 1.:
         print('delta_x:')
         print(delta_x)
         print('S:')
@@ -717,7 +718,7 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
 
             for i in range(len(e.xs)):
                 update_line(hl_for, ax, e.xs[i])    
-            ax.scatter(e.xs[:,0], e.xs[:,1], c='g')
+            ax.scatter(e.xs[::10,0], e.xs[::10,1], c='g')
             draw_update_line(ax)
             plt.waitforbuttonpress()
             x0.next = x
@@ -732,21 +733,41 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
             while node is not None:
                 #target_reached = False
                 # check if it is near the goal using goal heuristics, if so, then compute the real funnel distance
+                #S0 = np.identity(4)
+                #rho0 = 0.5
                 h_reached = h_nearby(x0, node, goal.S0, goal.rho0, system)
+                #h_reached = h_nearby(x0, node, S0, rho0, system)
                 if not h_reached:
                     node = node.next
-                    continue       
+                    continue
+                # passed the heuristics test, use trajopt to steer to the nearby state
+                print('forward heuristic near')
+                x, e = pathSteerTo(x0, node, dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=0, compute_funnel=False)
+                print('new heursitic node:')
+                print(x.x)
+                print('heuristic goal:')
+                print(node.x)
+                for i in range(len(e.xs)):
+                    update_line(hl_for, ax, e.xs[i])    
+                ax.scatter(e.xs[::10,0], e.xs[::10,1], c='g')
+                draw_update_line(ax)
+                plt.waitforbuttonpress()
+                x0.next = x
+                x.prev=  x0
+                e.next = x
+                x0.edge = e
+                
                 # passed the heuristics test, compute funnel and check nearby
                 # if funnel already computed then don't need to
                 if node.S0 is None:
                     lazyFunnel(node, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz)    
                     goal = node
-                target_reached, node_i0, node_i1 = nearby(x0, node, system)
+                target_reached, node_i0, node_i1 = nearby(x, node, system)
                 if target_reached:
                     # if node_i0 and node_i1 are subsets of the line, then update the edge info
-                    if x0.edge is not None:
+                    if x.edge is not None:
                         # need to extract subset of x0.edge
-                        edge = x0.edge
+                        edge = x.edge
                         edge.xs = edge.xs[:node_i0]
                         edge.us = edge.us[:node_i0]
                         edge.dts = edge.dts[:node_i0]
@@ -755,7 +776,7 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
                         # add a new node
                         x0_next = Node(edge.xs[-1])
                         edge.next = x0_next
-                    if x1.edge is not None:
+                    if node.edge is not None:
                         # need to extract subset of x1.edge
                         # change the t0 of edge starting from node to be time_knot[node_i] (use subset of edge)
                         edge = node.edge
@@ -780,14 +801,14 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
                 xnext = informer(env, xG, x0, direction=1)
                 next_nodes.append(xnext.x)
             next_nodes = np.array(next_nodes)
-            ax.scatter(next_nodes[:,0], next_nodes[:,1], color='orange', alpha=0.5)
+            ax.scatter(next_nodes[::10,0], next_nodes[::10,1], color='orange', alpha=0.5)
             update_line(hl_back_mpnet, ax, xnext.x)
             draw_update_line(ax)
             
             x, e = pathSteerTo(xG, informer(env, xG, x0, direction=1), dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=1, compute_funnel=False)
             for i in range(len(e.xs)-1, -1, -1):
                 update_line(hl_back, ax, e.xs[i])
-            ax.scatter(e.xs[:,0], e.xs[:,1], c='r')
+            ax.scatter(e.xs[::10,0], e.xs[::10,1], c='r')
             draw_update_line(ax)
             plt.waitforbuttonpress()
             x.next = xG
@@ -800,17 +821,36 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
             while node is not None:
                 #target_reached = False
                 # check if it is near the goal using goal heuristics, if so, then compute the real funnel distance
+                #S0 = np.identity(4)
+                #rho0 = 0.5
                 h_reached = h_nearby(node, xG, goal.S0, goal.rho0, system)
+                #h_reached = h_nearby(node, xG, S0, rho0, system)
                 if not h_reached:
                     node = node.prev
                     continue
+                # passed the heuristics test, connect from node to xG
+                print('backward heurstics near')
+                x, e = pathSteerTo(xG, node, dynamics=dynamics, enforce_bounds=enforce_bounds, traj_opt=traj_opt, jac_A=jac_A, jac_B=jac_B, step_sz=step_sz, direction=1, compute_funnel=False)     
+                for i in range(len(e.xs)-1, -1, -1):
+                    update_line(hl_back, ax, e.xs[i])
+                ax.scatter(e.xs[:,0], e.xs[:,1], c='r')
+                draw_update_line(ax)
+                plt.waitforbuttonpress()
+                print('new heursitic node:')
+                print(x.x)
+                print('heuristic goal:')
+                print(node.x)
+                x.next = xG
+                x.edge = e
+                e.next = xG
+                xG.prev = x
 
-                # passed the heuristics test, compute funnel and check nearby
-                if xG.S0 is None:
-                    lazyFunnel(xG, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz)
+                # passed the heuristics test, compute funnel and check nearby at the new point x
+                if x.S0 is None:
+                    lazyFunnel(x, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz)
                     goal = xG  # update the last node that we have computed funnel
-
-                target_reached, node_i0, node_i1 = nearby(node, xG, system)
+                # try to see if the newly computed x is near xG
+                target_reached, node_i0, node_i1 = nearby(node, x, system)
                 if target_reached:
                     # if node_i0 and node_i1 are subsets of the line, then update the edge info
                     if node.edge is not None:
@@ -824,20 +864,21 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
                         # add a new node
                         node_next = Node(edge.xs[-1])
                         edge.next = node_next
-                    if x1.edge is not None:
+                    if x.edge is not None:
                         # need to extract subset of x1.edge
                         # change the t0 of edge starting from node to be time_knot[node_i] (use subset of edge)
-                        edge = xG.edge
-                        edge.t0 = xG.edge.time_knot[node_i1]
+                        edge = x.edge
+                        edge.t0 = x.edge.time_knot[node_i1]
                         edge.i0 = node_i1
                         # change the node to be xs[node_i], S0 to be S(time_knot[node_i]), rho0 to be rho0s[node_i]
-                        new_node = Node(xG.edge.xs[node_i1])
-                        new_node.S0 = xG.edge.S(edge.t0)
-                        new_node.rho0 = xG.edge.rho0s[node_i1]
+                        new_node = Node(x.edge.xs[node_i1])
+                        new_node.S0 = x.edge.S(edge.t0)
+                        new_node.rho0 = x.edge.rho0s[node_i1]
                         new_node.edge = edge
-                        new_node.next = xG.next
-                        xG = new_node
+                        new_node.next = x.next
+                        x = new_node
                     x0 = node
+                    xG = x
                     break
                 node = node.prev
 
@@ -886,7 +927,7 @@ def plan(env, x0, xG, informer, system, dynamics, enforce_bounds, traj_opt, jac_
 
 
 def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None):
-    DEFAULT_STEP=0.02
+    
     # data_type: seen or unseen
     obc, obs, paths, path_lengths = test_data
     if obs is not None:
@@ -925,13 +966,13 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
             system = _sst_module.PSOPTAcrobot()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.02
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 10, 1, 5, step_sz)
+            step_sz = 0.002
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 20, step_sz)
             goal_S0 = np.identity(4)
             goal_S0[2,2] = 0.
             goal_S0[3,3] = 0.
-            goal_rho0 = 0.1
-
+            goal_rho0 = 0.5
+        DEFAULT_STEP=step_sz
         for j in range(len(paths[0])):
             state = paths[i][j]
             def informer(env, x0, xG, direction):

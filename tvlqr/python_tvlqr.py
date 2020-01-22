@@ -49,6 +49,7 @@ def tvlqr(x, u, dt, func, jac_A, jac_B, Qf=None):
         B = np.asarray(B)
         #I = np.identity(len(x[0]))
         Q = 1*np.identity(len(x[0]))
+        #Q = np.diag([100.,100.,1.,1.])
         S_ = S_.reshape(Q.shape)
         res = -(Q - S_ @ B @ B.T @ S_ + S_ @ A + A.T @ S_)
         res = res.flatten()

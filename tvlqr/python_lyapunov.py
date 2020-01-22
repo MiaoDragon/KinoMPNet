@@ -109,7 +109,8 @@ def sample_tv_verify_sqrtrho(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1
         print('rho0 = %f, rho1 = %f' % (prev_rho0, prev_rho1))
         return prev_rho0, prev_rho1
 
-def sample_tv_verify_prev(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
+    
+def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
     # sample points at t0 and t1, make sure that d(x^TSx)/dt <= rho_dot
     # here we parameterize rho in the time interval of [t0, t1] by a line [rho0, rho1]
 
@@ -133,20 +134,25 @@ def sample_tv_verify_prev(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B
     Sdot1 = -(Q-S1@B1@np.linalg.pinv(R)@B1.T@S1+S1@A1+A1.T@S1)
     K0 = np.linalg.pinv(R)@B0.T@S0
     K1 = np.linalg.pinv(R)@B1.T@S1
-    prev_rho0 = 1e-3
-    rho0 = 1e-3
+    prev_rho0 = 1e-6
+    rho0 = 1e-6
     rho_alpha = 0.2
-    prev_rho1 = 1e-3
+    prev_rho1 = 1e-6
     upper_rho_threshold = 1e-10
-    rho_step = upper_rho / 20.
-    rho0 = upper_rho-upper_rho_threshold
+    #rho_step = upper_rho / 200.
+    #rho0 = upper_rho-upper_rho_threshold
+    rho0 = (1.05)*upper_rho
+    rho_step = upper_rho / 1000.
     initial = True
     goingdown = False
 
     while True:
         rho0_violate = False
         rho1 = 1e-3
-        rho1_grid = np.linspace(upper_rho-upper_rho_threshold, rho1, num=101)
+        rho1_grid = np.linspace(upper_rho*1.1, upper_rho*0.8, num=101)
+        rho1_grid = np.append(rho1_grid, np.linspace(upper_rho*0.8, 0., num=51), axis=0)
+        
+        #rho1_grid = np.linspace(upper_rho-upper_rho_threshold, rho1, num=101)
         # find a rho1 in (0, upper_rho] that can make sure the constraints are valid
         # varify the constraints are true
         valid_rho1_found = False  # if one valid rho1 is found
@@ -219,10 +225,7 @@ def sample_tv_verify_prev(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B
         #print('rho0 = %f, rho1 = %f' % (prev_rho0, prev_rho1))
         return prev_rho0, prev_rho1
 
-
-
-
-def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
+def sample_tv_verify_lam(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
     # here we assume the lyapunov function is V(x) = xT(S/||S||*)x, we normalize S by its
     # largest eigenvalue to make sure we use a small rho to represent a large area
     # the derivative of (S/S_norm) = S_dot/S_norm + S(-1/(S_norm)^2)*v_max^TS_dot v_max
@@ -254,10 +257,10 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     U = U / np.linalg.norm(U, axis=1, keepdims=True)
     tmp = np.linalg.pinv(S0)
     tmp = scipy.linalg.sqrtm(tmp.T @ tmp)
-    U0 = U@scipy.linalg.sqrtm(tmp)/ np.sqrt(lam_S0)
+    U0 = U@scipy.linalg.sqrtm(tmp) * np.sqrt(lam_S0)
     tmp = np.linalg.pinv(S1)
     tmp = scipy.linalg.sqrtm(tmp.T @ tmp)
-    U1 = U@scipy.linalg.sqrtm(tmp)/ np.sqrt(lam_S1)
+    U1 = U@scipy.linalg.sqrtm(tmp) * np.sqrt(lam_S1)
 
     Sdot0 = -(Q-S0@B0@np.linalg.pinv(R)@B0.T@S0+S0@A0+A0.T@S0)
     Sdot1 = -(Q-S1@B1@np.linalg.pinv(R)@B1.T@S1+S1@A1+A1.T@S1)
@@ -271,15 +274,17 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     rho_alpha = 0.2
     prev_rho1 = 1e-6
     upper_rho_threshold = 1e-10
-    rho_step = upper_rho / 10.
-    rho0 = upper_rho-upper_rho_threshold
+    rho_step = upper_rho / 100.
+    #rho0 = upper_rho-upper_rho_threshold
+    rho0 = upper_rho*2
     initial = True
     goingdown = False
 
     while True:
         rho0_violate = False
         rho1 = 1e-6
-        rho1_grid = np.linspace(upper_rho-upper_rho_threshold, rho1, num=101)
+        rho1_grid = np.linspace(upper_rho*2, rho1, num=201)
+        #rho1_grid = np.linspace(upper_rho-upper_rho_threshold, rho1, num=101)
         # find a rho1 in (0, upper_rho] that can make sure the constraints are valid
         # varify the constraints are true
         valid_rho1_found = False  # if one valid rho1 is found
@@ -294,6 +299,8 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
             rhodot1 = (rho1-rho0)/(t1-t0)
             rhodot0 = 2 * rhodot0 * rho0
             rhodot1 = 2 * rhodot1 * rho1
+            #print('searching... upper rho: %f' % (upper_rho))            
+            #print('searching... current rho0: %f' % (rho0))
             #print('    searching... current rho1: %f' % (rho1))
             violate = False
             # varify constraint at t0 first

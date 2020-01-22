@@ -17,7 +17,7 @@ import time
 from tools.pcd_generation import rectangle_pcd
 
 import pickle
-
+import os
 
 
 # visualize the path
@@ -112,7 +112,7 @@ class CartPoleVisualizer(Visualizer):
         self.obs = obstacles
         print(len(self.states))
         ani = animation.FuncAnimation(plt.gcf(), self._animate, range(0, len(self.states)),
-                                      interval=self.dt*50, blit=True, init_func=self._init,
+                                      interval=self.dt, blit=True, init_func=self._init,
                                       repeat=True)
         return ani
 
@@ -128,13 +128,15 @@ L = 2.5
 
 # convert from obs to point cloud
 # load generated point cloud
-
-for obs_idx in range(2):
-    for p_idx in range(5):
+writer=animation.FFMpegFileWriter(fps=50)
+for obs_idx in range(5):
+    for p_idx in range(10):
         # Create custom system
         #obs_list = [[-10., -3.],
         #            [0., 3.],
         #            [10, -3.]]
+        if os.path.exists('../cartpole_env%d_path%d.mp4' % (obs_idx, p_idx)):
+            continue
         file = open('../data/cartpole_obs/obs_%d.pkl' % (obs_idx), 'rb')
         obs_list = pickle.load(file)
         file = open('../data/cartpole_obs/obc_%d.pkl' % (obs_idx), 'rb')
@@ -161,4 +163,4 @@ for obs_idx in range(2):
         actions = controls
         anim = vis.animate(np.array(states), np.array(actions), obs_list)
         #HTML(anim.to_html5_video())
-        anim.save('../cartpole_env%d_path%d.mp4' % (obs_idx, p_idx))
+        anim.save('../cartpole_env%d_path%d.mp4' % (obs_idx, p_idx), writer=writer)
