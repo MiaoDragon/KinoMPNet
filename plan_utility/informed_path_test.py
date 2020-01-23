@@ -100,36 +100,11 @@ def lqr(A,B,Q,R):
 
     return K, X, eigVals
 
-traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)
-#print(state)
-#state = np.append(state, [sg[-1]], axis=0)
-state[-1] = sg[-1]
-#print(state)
-start = Node(state[0])
-goal = Node(state[-1])
-
-xG = np.array(sg[-1])
-uG = stable_u(sg[-1])
-#print(dynamics(xG, uG))
-A = jax.jacfwd(jax_dynamics, argnums=0)(xG, uG)
-B = jax.jacfwd(jax_dynamics, argnums=1)(xG, uG)
-
-A = np.asarray(A)
-B = np.asarray(B)
-Q = np.identity(2)
-R = np.identity(1)
-K, lqr_S, E = lqr(A, B, Q, R)
-goal.S0 = np.identity(2)
-goal.rho0 = 1.0
-lqr_rho = sample_ti_verify(xG, uG, lqr_S, K, dynamics, numSample=1000)
-goal.rho0 = lqr_rho
-goal.S0 = lqr_S
-#print(goal.rho0)
-
 jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 
-test_data = data_loader.load_test_dataset(10, 100, '../data/pendulum/', obs_f=False)
+data_folder = '../data/pendulum/'
+test_data = data_loader.load_test_dataset(1, 5, '../data/pendulum/', obs_f=False)
 # data_type: seen or unseen
 obc, obs, paths, path_lengths = test_data
 
@@ -143,7 +118,7 @@ for i in range(len(paths)):
     valid_path = []      # if the feasibility is valid or not
     # save paths to different files, indicated by i
     #print(obs, flush=True)
-
+    env_type = 'pendulum'
     # feasible paths for each env
     if env_type == 'pendulum':
         system = standard_cpp_systems.PSOPTPendulum()
@@ -177,7 +152,31 @@ for i in range(len(paths)):
         goal_rho0 = 1.0
 
     for j in range(len(paths[0])):
+
+        file = open(data_folder+'0/start_goal_%d.pkl' % (i), 'rb')
+        p = pickle._Unpickler(file)
+        p.encoding = 'latin1'
+        start_goal = p.load()
+        A = jax.jacfwd(jax_dynamics, argnums=0)(start_goal[1], stable_u(start_goal[1]))
+        B = jax.jacfwd(jax_dynamics, argnums=1)(start_goal[1], stable_u(start_goal[1]))
+        A = np.asarray(A)
+        B = np.asarray(B)
+        Q = np.identity(2)
+        R = np.identity(1)
+        K, lqr_S, E = lqr(A, B, Q, R)
+
+
+        start = Node(start_goal[0])
+        goal = Node(start_goal[1])
+
+        goal.S0 = np.identity(2)
+        goal.rho0 = 1.0
+        lqr_rho = sample_ti_verify(xG, uG, lqr_S, K, dynamics, numSample=1000)
+        goal.rho0 = lqr_rho
+        goal.S0 = lqr_S
+
         state = paths[i][j]
+        state = np.append(state, start_goal[1], axis=0)
         def informer(env, x0, xG, direction):
             # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
             dis = np.abs(x0.x - state)
