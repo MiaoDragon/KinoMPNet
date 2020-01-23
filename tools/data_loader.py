@@ -93,6 +93,8 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
     if obs_f is None:
         obs = None
         obc = None
+        obs_list = None
+        obc_list = None
     else:
         obs_list = []
         obc_list = []
