@@ -1,8 +1,3 @@
-from ctypes import *
-#ctypes.cdll.LoadLibrary('')
-lib1 = CDLL("../deps/sparse_rrt/deps/trajopt/build/lib/libsco.so")
-lib2 = CDLL("../deps/sparse_rrt/deps/trajopt/build/lib/libutils.so")
-
 import sys
 import jax
 sys.path.append('../deps/sparse_rrt')
@@ -104,7 +99,7 @@ jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 
 data_folder = '../data/pendulum/'
-test_data = data_loader.load_test_dataset(1, 5, '../data/pendulum/', obs_f=False)
+test_data = data_loader.load_test_dataset(1, 5, '../data/pendulum/', obs_f=None)
 # data_type: seen or unseen
 obc, obs, paths, path_lengths = test_data
 
