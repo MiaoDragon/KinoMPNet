@@ -33,12 +33,12 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
             obc = p.load()
-            # concatenate on the first direction (each obs has a different index)            
+            # concatenate on the first direction (each obs has a different index)
             obc = obc.reshape(-1, 2)
             obs_list.append(obs)
             obc_list.append(obc)
-    obc_list = np.array(obc_list)
-    obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
+        obc_list = np.array(obc_list)
+        obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
 
     dataset = []
     targets = []
@@ -70,8 +70,9 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
     dataset = np.array(dataset)
     targets = np.array(targets)
     env_indices = np.array(env_indices)
-    obs_list = np.array(obs_list)
-    obc_list = np.array(obc_list)
+    if obs_list is not None:
+        obs_list = np.array(obs_list)
+        obc_list = np.array(obc_list)
     return obc_list, dataset, targets, env_indices
 
 
@@ -106,7 +107,7 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
             obc = p.load()
-            # concatenate on the first direction (each obs has a different index)            
+            # concatenate on the first direction (each obs has a different index)
             obc = obc.reshape(-1, 2)
             obs_list.append(obs)
             obc_list.append(obc)
@@ -128,11 +129,11 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             file = open(sg_file, 'rb')
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
-            sg = p.load()       
+            sg = p.load()
             file = open(path_file, 'rb')
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
-            p = p.load()      
+            p = p.load()
             p = np.append(p, [sg[1]], axis=0)
             paths.append(p)
             path_lengths.append(len(p))
