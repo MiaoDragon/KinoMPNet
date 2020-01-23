@@ -62,7 +62,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             # here direciton=0 means we are computing forward steer, and 1 means
             # we are computing backward
             xw = informer(env, x0, xG, direction=0)
-            x, e = pathSteerTo(x0, xw, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz, direction=0)
+            x, e = pathSteerTo(x0, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, direction=0)
             for i in range(len(e.xs)):
                 update_line(hl_for, ax, e.xs[i])
             ax.scatter(e.xs[::10,0], e.xs[::10,1], c='g')
@@ -76,7 +76,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             tree=1
         else:
             xw = informer(env, xG, x0, direction=1)
-            x, e = pathSteerTo(xG, xw, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz, direction=1)
+            x, e = pathSteerTo(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, direction=1)
             for i in range(len(e.xs)):
                 update_line(hl_back, ax, e.xs[i])
             ax.scatter(e.xs[::10,0], e.xs[::10,1], c='r')
@@ -90,7 +90,14 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             tree=0
 
         # steer endpoint
-        xG_, e = pathSteerTo(x0, xG, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz, direction=0)
+        xG_, e = pathSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, direction=0)
+        print('endpoint steering...')
+        print('x0:')
+        print(x0.x)
+        print('xG:')
+        print(xG.x)
+        print('xG_:')
+        print(xG_.x)
         ax.scatter(e.xs[::10,0], e.xs[::10,1], c='salmon')
         draw_update_line(ax)
         # find the nearest point from xG_ to points on the goal tree
@@ -103,7 +110,8 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             if dis < min_d:
                 min_d = dis
                 min_node = node
-        if dis > 1.0:
+            node = node.next
+        if min_d > 1.0:
             itr += 1
             continue
         # otherwise it is a nearby node
@@ -111,7 +119,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             lazyFunnel(min_node, funnel_node, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz)
             funnel_node = min_node
 
-        reached, node_0, node_1 = nearby(xG_, min_node, system)
+        reached, node_i0, node_i1 = nearby(xG_, min_node, system)
         if reached:
             target_reached = True
             # since the nearby nodes are on the edge, need to extract the node index
@@ -123,11 +131,12 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
                 edge.i0 = node_i1
                 # change the node to be xs[node_i], S0 to be S(time_knot[node_i]), rho0 to be rho0s[node_i]
                 new_node = Node(edge.xs[node_i1])
-                new_node.S0 = edge.S(edge.t0)
+                new_node.S0 = edge.S(edge.t0).reshape((len(edge.xs[node_i1]),len(edge.xs[node_i1])))
                 new_node.rho0 = edge.rho0s[node_i1]
                 new_node.edge = edge
                 new_node.next = min_node.next
-            xG = node
+                min_node = new_node
+            xG = min_node
             break
         itr += 1
 
@@ -143,7 +152,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
         # construct the funnel later
         # connect from x0 to xG, the endpoint of x0 is xG_, but it is near xG
         print('before funnelsteerto')
-        funnelSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direciton=0, step_sz=step_sz)
+        funnelSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, step_sz=step_sz)
         print('after funnelsteerto')
 
         #xG_.next = xG
@@ -164,4 +173,5 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
         while xG is not None:
             path_list.append(xG.x)
             xG = xG.next
+    plt.cla()
     return target_reached, path_list

@@ -32,7 +32,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, step_sz=None):
     new_dts = np.array(new_dts)
     return new_xs, new_us, new_dts
 
-def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, step_sz=0.002, compute_funnel=True):
+def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, step_sz=0.002):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
@@ -136,10 +136,10 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
     goal.prev = start
     return x1, edge
 
-def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direciton, step_sz=0.02):
+def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, step_sz=0.02):
     start = x0
     goal = x1
-    if direciton == 0:
+    if direction == 0:
         start = x0
         goal = x1
     else:
@@ -167,7 +167,8 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
     time_knot = start.edge.time_knot
     xtraj = start.edge.xtraj
     utraj = start.edge.utraj
-
+    rho0s = []
+    rho1s = []
     S = start.edge.S
     print('time_knot: %d' % (len(time_knot)))
     #todo: to add rho0s and rho1s list to edge
@@ -193,7 +194,12 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
         S1 = S(t1).reshape(len(x0),len(x0))
         Q = np.identity(len(x0))
         R = np.identity(len(u0))
-        rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, numSample=1000)
+        rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, numSample=100)
+        rho0s.append(rho0)
+        rho1s.append(rho1)
+        print('upper_rho: %f' % (upper_rho))
+        print('rho0: %f' % (rho0))
+        print('rho1: %f' % (rho1))
         upper_rho = rho0
         upper_x = x0
         upper_S = S0
@@ -204,6 +210,10 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
             goal.S1 = S1
     start.edge.rho0 = rho0
     start.rho0 = rho0
+    rho0s.reverse()
+    rho1s.reverse()
+    start.edge.rho0s = rho0s
+    start.edge.rho1s = rho1s
 
 
 
@@ -288,7 +298,7 @@ def nearby(x0, x1, system):
                 return True, 0, 0
     return False, 0, 0
 
-def node_h_nearby(x0, x1, S, rho, system):
+def node_h_dist(x0, x1, S, rho, system):
     # given two nodes, S and rho, check if x0 is near x1
     delta_x = x0 - x1
     # this is pendulum specific. For other envs, need to do similar things
@@ -302,6 +312,7 @@ def node_h_nearby(x0, x1, S, rho, system):
                 delta_x[i] = delta_x[i] + 2*np.pi
     #lam_S = np.linalg.eigvals(S).max()
     xTSx = delta_x.T@S@delta_x# / lam_S
+    """
     if xTSx <= 1.:
         print('delta_x:')
         print(delta_x)
@@ -310,6 +321,7 @@ def node_h_nearby(x0, x1, S, rho, system):
         print('xTSx: %f' % (xTSx))
         # notice that we define rho to be ||S^{1/2}x||
         print('rho^2: %f' % (rho*rho))
+    """
     return xTSx / (rho*rho)
 def line_h_dist(x0, xG, S, rho, system):
     # check state x0 against line starting from node xG
@@ -325,7 +337,7 @@ def line_h_dist(x0, xG, S, rho, system):
         elif xG.S0 is not None:
             S = xG.S0
             rho = xG.rho0
-        dist = node_h_nearby(x0, xs2[k2], S, rho, system)
+        dist = node_h_dist(x0, xs2[k2], S, rho, system)
         if dist < res:
             res = dist
     return res

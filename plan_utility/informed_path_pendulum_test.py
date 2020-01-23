@@ -13,56 +13,93 @@ import scipy
 from plan_utility.informed_path import *
 from plan_utility.plan_general import *
 from plan_utility.data_structure import *
-from plan_utility import pendulum, acrobot_obs
-
 from tvlqr.python_lyapunov import *
-env_type = 'acrobot_obs'
-data_folder = '../data/acrobot_obs/'
-# setup evaluation function and load function
-if env_type == 'pendulum':
-    IsInCollision =pendulum.IsInCollision
-    normalize = pendulum.normalize
-    unnormalize = pendulum.unnormalize
-    obs_file = None
-    obc_file = None
-    dynamics = pendulum.dynamics
-    jax_dynamics = pendulum.jax_dynamics
-    enforce_bounds = pendulum.enforce_bounds
 
-    obs_f = False
-    #system = standard_cpp_systems.PSOPTPendulum()
-    #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-elif env_type == 'cartpole_obs':
-    IsInCollision =cartpole.IsInCollision
-    normalize = cartpole.normalize
-    unnormalize = cartpole.unnormalize
-    obs_file = None
-    obc_file = None
-    dynamics = cartpole.dynamics
-    jax_dynamics = cartpole.jax_dynamics
-    enforce_bounds = cartpole.enforce_bounds
+def dynamics(x, u):
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    MIN_W, MAX_W = -7., 7
 
-    obs_f = True
-    #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
-    #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-elif env_type == 'acrobot_obs':
-    IsInCollision =acrobot_obs.IsInCollision
-    normalize = acrobot_obs.normalize
-    unnormalize = acrobot_obs.unnormalize
-    obs_file = None
-    obc_file = None
-    dynamics = acrobot_obs.dynamics
-    jax_dynamics = acrobot_obs.jax_dynamics
-    enforce_bounds = acrobot_obs.enforce_bounds
-    obs_f = True
-    #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
-    #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+    MIN_TORQUE, MAX_TORQUE = -1., 1.
+
+    LENGTH = 1.
+    MASS = 1.
+    DAMPING = .05
+    gravity_coeff = MASS*9.81*LENGTH*0.5
+    integration_coeff = 3. / (MASS*LENGTH*LENGTH)
+    res = np.zeros(2)
+    res[0] = x[1]
+    res[1] = integration_coeff * (u[0] - gravity_coeff*np.cos(x[0]) - DAMPING*x[1])
+    #if res[0] < -np.pi:
+    #    res[0] += 2*np.pi
+    #elif res[0] > np.pi:
+    #    res[0] -= 2 * np.pi
+    #res = np.clip(res, [MIN_ANGLE, MIN_W], [MAX_ANGLE, MAX_W])
+    return res
+
+def enforce_bounds(state):
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    MIN_W, MAX_W = -7., 7
+
+    if state[0] < -np.pi:
+        state[0] += 2*np.pi
+    elif state[0] > np.pi:
+        state[0] -= 2 * np.pi
+    state = np.clip(state, [MIN_ANGLE, MIN_W], [MAX_ANGLE, MAX_W])
+    return state
+
+def stable_u(x):
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    MIN_W, MAX_W = -7., 7
+
+    MIN_TORQUE, MAX_TORQUE = -1., 1.
+
+    LENGTH = 1.
+    MASS = 1.
+    DAMPING = .05
+    gravity_coeff = MASS*9.81*LENGTH*0.5
+    integration_coeff = 3. / (MASS*LENGTH*LENGTH)
+    return np.array([gravity_coeff*np.cos(x[0])])
+
+def jax_dynamics(x, u):
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    MIN_W, MAX_W = -7., 7
+
+    MIN_TORQUE, MAX_TORQUE = -1., 1.
+
+    LENGTH = 1.
+    MASS = 1.
+    DAMPING = .05
+    gravity_coeff = MASS*9.81*LENGTH*0.5
+    integration_coeff = 3. / (MASS*LENGTH*LENGTH)
+    #res = jax.numpy.zeros(2)
+    #res[0] = x[1]
+    #res[1] = integration_coeff * (u[0] - gravity_coeff*jax.numpy.cos(x[0]) - DAMPING*x[1])
+    return jax.numpy.asarray([x[1],integration_coeff * (u[0] - gravity_coeff*jax.numpy.cos(x[0]) - DAMPING*x[1])])
+
+def lqr(A,B,Q,R):
+    """Solve the continuous time lqr controller.
+
+    dx/dt = A x + B u
+
+    cost = integral x.T*Q*x + u.T*R*u
+    """
+    #ref Bertsekas, p.151
+
+    #first, try to solve the ricatti equation
+    X = np.matrix(scipy.linalg.solve_continuous_are(A, B, Q, R))
+
+    #compute the LQR gain
+    K = np.matrix(scipy.linalg.inv(R)*(B.T*X))
+
+    eigVals, eigVecs = scipy.linalg.eig(A-B*K)
+
+    return K, X, eigVals
 
 jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 
-
-test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=1, obs_f=None)
+data_folder = '../data/pendulum/'
+test_data = data_loader.load_test_dataset(1, 5, '../data/pendulum/', sp=1, obs_f=None)
 # data_type: seen or unseen
 obc, obs, paths, path_lengths = test_data
 
@@ -76,6 +113,7 @@ for i in range(len(paths)):
     valid_path = []      # if the feasibility is valid or not
     # save paths to different files, indicated by i
     #print(obs, flush=True)
+    env_type = 'pendulum'
     # feasible paths for each env
     if env_type == 'pendulum':
         system = standard_cpp_systems.PSOPTPendulum()
@@ -93,16 +131,15 @@ for i in range(len(paths)):
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
-        #goal_S0 = np.identity(4)
-        goal_S0 = np.diag([1.,1.,0.,0.])
-        goal_rho0 = 0.8
-    elif env_type == 'acrobot_obs_2':
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_2':
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
         goal_S0 = np.identity(4)
         goal_rho0 = 1.0
-    elif env_type == 'acrobot_obs_3':
+    elif args.env_type == 'acrobot_obs_3':
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
@@ -110,7 +147,35 @@ for i in range(len(paths)):
         goal_rho0 = 1.0
 
     for j in range(len(paths[0])):
+
+        file = open(data_folder+'0/start_goal_%d.pkl' % (i), 'rb')
+        p = pickle._Unpickler(file)
+        p.encoding = 'latin1'
+        start_goal = p.load()
+        xG = start_goal[1]
+        uG = stable_u(start_goal[1])
+        A = jax.jacfwd(jax_dynamics, argnums=0)(start_goal[1], stable_u(start_goal[1]))
+        B = jax.jacfwd(jax_dynamics, argnums=1)(start_goal[1], stable_u(start_goal[1]))
+        A = np.asarray(A)
+        B = np.asarray(B)
+        Q = np.identity(2)
+        R = np.identity(1)
+        K, lqr_S, E = lqr(A, B, Q, R)
+
+
+        start = Node(start_goal[0])
+        goal = Node(start_goal[1])
+
+        goal.S0 = np.identity(2)
+        goal.rho0 = 1.0
+        lqr_rho = sample_ti_verify(xG, uG, lqr_S, K, dynamics, numSample=1000)
+        goal.rho0 = lqr_rho
+        goal.S0 = lqr_S
+        goal_S0 = lqr_S
+        goal_rho0 = lqr_rho
+
         state = paths[i][j]
+        state = np.append(state, [start_goal[1]], axis=0)
         def informer(env, x0, xG, direction):
             # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
             dis = np.abs(x0.x - state)
