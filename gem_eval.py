@@ -14,7 +14,6 @@ from sparse_rrt import _sst_module
 #fig = plt.figure()
 
 def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None):
-    DEFAULT_STEP=0.02
     # data_type: seen or unseen
     obc, obs, paths, path_lengths = test_data
     if obs is not None:
@@ -55,31 +54,37 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
         if env_type == 'pendulum':
             system = standard_cpp_systems.PSOPTPendulum()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 20, 0.002)
+            step_sz = 0.002
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 20, step_sz)
+
         elif env_type == 'cartpole_obs':
             #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
             system = _sst_module.CartPole()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+            step_sz = 0.002
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
             goal_S0 = np.identity(4)
             goal_rho0 = 1.0
         elif env_type == 'acrobot_obs':
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
             system = _sst_module.PSOPTAcrobot()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+            step_sz = 0.002
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
             goal_S0 = np.identity(4)
             goal_rho0 = 1.0
         elif args.env_type == 'acrobot_obs_2':
             system = _sst_module.PSOPTAcrobot()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+            step_sz = 0.002
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_szs)
             goal_S0 = np.identity(4)
             goal_rho0 = 1.0
         elif args.env_type == 'acrobot_obs_3':
             system = _sst_module.PSOPTAcrobot()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+            step_sz = 0.002
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
             goal_S0 = np.identity(4)
             goal_rho0 = 1.0
 
@@ -111,7 +116,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
 
                 control = []
                 time_step = []
-                step_sz = DEFAULT_STEP
+                step_sz = step_sz
                 MAX_NEURAL_REPLAN = 11
                 if obs is None:
                     obs_i = None

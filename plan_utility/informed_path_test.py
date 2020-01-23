@@ -8,11 +8,6 @@ import jax
 sys.path.append('../deps/sparse_rrt')
 sys.path.append('..')
 
-#from ctypes import *
-#ctypes.cdll.LoadLibrary('')
-#lib1 = CDLL("/home/yinglong/Documents/kinodynamic/sparse_rrt/deps/trajopt/build/lib/libsco.so")
-#lib2 = CDLL("/home/yinglong/Documents/kinodynamic/sparse_rrt/deps/trajopt/build/lib/libutils.so")
-
 from sparse_rrt.planners import SST
 #from sparse_rrt.systems import standard_cpp_systems
 from sparse_rrt import _sst_module
@@ -24,36 +19,6 @@ from plan_utility.informed_path import *
 from plan_utility.plan_general import *
 from plan_utility.data_structure import *
 from tvlqr.python_lyapunov import *
-_system = _sst_module.PSOPTPendulum()
-bvp_solver = _sst_module.PSOPTBVPWrapper(_system, 2, 1, 0)
-
-low = []
-high = []
-state_bounds = _system.get_state_bounds()
-for i in range(len(state_bounds)):
-    low.append(state_bounds[i][0])
-    high.append(state_bounds[i][1])
-
-
-f = open('../data/pendulum/0/path_%d.pkl' % (3), 'rb')
-p = pickle._Unpickler(f)
-p.encoding = 'latin1'
-state = p.load()
-
-f = open('../data/pendulum/0/control_%d.pkl' % (3), 'rb')
-p = pickle._Unpickler(f)
-p.encoding = 'latin1'
-control = p.load()
-
-f = open('../data/pendulum/0/cost_%d.pkl' % (3), 'rb')
-p = pickle._Unpickler(f)
-p.encoding = 'latin1'
-times = p.load()
-f = open('../data/pendulum/0/start_goal_%d.pkl' % (3), 'rb')
-p = pickle._Unpickler(f)
-p.encoding = 'latin1'
-sg = p.load()
-goal = sg[-1]
 
 def dynamics(x, u):
     MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
@@ -135,21 +100,6 @@ def lqr(A,B,Q,R):
 
     return K, X, eigVals
 
-def informer(env, x0, xG, direction):
-    # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
-    dif = np.linalg.norm(x0.x - state, axis=1)
-    max_d_i = np.argmin(dif)
-    #print('current state: ')
-    #print(x0.x)
-    #print('chosen data:')
-    #print(state[max_d_i])
-    if direction == 0:
-        # forward
-        res = Node(state[max_d_i+1])
-    else:
-        res = Node(state[max_d_i-1])
-    return res
-
 traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 100, 0.002)
 #print(state)
 #state = np.append(state, [sg[-1]], axis=0)
@@ -178,4 +128,158 @@ goal.S0 = lqr_S
 
 jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
-target_reached = plan(None, start, goal, informer, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.002, MAX_LENGTH=4)
+
+test_data = data_loader.load_test_dataset(10, 100, '../data/pendulum/', obs_f=False)
+# data_type: seen or unseen
+obc, obs, paths, path_lengths = test_data
+
+fes_env = []   # list of list
+valid_env = []
+time_env = []
+time_total = []
+for i in range(len(paths)):
+    time_path = []
+    fes_path = []   # 1 for feasible, 0 for not feasible
+    valid_path = []      # if the feasibility is valid or not
+    # save paths to different files, indicated by i
+    #print(obs, flush=True)
+
+    # feasible paths for each env
+    if env_type == 'pendulum':
+        system = standard_cpp_systems.PSOPTPendulum()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 20, 0.002)
+    elif env_type == 'cartpole_obs':
+        #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+        system = _sst_module.CartPole()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif env_type == 'acrobot_obs':
+        #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+        system = _sst_module.PSOPTAcrobot()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_2':
+        system = _sst_module.PSOPTAcrobot()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_3':
+        system = _sst_module.PSOPTAcrobot()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+
+    for j in range(len(paths[0])):
+        state = paths[i][j]
+        def informer(env, x0, xG, direction):
+            # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
+            dis = np.abs(x0.x - state)
+            circular = system.is_circular_topology()
+            for i in range(len(x0.x)):
+                if circular[i]:
+                    # if it is angle
+                    dis[:,i] = (dis[:,i] > np.pi) * (2*np.pi - dis[:,i]) + (dis[:,i] <= np.pi) * dis[:,i]
+            S = np.identity(len(x0.x))
+            #S = np.diag([1/30./30., 1/40./40., 1., 1.])
+            #dif = np.sqrt(dis.T@S@dis)
+            dif = []
+            for i in range(len(dis)):
+                dif.append(np.sqrt(dis[i].T@S@dis[i]))
+            dif = np.array(dif)
+            #dif = np.linalg.norm(dis, axis=1)
+            max_d_i = np.argmin(dif)
+            #print('current state: ')
+            #print(x0.x)
+            #print('chosen data:')
+            #print(state[max_d_i])
+
+            if direction == 0:
+                # forward
+                if max_d_i+1 == len(state):
+                    next_idx = max_d_i
+                else:
+                    next_idx = max_d_i+1
+                res = Node(state[next_idx])
+
+            else:
+                if max_d_i-1 == -1:
+                    next_idx = max_d_i
+                else:
+                    next_idx = max_d_i-1
+                res = Node(state[next_idx])
+            return res
+
+        time0 = time.time()
+        time_norm = 0.
+        fp = 0 # indicator for feasibility
+        print ("step: i="+str(i)+" j="+str(j))
+        p1_ind=0
+        p2_ind=0
+        p_ind=0
+        if path_lengths[i][j]==0:
+            # invalid, feasible = 0, and path count = 0
+            fp = 0
+            valid_path.append(0)
+        if path_lengths[i][j]>0:
+            fp = 0
+            valid_path.append(1)
+            #paths[i][j][0][1] = 0.
+            #paths[i][j][path_lengths[i][j]-1][1] = 0.
+            path = [paths[i][j][0], paths[i][j][path_lengths[i][j]-1]]
+            # plot the entire path
+            #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
+
+            start = Node(path[0])
+            goal = Node(path[-1])
+            goal.S0 = goal_S0
+            goal.rho0 = goal_rho0    # change this later
+
+            control = []
+            time_step = []
+            step_sz = DEFAULT_STEP
+            MAX_NEURAL_REPLAN = 11
+            if obs is None:
+                obs_i = None
+                obc_i = None
+            else:
+                obs_i = obs[i]
+                obc_i = obc[i]
+            for t in range(MAX_NEURAL_REPLAN):
+                # adaptive step size on replanning attempts
+                res, path_list = plan(obc[i], start, goal, paths[i][j], informer, system, dynamics, \
+                           enforce_bounds, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
+                #print('after neural replan:')
+                #print(path)
+                #path = lvc(path, obc[i], IsInCollision, step_sz=step_sz)
+                #print('after lvc:')
+                #print(path)
+                if res:
+                    fp = 1
+                    print('feasible ok!')
+                    break
+                #if feasibility_check(bvp_solver, path, obc_i, IsInCollision, step_sz=0.01):
+                #    fp = 1
+                #    print('feasible, ok!')
+                #    break
+        if fp:
+            # only for successful paths
+            time1 = time.time() - time0
+            time1 -= time_norm
+            time_path.append(time1)
+            print('test time: %f' % (time1))
+            # write the path
+            #print('planned path:')
+            #print(path)
+            #path = np.array(path)
+            #np.savetxt('results/path_%d.txt' % (j), path)
+            #np.savetxt('results/control_%d.txt' % (j), np.array(control))
+            #np.savetxt('results/timestep_%d.txt' % (j), np.array(time_step))
+
+        fes_path.append(fp)

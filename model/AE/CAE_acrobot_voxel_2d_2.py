@@ -4,7 +4,8 @@ import os
 import torch
 from torch import nn
 from torch.autograd import Variable
-
+# CNN: 8 -> 8
+# linaer: 64
 class Encoder(nn.Module):
     # ref: https://github.com/lxxue/voxnet-pytorch/blob/master/models/voxnet.py
     # adapted from SingleView 2
