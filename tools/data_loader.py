@@ -111,8 +111,8 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             obc = obc.reshape(-1, 2)
             obs_list.append(obs)
             obc_list.append(obc)
-    obc_list = np.array(obc_list)
-    obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
+            obc_list = np.array(obc_list)
+            obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
 
     path_env = []
     path_length_env = []
@@ -139,8 +139,9 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             path_lengths.append(len(p))
         path_env.append(paths)
         path_length_env.append(path_lengths)
-    obs_list = np.array(obs_list)
-    obc_list = np.array(obc_list)
+    if obs_list is not None:
+        obs_list = np.array(obs_list)
+        obc_list = np.array(obc_list)
     return obc_list, obs_list, path_env, path_length_env
 
 
