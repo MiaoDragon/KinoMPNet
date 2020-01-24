@@ -109,8 +109,44 @@ def sample_tv_verify_sqrtrho(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1
         print('rho0 = %f, rho1 = %f' % (prev_rho0, prev_rho1))
         return prev_rho0, prev_rho1
 
-    
+
 def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
+    # assume we are instead set rho1 to be upper_rho, and then obtain rho_dot
+    # here we assume upper_S is the same as S1
+    U = np.random.normal(loc=0.0, scale=1.0, size=(numSample,len(S0)))
+    # individually normalize each sample
+    U = U / np.linalg.norm(U, axis=1, keepdims=True)
+    tmp = np.linalg.pinv(S1)
+    tmp = scipy.linalg.sqrtm(tmp.T @ tmp)
+    U1 = U@scipy.linalg.sqrtm(tmp)
+    # U1 satisfies: u1[i].T S1 u1[i] = 1
+    Sdot1 = -(Q-S1@B1@np.linalg.pinv(R)@B1.T@S1+S1@A1+A1.T@S1)
+    K1 = np.linalg.pinv(R)@B1.T@S1
+
+    # here we use a more relaxed version, to deal with cases when upper_x is not x1
+    # in this case, we only care about (x_bar + x1 - x_upper).T S1 (x_bar + x1 - x_upper) = upper_rho^2
+    # then given our previous samples, x_bar = upper_rho * U1[i] + x_upper - x1
+    X1 = upper_rho * U1 + x_upper.reshape(1,-1) - x1.reshape(1,-1)
+
+    # in case x1 is not the same as upper_x, we solve the optimization to obtain rho
+    delta = np.sqrt((upper_x-x1).T@upper_S@(upper_x-x1))
+    rho1 = upper_rho - delta
+
+    # we then obtain rhodot1 by setting it to be the following:
+    #   max_{xTSx=rho1^2}(d/dt(xTSx))
+    rhodot1 = -1e8
+    for i in range(numSample):
+        cons = X1[i].T@Sdot1@X1[i] + 2*X1[i].T@S1@(func(x1+X1[i],u1-K1@X1[i])-func(x1,u1))
+        if cons > rhodot1:
+            rhodot1 = consm
+    # since we actually find d/dt(rho^2), it is 2rho rhodot
+    rhodot1 = rhodot1 / 2 / rho1
+    # backpropagate one time step to find rho0
+    rho0 = rho1 - rhodot1*(t1-t0)
+    return rho0, rho1
+
+
+def sample_tv_verify_prev(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
     # sample points at t0 and t1, make sure that d(x^TSx)/dt <= rho_dot
     # here we parameterize rho in the time interval of [t0, t1] by a line [rho0, rho1]
 
@@ -151,7 +187,7 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
         rho1 = 1e-3
         rho1_grid = np.linspace(upper_rho*1.1, upper_rho*0.8, num=101)
         rho1_grid = np.append(rho1_grid, np.linspace(upper_rho*0.8, 0., num=51), axis=0)
-        
+
         #rho1_grid = np.linspace(upper_rho-upper_rho_threshold, rho1, num=101)
         # find a rho1 in (0, upper_rho] that can make sure the constraints are valid
         # varify the constraints are true
@@ -299,7 +335,7 @@ def sample_tv_verify_lam(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0
             rhodot1 = (rho1-rho0)/(t1-t0)
             rhodot0 = 2 * rhodot0 * rho0
             rhodot1 = 2 * rhodot1 * rho1
-            #print('searching... upper rho: %f' % (upper_rho))            
+            #print('searching... upper rho: %f' % (upper_rho))
             #print('searching... current rho0: %f' % (rho0))
             #print('    searching... current rho1: %f' % (rho1))
             violate = False
