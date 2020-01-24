@@ -126,7 +126,7 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     # here we use a more relaxed version, to deal with cases when upper_x is not x1
     # in this case, we only care about (x_bar + x1 - x_upper).T S1 (x_bar + x1 - x_upper) = upper_rho^2
     # then given our previous samples, x_bar = upper_rho * U1[i] + x_upper - x1
-    X1 = upper_rho * U1 + x_upper.reshape(1,-1) - x1.reshape(1,-1)
+    X1 = upper_rho * U1 + upper_x.reshape(1,-1) - x1.reshape(1,-1)
 
     # in case x1 is not the same as upper_x, we solve the optimization to obtain rho
     delta = np.sqrt((upper_x-x1).T@upper_S@(upper_x-x1))
@@ -138,10 +138,26 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     for i in range(numSample):
         cons = X1[i].T@Sdot1@X1[i] + 2*X1[i].T@S1@(func(x1+X1[i],u1-K1@X1[i])-func(x1,u1))
         if cons > rhodot1:
-            rhodot1 = consm
+            rhodot1 = cons
     # since we actually find d/dt(rho^2), it is 2rho rhodot
     rhodot1 = rhodot1 / 2 / rho1
     # backpropagate one time step to find rho0
+    rho0 = rho1 - rhodot1*(t1-t0)    
+    # obtain rhodot0
+    tmp = np.linalg.pinv(S0)
+    tmp = scipy.linalg.sqrtm(tmp.T @ tmp)
+    U0 = U@scipy.linalg.sqrtm(tmp)
+    # U1 satisfies: u1[i].T S1 u1[i] = 1
+    Sdot0 = -(Q-S0@B0@np.linalg.pinv(R)@B0.T@S0+S0@A0+A0.T@S0)
+    K0 = np.linalg.pinv(R)@B0.T@S0
+    X0 = rho0 * U0
+    rhodot0 = -1e8
+    for i in range(numSample):
+        cons = X0[i].T@Sdot0@X0[i] + 2*X0[i].T@S0@(func(x0+X0[i],u0-K0@X0[i])-func(x0,u0))
+        if cons > rhodot0:
+            rhodot0 = cons
+    if rhodot0 > rhodot1:
+        rhodot1 = (rhodot0 + rhodot1) / 2
     rho0 = rho1 - rhodot1*(t1-t0)
     return rho0, rho1
 
