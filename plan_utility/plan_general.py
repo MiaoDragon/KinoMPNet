@@ -5,9 +5,10 @@ import numpy as np
 from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
-def propagate(x, us, dts, dynamics, enforce_bounds, step_sz=None):
+def propagate(x, us, dts, dynamics, enforce_bounds, system=None, step_sz=None):
     # use the dynamics to interpolate the state x
     # can implement different interpolation method for this
+    # ADDED: notice now for circular cases, we use the unmapped angle to ensure smoothness
     new_xs = [x]
     new_us = []
     new_dts = []
@@ -18,12 +19,28 @@ def propagate(x, us, dts, dynamics, enforce_bounds, step_sz=None):
         last_step = dt - num_steps*step_sz
         for k in range(num_steps):
             x = x + step_sz*dynamics(x, u)
+            # remember the angle value before mapping to [-2pi to 2pi], and use it after enforcing bounds
+            before_enforce_x = np.array(x)
             x = enforce_bounds(x)
+            if system is not None:
+                circular = system.is_circular_topology()
+                for i in range(len(x)):
+                    if circular[i]:
+                        # use our previously saved version
+                        x[i] = before_enforce_x[i]
             new_xs.append(x)
             new_us.append(u)
             new_dts.append(step_sz)
         x = x + last_step*dynamics(x, u)
+        before_enforce_x = np.array(x)
         x = enforce_bounds(x)
+        if system is not None:
+            circular = system.is_circular_topology()
+            for i in range(len(x)):
+                if circular[i]:
+                    # use our previously saved version
+                    x[i] = before_enforce_x[i]
+
         new_xs.append(x)
         new_us.append(u)
         new_dts.append(last_step)
@@ -59,7 +76,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         # ensure us and dts have length 1 less than xs
         if len(us) == len(xs):
             us = us[:-1]
-        xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, step_sz=step_sz)
+        xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
         """
             print('propagation result:')
             print('xs[0]:')
@@ -98,7 +115,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         us = np.flip(us, axis=0)
         dts = np.flip(dts, axis=0)
         # reversely propagate the system
-        xs, us, dts = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), enforce_bounds=enforce_bounds, step_sz=step_sz)
+        xs, us, dts = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
         xs = np.flip(xs, axis=0)
         us = np.flip(us, axis=0)
         dts = np.flip(dts, axis=0)
@@ -179,6 +196,10 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
         x0 = xtraj(t0)
         u0 = utraj(t0)
         x1 = xtraj(t1)
+        #print('x1:')
+        #print(x1)
+        #print('xs[i]:')
+        #print(edge.xs[i])
         #if i == len(time_knot)-1:
         #    x1 = goal.x
         u1 = utraj(t1)
@@ -240,20 +261,22 @@ def node_nearby(x0, x1, S, rho, system):
     for i in range(len(delta_x)):
         if circular[i]:
             # if it is angle
+            # should not change the "sign" of the delta_x
+            # map to [-pi, pi]
+            delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+            # should not change the "sign" of the delta_x
             if delta_x[i] > np.pi:
                 delta_x[i] = delta_x[i] - 2*np.pi
-            if delta_x[i] < -np.pi:
-                delta_x[i] = delta_x[i] + 2*np.pi
     #lam_S = np.linalg.eigvals(S).max()
     xTSx = delta_x.T@S@delta_x# / lam_S
-    if xTSx <= 4.:
+    # here we use a safe threshold (0.9)
+    if xTSx <= rho*rho:
         print('nearby:')
         print('S:')
         print(S)
         print('xTSx: %f' % (xTSx))
         print('rho^2: %f' % (rho*rho))
-    if xTSx <= rho*rho:
-         return True
+        return True
     return False
 
 def line_nearby(x0, x1, system):
@@ -306,10 +329,12 @@ def node_h_dist(x0, x1, S, rho, system):
     for i in range(len(delta_x)):
         if circular[i]:
             # if it is angle
+            # should not change the "sign" of the delta_x
+            # map to [-pi, pi]
+            delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+            # should not change the "sign" of the delta_x
             if delta_x[i] > np.pi:
                 delta_x[i] = delta_x[i] - 2*np.pi
-            if delta_x[i] < -np.pi:
-                delta_x[i] = delta_x[i] + 2*np.pi
     #lam_S = np.linalg.eigvals(S).max()
     xTSx = delta_x.T@S@delta_x# / lam_S
     """

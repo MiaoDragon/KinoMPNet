@@ -73,10 +73,12 @@ def tvlqr(x, u, dt, func, jac_A, jac_B, system=None, Qf=None):
             for i in range(len(delta_x)):
                 if circular[i]:
                     # if it is angle
+                    # should not change the "sign" of the delta_x
+                    # map to [-pi, pi]
+                    delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                    # should not change the "sign" of the delta_x
                     if delta_x[i] > np.pi:
                         delta_x[i] = delta_x[i] - 2*np.pi
-                    if delta_x[i] < -np.pi:
-                        delta_x[i] = delta_x[i] + 2*np.pi
         u = -K @ delta_x + utraj(t)
         return u
     return controller, xtraj, utraj, S

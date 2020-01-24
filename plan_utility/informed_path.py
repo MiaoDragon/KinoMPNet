@@ -62,7 +62,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             # here direciton=0 means we are computing forward steer, and 1 means
             # we are computing backward
             xw = informer(env, x0, xG, direction=0)
-            x, e = pathSteerTo(x0, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, direction=0)
+            x, e = pathSteerTo(x0, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0)
             for i in range(len(e.xs)):
                 update_line(hl_for, ax, e.xs[i])
             ax.scatter(e.xs[::10,0], e.xs[::10,1], c='g')
@@ -76,7 +76,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             tree=1
         else:
             xw = informer(env, xG, x0, direction=1)
-            x, e = pathSteerTo(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, direction=1)
+            x, e = pathSteerTo(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1)
             for i in range(len(e.xs)):
                 update_line(hl_back, ax, e.xs[i])
             ax.scatter(e.xs[::10,0], e.xs[::10,1], c='r')
@@ -90,7 +90,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             tree=0
 
         # steer endpoint
-        xG_, e = pathSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, direction=0)
+        xG_, e = pathSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0)
         # add xG_ to the start tree
         x0.next = xG_
         xG_.prev = x0
@@ -145,6 +145,14 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
                 min_node = new_node
             xG = min_node
             x0 = xG_
+            # again print out the xTSx
+            print('xTSx:')
+            print((x0.x-xG.x).T@(xG.S0)@(x0.x-xG.x))
+            print('rho0^2: %f' % (xG.rho0*xG.rho0))
+            # print for the edge endpoint
+            print('for edge endpoint:')
+            print('xTSx:')
+            print((x0.prev.edge.xs[-1]-xG.x).T@(xG.S0)@(x0.prev.edge.xs[-1]-xG.x))
             break
         itr += 1
 

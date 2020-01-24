@@ -133,13 +133,16 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     delta_x = upper_x-x1
     if system is not None:
         circular = system.is_circular_topology()
+        # if it is an angle
         for i in range(len(delta_x)):
             if circular[i]:
                 # if it is angle
+                # should not change the "sign" of the delta_x
+                # map to [-pi, pi]
+                delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                # should not change the "sign" of the delta_x
                 if delta_x[i] > np.pi:
-                    delta_x[i] = delta_x[i] - 2*np.pi
-                if delta_x[i] < -np.pi:
-                    delta_x[i] = delta_x[i] + 2*np.pi
+                    delta_x[i] = delta_x[i] - 2*np.pi                
     delta = np.sqrt(delta_x.T@upper_S@delta_x)
     rho1 = upper_rho - delta
     print('delta:')
