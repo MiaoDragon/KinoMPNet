@@ -32,7 +32,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, step_sz=None):
     new_dts = np.array(new_dts)
     return new_xs, new_us, new_dts
 
-def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, step_sz=0.002):
+def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
@@ -136,7 +136,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
     goal.prev = start
     return x1, edge
 
-def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, step_sz=0.02):
+def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.02):
     start = x0
     goal = x1
     if direction == 0:
@@ -155,7 +155,7 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
     Qf = goal.S0
     if Qf is not None:
         Qf = np.array(Qf)
-    controller, xtraj, utraj, S = tvlqr(xs, us, dts, dynamics, jac_A, jac_B, Qf=Qf)
+    controller, xtraj, utraj, S = tvlqr(xs, us, dts, dynamics, jac_A, jac_B, system=system, Qf=Qf)
     start.S0 = S(0).reshape((len(start.x),len(start.x)))
     edge.xtraj = xtraj
     edge.utraj = utraj
@@ -194,7 +194,7 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
         S1 = S(t1).reshape(len(x0),len(x0))
         Q = np.identity(len(x0))
         R = np.identity(len(u0))
-        rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, numSample=100)
+        rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, system=system, numSample=100)
         rho0s.append(rho0)
         rho1s.append(rho1)
         print('upper_rho: %f' % (upper_rho))
@@ -217,7 +217,7 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
 
 
 
-def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=0.02):
+def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=None, step_sz=0.02):
     # compute funnel backward until xg
     # recursively backpropagate the funnel computation
     start = xG.prev
@@ -227,7 +227,7 @@ def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz
         if xg.prev is not None and np.linalg.norm(xg.prev.x - start.x) <= 1e-6:
             # xg already computed
             break
-        funnelSteerTo(start, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, step_sz=step_sz)
+        funnelSteerTo(start, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
         start = start.prev
         goal = goal.prev
 

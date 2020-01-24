@@ -110,9 +110,10 @@ def sample_tv_verify_sqrtrho(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1
         return prev_rho0, prev_rho1
 
 
-def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, numSample=50):
+def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func, system=None, numSample=50):
     # assume we are instead set rho1 to be upper_rho, and then obtain rho_dot
     # here we assume upper_S is the same as S1
+    # system is used to calculate circular state difference
     U = np.random.normal(loc=0.0, scale=1.0, size=(numSample,len(S0)))
     # individually normalize each sample
     U = U / np.linalg.norm(U, axis=1, keepdims=True)
@@ -129,9 +130,22 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     X1 = upper_rho * U1 + upper_x.reshape(1,-1) - x1.reshape(1,-1)
 
     # in case x1 is not the same as upper_x, we solve the optimization to obtain rho
-    delta = np.sqrt((upper_x-x1).T@upper_S@(upper_x-x1))
+    delta_x = upper_x-x1
+    if system is not None:
+        circular = system.is_circular_topology()
+        for i in range(len(delta_x)):
+            if circular[i]:
+                # if it is angle
+                if delta_x[i] > np.pi:
+                    delta_x[i] = delta_x[i] - 2*np.pi
+                if delta_x[i] < -np.pi:
+                    delta_x[i] = delta_x[i] + 2*np.pi
+    delta = np.sqrt(delta_x.T@upper_S@delta_x)
     rho1 = upper_rho - delta
-
+    print('delta:')
+    print(delta)
+    print('upper_rho')
+    print(upper_rho)
     # we then obtain rhodot1 by setting it to be the following:
     #   max_{xTSx=rho1^2}(d/dt(xTSx))
     rhodot1 = -1e8

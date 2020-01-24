@@ -91,6 +91,13 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
 
         # steer endpoint
         xG_, e = pathSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, direction=0)
+        # add xG_ to the start tree
+        x0.next = xG_
+        xG_.prev = x0
+        x0.edge = e
+        x0.edge.next = xG_
+        
+
         print('endpoint steering...')
         print('x0:')
         print(x0.x)
@@ -116,7 +123,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             continue
         # otherwise it is a nearby node
         if min_node.S0 is None:
-            lazyFunnel(min_node, funnel_node, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz)
+            lazyFunnel(min_node, funnel_node, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=system, step_sz=step_sz)
             funnel_node = min_node
 
         reached, node_i0, node_i1 = nearby(xG_, min_node, system)
@@ -137,6 +144,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
                 new_node.next = min_node.next
                 min_node = new_node
             xG = min_node
+            x0 = xG_
             break
         itr += 1
 
@@ -152,7 +160,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
         # construct the funnel later
         # connect from x0 to xG, the endpoint of x0 is xG_, but it is near xG
         print('before funnelsteerto')
-        funnelSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, step_sz=step_sz)
+        funnelSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
         print('after funnelsteerto')
 
         #xG_.next = xG

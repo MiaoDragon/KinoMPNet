@@ -161,7 +161,8 @@ for i in range(len(paths)):
         Q = np.identity(2)
         R = np.identity(1)
         K, lqr_S, E = lqr(A, B, Q, R)
-
+        K = np.array(K)
+        lqr_S = np.array(lqr_S)
 
         start = Node(start_goal[0])
         goal = Node(start_goal[1])

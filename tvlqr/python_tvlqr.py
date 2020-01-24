@@ -17,7 +17,7 @@ import scipy
 from scipy.interpolate import CubicHermiteSpline, PPoly, interp1d
 from scipy.integrate import solve_ivp, ode, odeint
 import numpy as np
-def tvlqr(x, u, dt, func, jac_A, jac_B, Qf=None):
+def tvlqr(x, u, dt, func, jac_A, jac_B, system=None, Qf=None):
     # len(x) = len(u)+1=len(dt)+1
     # interpolation of x
     t = [0.]
@@ -67,6 +67,16 @@ def tvlqr(x, u, dt, func, jac_A, jac_B, Qf=None):
         B = jac_B(xtraj(t), utraj(t))
         B = np.asarray(B)
         K = B.T @ S(t).reshape((len(x),len(x)))
-        u = -K @ (x - xtraj(t)) + utraj(t)
+        delta_x = x - xtraj(t)
+        if system is not None:
+            circular = system.is_circular_topology()
+            for i in range(len(delta_x)):
+                if circular[i]:
+                    # if it is angle
+                    if delta_x[i] > np.pi:
+                        delta_x[i] = delta_x[i] - 2*np.pi
+                    if delta_x[i] < -np.pi:
+                        delta_x[i] = delta_x[i] + 2*np.pi
+        u = -K @ delta_x + utraj(t)
         return u
     return controller, xtraj, utraj, S
