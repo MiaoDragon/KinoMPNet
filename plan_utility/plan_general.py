@@ -59,8 +59,8 @@ def propagate(x, us, dts, dynamics, enforce_bounds, system=None, step_sz=None):
     new_us = np.array(new_us)
     new_dts = np.array(new_dts)
     return new_xs, new_us, new_dts
-"""
-def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
+
+def pathSteerToPrev(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
@@ -163,7 +163,6 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
     start.next = goal
     goal.prev = start
     return x1, edge
-"""
 
 
 def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
