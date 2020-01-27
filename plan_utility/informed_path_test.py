@@ -64,7 +64,7 @@ jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 
 test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=1, obs_f=None)
 # data_type: seen or unseen
-obc, obs, paths, path_lengths = test_data
+obc, obs, paths, path_lengths, controls, costs = test_data
 
 fes_env = []   # list of list
 valid_env = []
@@ -92,10 +92,11 @@ for i in range(len(paths)):
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, 0.002)
+        step_sz = 0.02
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 4, 0.02)
         #goal_S0 = np.identity(4)
         goal_S0 = np.diag([1.,1.,0.,0.])
-        goal_rho0 = 0.8
+        goal_rho0 = 1.5
     elif env_type == 'acrobot_obs_2':
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
@@ -111,6 +112,17 @@ for i in range(len(paths)):
 
     for j in range(len(paths[0])):
         state = paths[i][j]
+        # obtain the sequence
+        p_start = paths[i][j][0]
+        detail_paths = [p_start]
+        for k in range(len(controls[i][j])):
+            for step in range(int(costs[i][j][k]/step_sz)):
+                p_start = p_start + step_sz*dynamics(p_start, controls[i][j][k])
+                p_start = enforce_bounds(p_start)
+                detail_paths.append(p_start)
+        #detail_paths.append(paths[i][j][-1])
+        state = detail_paths[::30]
+        
         def informer(env, x0, xG, direction):
             # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
             dis = np.abs(x0.x - state)
@@ -119,7 +131,8 @@ for i in range(len(paths)):
                 if circular[i]:
                     # if it is angle
                     dis[:,i] = (dis[:,i] > np.pi) * (2*np.pi - dis[:,i]) + (dis[:,i] <= np.pi) * dis[:,i]
-            S = np.identity(len(x0.x))
+            #S = np.identity(len(x0.x))
+            S = np.diag([1.,1.,0.,0.])
             #S = np.diag([1/30./30., 1/40./40., 1., 1.])
             #dif = np.sqrt(dis.T@S@dis)
             dif = []
@@ -170,13 +183,14 @@ for i in range(len(paths)):
             #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
             start = Node(path[0])
-            goal = Node(path[-1])
+            goal = Node(paths[i][j][-2])
+            #goal = Node(path[-1])
             goal.S0 = goal_S0
             goal.rho0 = goal_rho0    # change this later
 
             control = []
             time_step = []
-            step_sz = 0.002
+            
             MAX_NEURAL_REPLAN = 11
             if obs is None:
                 obs_i = None
@@ -186,7 +200,7 @@ for i in range(len(paths)):
                 obc_i = obc[i]
             for t in range(MAX_NEURAL_REPLAN):
                 # adaptive step size on replanning attempts
-                res, path_list = plan(None, start, goal, paths[i][j], informer, system, dynamics, \
+                res, path_list = plan(None, start, goal, detail_paths, informer, system, dynamics, \
                            enforce_bounds, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
                 #print('after neural replan:')
                 #print(path)

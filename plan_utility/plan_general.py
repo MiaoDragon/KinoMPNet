@@ -5,6 +5,17 @@ import numpy as np
 from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
+def wrap_angle(x, system):
+    circular = system.is_circular_topology()
+    res = np.array(x)
+    for i in range(len(x)):
+        if circular[i]:
+            # use our previously saved version
+            res[i] = x[i] - np.floor(x[i] / (2*np.pi))*(2*np.pi)
+            if res[i] > np.pi:
+                res[i] = res[i] - 2*np.pi
+    return res
+
 def propagate(x, us, dts, dynamics, enforce_bounds, system=None, step_sz=None):
     # use the dynamics to interpolate the state x
     # can implement different interpolation method for this
@@ -90,7 +101,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         """
         edge_dt = np.sum(dts)
         start = x0
-        goal = Node(xs[-1])
+        goal = Node(wrap_angle(xs[-1], system))
         x1 = goal
     else:
         xs, us, dts = traj_opt(x1.x, x0.x)
@@ -131,7 +142,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
             print(dts)
         """
         edge_dt = np.sum(dts)
-        start = Node(xs[0])  # after flipping, the first in xs is the start
+        start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         goal = x0
         x1 = start
     # after trajopt, make actions of dimension 2
@@ -395,3 +406,5 @@ def h_dist(node, xG, S, rho, system):
         if dist < res:
             res = dist
     return res
+
+
