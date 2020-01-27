@@ -59,7 +59,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, system=None, step_sz=None):
     new_us = np.array(new_us)
     new_dts = np.array(new_dts)
     return new_xs, new_us, new_dts
-
+"""
 def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
@@ -163,6 +163,113 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
     start.next = goal
     goal.prev = start
     return x1, edge
+"""
+
+
+def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
+    # direciton 0 means forward from x0 to x1
+    # direciton 1 means backward from x0 to x1
+    # jac_A: given x, u -> linearization A
+    # jac_B: given x, u -> linearization B
+    # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
+    if direction == 0:
+        xs, us, dts = traj_opt(x0.x, x1.x)
+        """
+        print('----------------forward----------------')
+        print('trajectory opt:')
+        print('start:')
+        print(x0.x)
+        print('end:')
+        print(x1.x)
+        print('xs[0]:')
+        print(xs[0])
+        print('xs[-1]:')
+        print(xs[-1])
+        print('us:')
+        print(us)
+        print('dts:')
+        print(dts)
+        """
+        # ensure us and dts have length 1 less than xs
+        if len(us) == len(xs):
+            us = us[:-1]
+        xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
+        """
+            print('propagation result:')
+            print('xs[0]:')
+            print(xs[0])
+            print('xs[-1]:')
+            print(xs[-1])
+            print('us:')
+            print(us)
+            print('dts:')
+            print(dts)
+        """
+        edge_dt = np.sum(dts)
+        start = x0
+        goal = Node(wrap_angle(xs[-1], system))
+        x1 = goal
+    else:
+        xs, us, dts = traj_opt(x1.x, x0.x)
+        """
+        print('----------------backward----------------')
+        print('trajectory opt:')
+        print('start:')
+        print(x1.x)
+        print('end:')
+        print(x0.x)
+        print('xs[0]:')
+        print(xs[0])
+        print('xs[-1]:')
+        print(xs[-1])
+        print('us:')
+        print(us)
+        print('dts:')
+        print(dts)
+        """
+        if len(us) == len(xs):
+            us = us[:-1]
+        # reversely propagate the system
+        xs, us, dts = propagate(xs[0], us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
+        """
+            print('propagation result:')
+            print('xs[0]:')
+            print(xs[0])
+            print('xs[-1]:')
+            print(xs[-1])
+            print('us:')
+            print(us)
+            print('dts:')
+            print(dts)
+        """
+        edge_dt = np.sum(dts)
+        start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
+        # the next node is the x0
+        goal = x0
+        #goal = Node(wrap_angle(xs[-1], system))
+        x1 = start
+    # after trajopt, make actions of dimension 2
+    us = us.reshape(len(us), -1)
+
+    # notice that controller time starts from 0, hence locally need to shift the time by minusing t0_edges
+    # start from 0
+    time_knot = np.cumsum(dts)
+    time_knot = np.insert(time_knot, 0, 0.)
+
+    # can also change the resolution by the following function (for instance, every 10)
+    #indices = np.arange(0, len(time_knot), 10)
+    #time_knot = time_knot[indices]
+    #print(time_knot)
+    edge = Edge(xs, us, dts, time_knot, edge_dt)
+    edge.next = goal
+    start.edge = edge
+    start.next = goal
+    goal.prev = start
+    return x1, edge
+
+
+
+
 
 def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.02):
     start = x0
@@ -406,5 +513,3 @@ def h_dist(node, xG, S, rho, system):
         if dist < res:
             res = dist
     return res
-
-

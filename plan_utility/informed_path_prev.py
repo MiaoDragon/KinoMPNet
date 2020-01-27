@@ -81,16 +81,8 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
         else:
             xw = informer(env, xG, x0, direction=1)
             x, e = pathSteerTo(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1)
-            # check if the edge endpoint is near the next node
-            if not node_nearby(e.xs[-1], xG.x, xG.S0, xG.rho0, system):
-                # not in the region try next time
-                tree=0
-                continue
-            # directly compute funnel to connect
-            funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
             for i in range(len(e.xs)):
                 update_line(hl_back, ax, e.xs[i])
-            update_line(hl_back, ax, xG.x)
             xs_to_plot = np.array(e.xs[::10])
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
@@ -111,7 +103,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
         xG_.prev = x0
         x0.edge = e
         x0.edge.next = xG_
-
+        
 
         print('endpoint steering...')
         print('x0:')
