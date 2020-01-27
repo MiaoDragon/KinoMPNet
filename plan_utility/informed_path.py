@@ -22,6 +22,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
     hl_back_mpnet, = ax.plot([], [], 'salmon')
 
     def update_line(h, ax, new_data):
+        new_data = wrap_angle(new_data, system)
         h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
         #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
         #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
@@ -65,7 +66,10 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             x, e = pathSteerTo(x0, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0)
             for i in range(len(e.xs)):
                 update_line(hl_for, ax, e.xs[i])
-            ax.scatter(e.xs[::10,0], e.xs[::10,1], c='g')
+            xs_to_plot = np.array(e.xs[::10])
+            for i in range(len(xs_to_plot)):
+                xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='g')
             draw_update_line(ax)
             plt.waitforbuttonpress()
             x0.next = x
@@ -79,7 +83,10 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             x, e = pathSteerTo(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1)
             for i in range(len(e.xs)):
                 update_line(hl_back, ax, e.xs[i])
-            ax.scatter(e.xs[::10,0], e.xs[::10,1], c='r')
+            xs_to_plot = np.array(e.xs[::10])
+            for i in range(len(xs_to_plot)):
+                xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='r')
             draw_update_line(ax)
             plt.waitforbuttonpress()
             x.next = xG
@@ -105,7 +112,12 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
         print(xG.x)
         print('xG_:')
         print(xG_.x)
-        ax.scatter(e.xs[::10,0], e.xs[::10,1], c='salmon')
+        xs_to_plot = np.array(e.xs[::10])
+        for i in range(len(xs_to_plot)):
+            xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+        ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='salmon')
+
+        #ax.scatter(e.xs[::10,0], e.xs[::10,1], c='salmon')
         draw_update_line(ax)
         # find the nearest point from xG_ to points on the goal tree
         node = xG
@@ -137,7 +149,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
                 edge.t0 = edge.time_knot[node_i1]
                 edge.i0 = node_i1
                 # change the node to be xs[node_i], S0 to be S(time_knot[node_i]), rho0 to be rho0s[node_i]
-                new_node = Node(edge.xs[node_i1])
+                new_node = Node(wrap_angle(edge.xs[node_i1], system))
                 new_node.S0 = edge.S(edge.t0).reshape((len(edge.xs[node_i1]),len(edge.xs[node_i1])))
                 new_node.rho0 = edge.rho0s[node_i1]
                 new_node.edge = edge
