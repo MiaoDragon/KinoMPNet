@@ -6,7 +6,7 @@ import torch
 import model.AE.identity as cae_identity
 from model.mlp import MLP
 from model import mlp_acrobot
-from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2
+from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
@@ -49,6 +49,11 @@ def main(args):
         unnormalize = acrobot_obs.unnormalize
         mlp = mlp_acrobot.MLP3
         cae = CAE_acrobot_voxel_2d_2
+    elif args.env_type == 'acrobot_obs_4':
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        mlp = mlp_acrobot.MLP3
+        cae = CAE_acrobot_voxel_2d_3
 
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)

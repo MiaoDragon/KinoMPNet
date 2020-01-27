@@ -87,7 +87,13 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
             traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
             goal_S0 = np.identity(4)
             goal_rho0 = 1.0
-
+        elif args.env_type == 'acrobot_obs_4':
+            system = _sst_module.PSOPTAcrobot()
+            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+            step_sz = 0.002
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
+            goal_S0 = np.identity(4)
+            goal_rho0 = 1.0
         for j in range(len(paths[0])):
             time0 = time.time()
             time_norm = 0.
