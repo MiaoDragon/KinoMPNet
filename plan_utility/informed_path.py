@@ -5,7 +5,7 @@ import numpy as np
 from plan_utility.plan_general import *
 import matplotlib.pyplot as plt
 # this one predicts one individual path using informer and trajopt
-def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
+def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInCollision, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
     # jac_A: given (x, u) -> linearization A
     # jac B: given (x, u) -> linearization B
@@ -52,6 +52,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
     start = x0
     goal = xG
     funnel_node = goal
+    BVP_TOLERANCE = 1e-6
     while target_reached==0 and itr<MAX_LENGTH:
         itr=itr+1  # prevent the path from being too long
         print('iter: %d' % (itr))
@@ -63,7 +64,19 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             # here direciton=0 means we are computing forward steer, and 1 means
             # we are computing backward
             xw = informer(env, x0, xG, direction=0)
-            x, e = pathSteerTo(x0, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0)
+            x, e = pathSteerToBothDir(x0, xw, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
+            if e is None:
+                # in collision
+                tree = 1
+                itr += 1
+                continue
+                
+            # if the bvp solver solution is too faraway, then ignore it
+            if np.linalg.norm(e.xs[0] - x0.x) > BVP_TOLERANCE:
+                # ignore it
+                print('forward searching bvp not successful.')
+                # then propagate it to obtain the result
+                x, e = pathSteerToBothDir(x0, xw, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)                
             for i in range(len(e.xs)):
                 update_line(hl_for, ax, e.xs[i])
             xs_to_plot = np.array(e.xs[::10])
@@ -80,14 +93,40 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             tree=1
         else:
             xw = informer(env, xG, x0, direction=1)
-            x, e = pathSteerTo(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1)
+            # plot the informed point
+            ax.scatter(xw.x[0], xw.x[1], c='yellow')
+            x, e = pathSteerToForwardOnly(xG, xw, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
+            if e is None:
+                # in collision
+                tree = 0
+                itr += 1
+                continue
+                
+            print('after backward search...')
+            print('endpoint:')
+            print(e.xs[-1])
+            print('goal:')
+            print(xG.x)
+            print('startpoint:')
+            print(e.xs[0])
+            print('distance:')
+            print(node_h_dist(e.xs[-1], xG.x, xG.S0, xG.rho0, system))
+            print('S0:')
+            print(xG.S0)
+            print('rho0:')
+            print(xG.rho0)
             # check if the edge endpoint is near the next node
             if not node_nearby(e.xs[-1], xG.x, xG.S0, xG.rho0, system):
                 # not in the region try next time
+                itr += 1
                 tree=0
                 continue
+                # or we can also directly back propagate
+                print('backward not nearby, propagate using the trajopt')
+                #x, e = pathSteerToBothDir(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)                
             # directly compute funnel to connect
             funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
+
             for i in range(len(e.xs)):
                 update_line(hl_back, ax, e.xs[i])
             update_line(hl_back, ax, xG.x)
@@ -105,7 +144,20 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
             tree=0
 
         # steer endpoint
-        xG_, e = pathSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0)
+        xG_, e = pathSteerToBothDir(x0, xG, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
+        if e is None:
+            # in collision
+            itr += 1
+            continue
+            
+        # check if the BVP is successful
+        if np.linalg.norm(e.xs[0] - x0.x) > BVP_TOLERANCE:
+            # try propagating
+            xG_, e = pathSteerToBothDir(x0, xG, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
+            #itr += 1
+            #continue
+        
+        
         # add xG_ to the start tree
         x0.next = xG_
         xG_.prev = x0
@@ -188,7 +240,9 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, traj_opt
         # construct the funnel later
         # connect from x0 to xG, the endpoint of x0 is xG_, but it is near xG
         print('before funnelsteerto')
-        funnelSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
+        lazyFunnel(start, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=system, step_sz=step_sz)
+        print(start.edge.rho0s)
+        #funnelSteerTo(x0, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
         print('after funnelsteerto')
 
         #xG_.next = xG

@@ -16,13 +16,14 @@ def wrap_angle(x, system):
                 res[i] = res[i] - 2*np.pi
     return res
 
-def propagate(x, us, dts, dynamics, enforce_bounds, system=None, step_sz=None):
+def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, step_sz=None):
     # use the dynamics to interpolate the state x
     # can implement different interpolation method for this
     # ADDED: notice now for circular cases, we use the unmapped angle to ensure smoothness
     new_xs = [x]
     new_us = []
     new_dts = []
+    valid = True  # collision free
     for i in range(len(us)):
         dt = dts[i]
         u = us[i]
@@ -35,32 +36,44 @@ def propagate(x, us, dts, dynamics, enforce_bounds, system=None, step_sz=None):
             x = enforce_bounds(x)
             if system is not None:
                 circular = system.is_circular_topology()
-                for i in range(len(x)):
-                    if circular[i]:
+                for xi in range(len(x)):
+                    if circular[xi]:
                         # use our previously saved version
-                        x[i] = before_enforce_x[i]
+                        x[xi] = before_enforce_x[xi]
+            if IsInCollision(x):
+                # the ccurrent state is in collision, abort
+                print('collision, i=%d, num_steps=%d' % (i, k))
+                valid = False
+                break
             new_xs.append(x)
             new_us.append(u)
             new_dts.append(step_sz)
+            print('appended, i=%d' % (i))
+        if not valid:
+            break
         x = x + last_step*dynamics(x, u)
         before_enforce_x = np.array(x)
         x = enforce_bounds(x)
         if system is not None:
             circular = system.is_circular_topology()
-            for i in range(len(x)):
-                if circular[i]:
+            for xi in range(len(x)):
+                if circular[xi]:
                     # use our previously saved version
-                    x[i] = before_enforce_x[i]
-
+                    x[xi] = before_enforce_x[xi]
+        if IsInCollision(x):
+            print('collision, i=%d' % (i))
+            valid = False
+            break
         new_xs.append(x)
         new_us.append(u)
         new_dts.append(last_step)
     new_xs = np.array(new_xs)
     new_us = np.array(new_us)
     new_dts = np.array(new_dts)
+    print('len(new_us): %d' % (len(new_us)))
     return new_xs, new_us, new_dts
 
-def pathSteerToPrev(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
+def pathSteerToBothDir(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
@@ -87,18 +100,22 @@ def pathSteerToPrev(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, di
         # ensure us and dts have length 1 less than xs
         if len(us) == len(xs):
             us = us[:-1]
-        xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
-        """
-            print('propagation result:')
-            print('xs[0]:')
-            print(xs[0])
-            print('xs[-1]:')
-            print(xs[-1])
-            print('us:')
-            print(us)
-            print('dts:')
-            print(dts)
-        """
+        if propagating:
+            xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            """
+                print('propagation result:')
+                print('xs[0]:')
+                print(xs[0])
+                print('xs[-1]:')
+                print(xs[-1])
+                print('us:')
+                print(us)
+                print('dts:')
+                print(dts)
+            """
+        else:
+            # check collision for the trajopt endpoint
+            pass
         edge_dt = np.sum(dts)
         start = x0
         goal = Node(wrap_angle(xs[-1], system))
@@ -123,28 +140,31 @@ def pathSteerToPrev(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, di
         """
         if len(us) == len(xs):
             us = us[:-1]
-        us = np.flip(us, axis=0)
-        dts = np.flip(dts, axis=0)
-        # reversely propagate the system
-        xs, us, dts = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
-        xs = np.flip(xs, axis=0)
-        us = np.flip(us, axis=0)
-        dts = np.flip(dts, axis=0)
-        """
-            print('propagation result:')
-            print('xs[0]:')
-            print(xs[0])
-            print('xs[-1]:')
-            print(xs[-1])
-            print('us:')
-            print(us)
-            print('dts:')
-            print(dts)
-        """
+        if propagating:
+            us = np.flip(us, axis=0)
+            dts = np.flip(dts, axis=0)
+            # reversely propagate the system
+            xs, us, dts = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            xs = np.flip(xs, axis=0)
+            us = np.flip(us, axis=0)
+            dts = np.flip(dts, axis=0)
+            """
+                print('propagation result:')
+                print('xs[0]:')
+                print(xs[0])
+                print('xs[-1]:')
+                print(xs[-1])
+                print('us:')
+                print(us)
+                print('dts:')
+                print(dts)
+            """
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         goal = x0
         x1 = start
+    if len(us) == 0:
+        return x1, None
     # after trajopt, make actions of dimension 2
     us = us.reshape(len(us), -1)
 
@@ -165,7 +185,7 @@ def pathSteerToPrev(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, di
     return x1, edge
 
 
-def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002):
+def pathSteerToForwardOnly(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
@@ -173,7 +193,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
         xs, us, dts = traj_opt(x0.x, x1.x)
-        """
+        
         print('----------------forward----------------')
         print('trajectory opt:')
         print('start:')
@@ -188,12 +208,13 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         print(us)
         print('dts:')
         print(dts)
-        """
+        
         # ensure us and dts have length 1 less than xs
         if len(us) == len(xs):
             us = us[:-1]
-        xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
-        """
+        # try without propagating
+        if propagating:
+            xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
             print('propagation result:')
             print('xs[0]:')
             print(xs[0])
@@ -203,14 +224,13 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
             print(us)
             print('dts:')
             print(dts)
-        """
         edge_dt = np.sum(dts)
         start = x0
         goal = Node(wrap_angle(xs[-1], system))
         x1 = goal
     else:
         xs, us, dts = traj_opt(x1.x, x0.x)
-        """
+        
         print('----------------backward----------------')
         print('trajectory opt:')
         print('start:')
@@ -225,12 +245,14 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
         print(us)
         print('dts:')
         print(dts)
-        """
+        
         if len(us) == len(xs):
             us = us[:-1]
-        # reversely propagate the system
-        xs, us, dts = propagate(xs[0], us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, system=system, step_sz=step_sz)
-        """
+        # try without propagating
+        if propagating:
+            # reversely propagate the system
+            xs, us, dts = propagate(xs[0], us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+
             print('propagation result:')
             print('xs[0]:')
             print(xs[0])
@@ -240,7 +262,7 @@ def pathSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direct
             print(us)
             print('dts:')
             print(dts)
-        """
+
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         # the next node is the x0
@@ -299,6 +321,7 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
     upper_S = goal.S0
     upper_rho = goal.rho0  # the rho0 of goal will be come the upper_rho currently
     time_knot = start.edge.time_knot
+    i0 = start.edge.i0  # the edge may be partly available
     xtraj = start.edge.xtraj
     utraj = start.edge.utraj
     rho0s = []
@@ -307,7 +330,7 @@ def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, dire
     print('time_knot: %d' % (len(time_knot)))
     #todo: to add rho0s and rho1s list to edge
     # reversely construct the funnel
-    for i in range(len(time_knot)-1, 0, -1):
+    for i in range(len(time_knot)-1, i0, -1):
         t0 = time_knot[i-1]
         t1 = time_knot[i]
         x0 = xtraj(t0)
@@ -362,13 +385,13 @@ def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=
     goal = xG
     while start is not None:
         # already at xg
-        if xg.prev is not None and np.linalg.norm(xg.prev.x - start.x) <= 1e-6:
-            # xg already computed
-            break
         funnelSteerTo(start, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
+        # if this node is the same as xg, then break
+        if np.linalg.norm(xg.x - start.x) <= 1e-6:
+            break
+
         start = start.prev
         goal = goal.prev
-
 
 
 def node_nearby(x0, x1, S, rho, system):

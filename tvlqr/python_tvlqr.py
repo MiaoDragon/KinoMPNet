@@ -79,6 +79,10 @@ def tvlqr(x, u, dt, func, jac_A, jac_B, system=None, Qf=None):
                     # should not change the "sign" of the delta_x
                     if delta_x[i] > np.pi:
                         delta_x[i] = delta_x[i] - 2*np.pi
+        # print the distance
+        print('inside controller: delta_x divergence: %f' % (delta_x@S(t).reshape((len(x),len(x)))@delta_x))
+        print('delta_x:')
+        print(delta_x)
         u = -K @ delta_x + utraj(t)
         return u
     return controller, xtraj, utraj, S

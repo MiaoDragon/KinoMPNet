@@ -1,6 +1,9 @@
 import torch
-import jax
 import numpy as np
+import sys
+sys.path.append('..')
+import jax
+from plan_utility.line_line_cc import line_line_cc 
 def normalize(x, bound):
     # normalize to -1 ~ 1  (bound can be a tensor)
     #return x
@@ -166,5 +169,37 @@ def jax_dynamics(state, control):
     deriv[STATE_V_2] = theta2dot_dot
     return jax.numpy.asarray(deriv)
 
-def IsInCollision(x, obc):
+def IsInCollision(x, obc, obc_width=6.):
+    STATE_THETA_1, STATE_THETA_2, STATE_V_1, STATE_V_2 = 0, 1, 2, 3
+    MIN_V_1, MAX_V_1 = -6., 6.
+    MIN_V_2, MAX_V_2 = -6., 6.
+    MIN_TORQUE, MAX_TORQUE = -4., 4.
+
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+
+    LENGTH = 20.
+    m = 1.0
+    lc = 0.5
+    lc2 = 0.25
+    l2 = 1.
+    I1 = 0.2
+    I2 = 1.0
+    l = 1.0
+    g = 9.81
+    pole_x0 = 0.
+    pole_y0 = 0.
+    pole_x1 = LENGTH * np.cos(x[STATE_THETA_1] - np.pi / 2)
+    pole_y1 = LENGTH * np.sin(x[STATE_THETA_1] - np.pi / 2)
+    pole_x2 = pole_x1 + LENGTH * np.cos(x[STATE_THETA_1] + x[STATE_THETA_2] - np.pi / 2)
+    pole_y2 = pole_y1 + LENGTH * np.sin(x[STATE_THETA_1] + x[STATE_THETA_2] - np.pi / 2)
+    for i in range(len(obc)):
+        for j in range(0, 8, 2):
+            x1 = obc[i][j]
+            y1 = obc[i][j+1]
+            x2 = obc[i][(j+2) % 8]
+            y2 = obc[i][(j+3) % 8]
+            if line_line_cc(pole_x0, pole_y0, pole_x1, pole_y1, x1, y1, x2, y2):
+                return True
+            if line_line_cc(pole_x1, pole_y1, pole_x2, pole_y2, x1, y1, x2, y2):
+                return True
     return False

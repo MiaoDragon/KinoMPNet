@@ -16,6 +16,95 @@ from plan_utility.data_structure import *
 from plan_utility import pendulum, acrobot_obs
 
 from tvlqr.python_lyapunov import *
+import matplotlib.pyplot as plt
+
+def plot_ellipsoid(ax, S, rho, x0, alpha=1.0):
+    theta = np.linspace(0, np.pi*2, 100)
+    U = [np.cos(theta), np.sin(theta), np.zeros(100), np.zeros(100)]
+    U = np.array(U).T
+    tmp = np.linalg.pinv(S)
+    tmp = scipy.linalg.sqrtm(tmp.T @ tmp)
+    S_invsqrt = scipy.linalg.sqrtm(tmp)
+    X = U @ S_invsqrt  # 100x2
+    X = np.sqrt(rho)*X + x0
+    ax.plot(X[:,0],X[:,1], alpha=alpha)
+
+    
+def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, step_sz):
+    
+    plot_ellipsoid(ax, goal.S0, goal.rho0, goal.x, alpha=0.1)
+
+    # plot funnel
+    # rho_t = rho0+(rho1-rho0)/(t1-t0)*t
+    node = start
+    while node.edge is not None:
+        rho0s = node.edge.rho0s[node.edge.i0:]
+        rho1s = node.edge.rho1s[node.edge.i0:]
+        time_knot = node.edge.time_knot[node.edge.i0:]
+        S = node.edge.S
+        for i in range(len(rho0s)):
+            rho0 = rho0s[i]
+            rho1 = rho1s[i]
+            t0 = time_knot[i]
+            t1 = time_knot[i+1]
+            rho_t = rho0
+            S_t = S(t0).reshape(len(node.x),len(node.x))
+            x_t = node.edge.xtraj(t0)
+            u_t = node.edge.utraj(t0)
+            # plot
+            plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
+            rho_t = rho1
+            S_t = S(t1).reshape(len(node.x),len(node.x))
+            x_t = node.edge.xtraj(t1)
+            u_t = node.edge.utraj(t1)
+            # plot
+            plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
+        node = node.next
+    node = start
+    actual_x = node.x
+    xs = []
+    valid = True
+    while node.edge is not None:
+        # printout which node it is
+        print('steering node...')
+        print('node.x:')
+        print(node.x)
+        print('node.next.x:')
+        print(node.next.x)
+        # see if it can go to the goal region starting from start
+        dt = node.edge.dts[node.edge.i0:]
+        num = np.sum(dt)/step_sz
+        time_span = np.linspace(node.edge.t0, node.edge.t0+np.sum(dt), num+1)
+        delta_t = step_sz
+        xs.append(actual_x)
+        controller = node.edge.controller
+        print('number of time knots: %d' % (len(time_span)))
+        # plot data
+        for i in range(len(time_span)):
+            u = controller(time_span[i], actual_x)
+            xdot = dynamics(actual_x, u)
+            actual_x = actual_x + xdot * delta_t
+            xs.append(actual_x)
+            actual_x = enforce_bounds(actual_x)
+            print('actual x:')
+            print(actual_x)
+            if IsInCollision(actual_x):
+                print('In Collision Booooo!!')
+                valid = False
+        node = node.next
+    xs = np.array(xs)
+    ax.plot(xs[:,0], xs[:,1], 'black', label='using controller')
+    plt.show()
+    print('start:')
+    print(start.x)
+    print('goal:')
+    print(goal.x)
+    if not valid:
+        print('in Collision Boommm!!!')
+        
+    plt.waitforbuttonpress()
+
+    
 env_type = 'acrobot_obs'
 data_folder = '../data/acrobot_obs/'
 # setup evaluation function and load function
@@ -49,8 +138,8 @@ elif env_type == 'acrobot_obs':
     IsInCollision =acrobot_obs.IsInCollision
     normalize = acrobot_obs.normalize
     unnormalize = acrobot_obs.unnormalize
-    obs_file = None
-    obc_file = None
+    obs_file = True
+    obc_file = True
     dynamics = acrobot_obs.dynamics
     jax_dynamics = acrobot_obs.jax_dynamics
     enforce_bounds = acrobot_obs.enforce_bounds
@@ -62,7 +151,7 @@ jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 
 
-test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=1, obs_f=None)
+test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=0, obs_f=obs_f)
 # data_type: seen or unseen
 obc, obs, paths, path_lengths, controls, costs = test_data
 
@@ -90,10 +179,11 @@ for i in range(len(paths)):
         goal_rho0 = 1.0
     elif env_type == 'acrobot_obs':
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+        obs_width = 6.0
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
-        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 4, 0.02)
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 5, step_sz)
         #goal_S0 = np.identity(4)
         goal_S0 = np.diag([1.,1.,0.,0.])
         goal_rho0 = 1.5
@@ -121,8 +211,8 @@ for i in range(len(paths)):
                 p_start = enforce_bounds(p_start)
                 detail_paths.append(p_start)
         #detail_paths.append(paths[i][j][-1])
-        state = detail_paths[::30]
-        
+        #state = detail_paths[::200]
+        state = paths[i][j]
         def informer(env, x0, xG, direction):
             # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
             dis = np.abs(x0.x - state)
@@ -179,6 +269,7 @@ for i in range(len(paths)):
             #paths[i][j][0][1] = 0.
             #paths[i][j][path_lengths[i][j]-1][1] = 0.
             path = [paths[i][j][0], paths[i][j][path_lengths[i][j]-1]]
+            
             # plot the entire path
             #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
@@ -198,10 +289,31 @@ for i in range(len(paths)):
             else:
                 obs_i = obs[i]
                 obc_i = obc[i]
+                # convert obs_i center to points
+                new_obs_i = []
+                for k in range(len(obs_i)):
+                    obs_pt = []
+                    obs_pt.append(obs_i[k][0]-obs_width/2)
+                    obs_pt.append(obs_i[k][1]-obs_width/2)
+                    obs_pt.append(obs_i[k][0]-obs_width/2)
+                    obs_pt.append(obs_i[k][1]+obs_width/2)
+                    obs_pt.append(obs_i[k][0]+obs_width/2)
+                    obs_pt.append(obs_i[k][1]+obs_width/2)
+                    obs_pt.append(obs_i[k][0]+obs_width/2)
+                    obs_pt.append(obs_i[k][1]-obs_width/2)
+                    new_obs_i.append(obs_pt)
+                obs_i = new_obs_i
+            collision_check = lambda x: IsInCollision(x, obs_i)
             for t in range(MAX_NEURAL_REPLAN):
                 # adaptive step size on replanning attempts
                 res, path_list = plan(None, start, goal, detail_paths, informer, system, dynamics, \
-                           enforce_bounds, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
+                           enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+                # after plan, generate the trajectory, and check if it is within the region
+                plot_trajectory(ax, start, goal, dynamics, enforce_bounds, collision_check, step_sz)
+                
+                
                 #print('after neural replan:')
                 #print(path)
                 #path = lvc(path, obc[i], IsInCollision, step_sz=step_sz)

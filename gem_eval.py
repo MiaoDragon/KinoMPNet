@@ -9,13 +9,16 @@ import math
 import time
 from sparse_rrt.systems import standard_cpp_systems
 from sparse_rrt import _sst_module
-
+import sys
+sys.path.append('..')
+from plan_utility.data_structure import *
+from plan_utility.informed_path import plan
 #import matplotlib.pyplot as plt
 #fig = plt.figure()
 
-def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None):
+def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None, IsInCollision=None):
     # data_type: seen or unseen
-    obc, obs, paths, path_lengths = test_data
+    obc, obs, paths, path_lengths, controls, costs = test_data
     if obs is not None:
         obc = obc.astype(np.float32)
         obc = torch.from_numpy(obc)
@@ -67,11 +70,13 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
             goal_rho0 = 1.0
         elif env_type == 'acrobot_obs':
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+            obs_width = 6.0
             system = _sst_module.PSOPTAcrobot()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.002
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
-            goal_S0 = np.identity(4)
+            step_sz = 0.02
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 10, step_sz)
+            goal_S0 = np.diag([1.,1.,0,0])
+            #goal_S0 = np.identity(4)
             goal_rho0 = 1.0
         elif args.env_type == 'acrobot_obs_2':
             system = _sst_module.PSOPTAcrobot()
@@ -130,10 +135,26 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
                 else:
                     obs_i = obs[i]
                     obc_i = obc[i]
+                    # convert obs_i center to points
+                    new_obs_i = []
+                    for k in range(len(obs_i)):
+                        obs_pt = []
+                        obs_pt.append(obs_i[k][0]-obs_width/2)
+                        obs_pt.append(obs_i[k][1]-obs_width/2)
+                        obs_pt.append(obs_i[k][0]-obs_width/2)
+                        obs_pt.append(obs_i[k][1]+obs_width/2)
+                        obs_pt.append(obs_i[k][0]+obs_width/2)
+                        obs_pt.append(obs_i[k][1]+obs_width/2)
+                        obs_pt.append(obs_i[k][0]+obs_width/2)
+                        obs_pt.append(obs_i[k][1]-obs_width/2)
+                        new_obs_i.append(obs_pt)
+                    obs_i = new_obs_i
+                collision_check = lambda x: IsInCollision(x, obs_i)
                 for t in range(MAX_NEURAL_REPLAN):
                     # adaptive step size on replanning attempts
-                    res, path_list = plan(obc[i], start, goal, informer, system, dynamics, \
-                               enforce_bounds, traj_opt, jac_A, jac_B, step_sz=0.002, MAX_LENGTH=1000)
+                    
+                    res, path_list = plan(obc[i], start, goal, paths[i][j], informer, system, dynamics, \
+                               enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
                     #print('after neural replan:')
                     #print(path)
                     #path = lvc(path, obc[i], IsInCollision, step_sz=step_sz)

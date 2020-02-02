@@ -14,7 +14,7 @@ here for simplicity, we just use single-process to simulate this scenario
 from __future__ import print_function
 import sys
 sys.path.append('deps/sparse_rrt')
-
+sys.path.append('.')
 import model.AE.identity as cae_identity
 from model.AE import CAE_acrobot_voxel_2d
 from model import mlp, mlp_acrobot
@@ -171,14 +171,14 @@ def main(args):
         # seen
         if args.seen_N > 0:
             time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, seen_test_data, args.model_path, 'seen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, seen_test_data, args.model_path, 'seen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds, IsInCollision)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             seen_test_suc_rate += fes_path.sum() / valid_path.sum()
         # unseen
         if args.unseen_N > 0:
             time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, unseen_test_data, args.model_path, 'unseen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds)
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, unseen_test_data, args.model_path, 'unseen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds, IsInCollision)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             unseen_test_suc_rate += fes_path.sum() / valid_path.sum()

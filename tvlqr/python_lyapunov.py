@@ -124,11 +124,6 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     Sdot1 = -(Q-S1@B1@np.linalg.pinv(R)@B1.T@S1+S1@A1+A1.T@S1)
     K1 = np.linalg.pinv(R)@B1.T@S1
 
-    # here we use a more relaxed version, to deal with cases when upper_x is not x1
-    # in this case, we only care about (x_bar + x1 - x_upper).T S1 (x_bar + x1 - x_upper) = upper_rho^2
-    # then given our previous samples, x_bar = upper_rho * U1[i] + x_upper - x1
-    X1 = upper_rho * U1 + upper_x.reshape(1,-1) - x1.reshape(1,-1)
-
     # in case x1 is not the same as upper_x, we solve the optimization to obtain rho
     delta_x = upper_x-x1
     if system is not None:
@@ -149,15 +144,30 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     print(delta)
     print('upper_rho')
     print(upper_rho)
+    # here we use a more relaxed version, to deal with cases when upper_x is not x1
+    # in this case, we only care about (x_bar + x1 - x_upper).T S1 (x_bar + x1 - x_upper) = upper_rho^2
+    # then given our previous samples, x_bar = upper_rho * U1[i] + x_upper - x1
+    #X1 = upper_rho * U1 + upper_x.reshape(1,-1) - x1.reshape(1,-1)
+    # below is using the inner ellipsoid
+    X1 = rho1 * U1
     # we then obtain rhodot1 by setting it to be the following:
     #   max_{xTSx=rho1^2}(d/dt(xTSx))
+    # the intersection point is defined by:
+    # x = rho_upper/delta(x1-x_upper)+x_upper
+    #if delta > 1e-6:
+    #    # set a lowerbound for delta
+    #    #X1 = np.append(X1, np.array([upper_rho/delta*(x1-upper_x)+upper_x]), axis=0)
+    #    # only consider the intersection of ellipsoids
+    #    X1 = np.array([upper_rho/delta*(x1-upper_x)+upper_x])
+    #    print(X1.shape)
     rhodot1 = -1e8
-    for i in range(numSample):
+    for i in range(len(X1)):
         cons = X1[i].T@Sdot1@X1[i] + 2*X1[i].T@S1@(func(x1+X1[i],u1-K1@X1[i])-func(x1,u1))
         if cons > rhodot1:
             rhodot1 = cons
     # since we actually find d/dt(rho^2), it is 2rho rhodot
     rhodot1 = rhodot1 / 2 / rho1
+    print('rhodot1: %f' % (rhodot1))
     # backpropagate one time step to find rho0
     rho0 = rho1 - rhodot1*(t1-t0)    
     # obtain rhodot0
@@ -169,7 +179,7 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     K0 = np.linalg.pinv(R)@B0.T@S0
     X0 = rho0 * U0
     rhodot0 = -1e8
-    for i in range(numSample):
+    for i in range(len(X0)):
         cons = X0[i].T@Sdot0@X0[i] + 2*X0[i].T@S0@(func(x0+X0[i],u0-K0@X0[i])-func(x0,u0))
         if cons > rhodot0:
             rhodot0 = cons
