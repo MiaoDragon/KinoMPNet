@@ -29,9 +29,9 @@ def plot_ellipsoid(ax, S, rho, x0, alpha=1.0):
     X = np.sqrt(rho)*X + x0
     ax.plot(X[:,0],X[:,1], alpha=alpha)
 
-    
+
 def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, step_sz):
-    
+
     plot_ellipsoid(ax, goal.S0, goal.rho0, goal.x, alpha=0.1)
 
     # plot funnel
@@ -101,10 +101,10 @@ def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, st
     print(goal.x)
     if not valid:
         print('in Collision Boommm!!!')
-        
+
     plt.waitforbuttonpress()
 
-    
+
 env_type = 'acrobot_obs'
 data_folder = '../data/acrobot_obs/'
 # setup evaluation function and load function
@@ -183,7 +183,9 @@ for i in range(len(paths)):
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
-        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 5, step_sz)
+        num_steps = 20
+        traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, \
+                                                        step_sz*1, step_sz*5*num_steps, x_init, u_init, t_init)
         #goal_S0 = np.identity(4)
         goal_S0 = np.diag([1.,1.,0.,0.])
         goal_rho0 = 1.5
@@ -201,15 +203,18 @@ for i in range(len(paths)):
         goal_rho0 = 1.0
 
     for j in range(len(paths[0])):
+        state_i = []
         state = paths[i][j]
         # obtain the sequence
         p_start = paths[i][j][0]
         detail_paths = [p_start]
         for k in range(len(controls[i][j])):
+            state_i.append(len(detail_paths)-1)
             for step in range(int(costs[i][j][k]/step_sz)):
                 p_start = p_start + step_sz*dynamics(p_start, controls[i][j][k])
                 p_start = enforce_bounds(p_start)
                 detail_paths.append(p_start)
+        state_i.append(len(detail_paths)-1)
         #detail_paths.append(paths[i][j][-1])
         #state = detail_paths[::200]
         state = paths[i][j]
@@ -243,14 +248,24 @@ for i in range(len(paths)):
                 else:
                     next_idx = max_d_i+1
                 res = Node(state[next_idx])
-
+                # initial: from max_d_i to max_d_i+1
+                x_init = detail_paths[state_i[max_d_i]:state_i[next_idx]]
+                # action: copy over to number of steps
+                u_init = np.repeat(controls[i][j][max_d_i], num_steps, axis=0)
+                t_init = np.linspace(0, costs[i][j][max_d_i], num_steps)
             else:
                 if max_d_i-1 == -1:
                     next_idx = max_d_i
                 else:
                     next_idx = max_d_i-1
                 res = Node(state[next_idx])
-            return res
+                # initial: from max_d_i to max_d_i+1
+                x_init = detail_paths[state_i[next_idx]:state_i[max_d_i]]
+                # action: copy over to number of steps
+                u_init = np.repeat(controls[i][j][next_idx], num_steps, axis=0)
+                t_init = np.linspace(0, costs[i][j][next_idx], num_steps)
+
+            return res, x_init, u_init, t_init
 
         time0 = time.time()
         time_norm = 0.
@@ -269,7 +284,7 @@ for i in range(len(paths)):
             #paths[i][j][0][1] = 0.
             #paths[i][j][path_lengths[i][j]-1][1] = 0.
             path = [paths[i][j][0], paths[i][j][path_lengths[i][j]-1]]
-            
+
             # plot the entire path
             #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
@@ -281,7 +296,7 @@ for i in range(len(paths)):
 
             control = []
             time_step = []
-            
+
             MAX_NEURAL_REPLAN = 11
             if obs is None:
                 obs_i = None
@@ -312,8 +327,8 @@ for i in range(len(paths)):
                 ax = fig.add_subplot(111)
                 # after plan, generate the trajectory, and check if it is within the region
                 plot_trajectory(ax, start, goal, dynamics, enforce_bounds, collision_check, step_sz)
-                
-                
+
+
                 #print('after neural replan:')
                 #print(path)
                 #path = lvc(path, obc[i], IsInCollision, step_sz=step_sz)

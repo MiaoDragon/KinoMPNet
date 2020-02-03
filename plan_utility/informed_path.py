@@ -63,20 +63,24 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             # the edge information is stored at the endpoint
             # here direciton=0 means we are computing forward steer, and 1 means
             # we are computing backward
-            xw = informer(env, x0, xG, direction=0)
-            x, e = pathSteerToBothDir(x0, xw, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
+
+            # the informed initialization is in the forward direction
+            xw, x_init, u_init, t_init = informer(env, x0, xG, direction=0)
+            x, e = pathSteerToBothDir(x0, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                    jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
             if e is None:
                 # in collision
                 tree = 1
                 itr += 1
                 continue
-                
+
             # if the bvp solver solution is too faraway, then ignore it
             if np.linalg.norm(e.xs[0] - x0.x) > BVP_TOLERANCE:
                 # ignore it
                 print('forward searching bvp not successful.')
                 # then propagate it to obtain the result
-                x, e = pathSteerToBothDir(x0, xw, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)                
+                x, e = pathSteerToBothDir(x0, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                    jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
             for i in range(len(e.xs)):
                 update_line(hl_for, ax, e.xs[i])
             xs_to_plot = np.array(e.xs[::10])
@@ -92,16 +96,18 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             x0 = x
             tree=1
         else:
-            xw = informer(env, xG, x0, direction=1)
+            # the informed initialization is in the forward direction
+            xw, x_init, u_init, t_init = informer(env, xG, x0, direction=1)
             # plot the informed point
             ax.scatter(xw.x[0], xw.x[1], c='yellow')
-            x, e = pathSteerToForwardOnly(xG, xw, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
+            x, e = pathSteerToForwardOnly(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                    jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
             if e is None:
                 # in collision
                 tree = 0
                 itr += 1
                 continue
-                
+
             print('after backward search...')
             print('endpoint:')
             print(e.xs[-1])
@@ -123,7 +129,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
                 continue
                 # or we can also directly back propagate
                 print('backward not nearby, propagate using the trajopt')
-                #x, e = pathSteerToBothDir(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)                
+                #x, e = pathSteerToBothDir(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
             # directly compute funnel to connect
             funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
 
@@ -144,20 +150,22 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             tree=0
 
         # steer endpoint
-        xG_, e = pathSteerToBothDir(x0, xG, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
+        xG_, e = pathSteerToBothDir(x0, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
         if e is None:
             # in collision
             itr += 1
             continue
-            
+
         # check if the BVP is successful
         if np.linalg.norm(e.xs[0] - x0.x) > BVP_TOLERANCE:
             # try propagating
-            xG_, e = pathSteerToBothDir(x0, xG, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
+            xG_, e = pathSteerToBothDir(x0, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
             #itr += 1
             #continue
-        
-        
+
+
         # add xG_ to the start tree
         x0.next = xG_
         xG_.prev = x0

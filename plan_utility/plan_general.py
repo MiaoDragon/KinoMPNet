@@ -73,14 +73,14 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     print('len(new_us): %d' % (len(new_us)))
     return new_xs, new_us, new_dts
 
-def pathSteerToBothDir(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False):
+def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
     # jac_B: given x, u -> linearization B
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
-        xs, us, dts = traj_opt(x0.x, x1.x)
+        xs, us, dts = traj_opt(x0.x, x1.x, x_init, u_init, t_init)
         """
         print('----------------forward----------------')
         print('trajectory opt:')
@@ -121,7 +121,7 @@ def pathSteerToBothDir(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_A, j
         goal = Node(wrap_angle(xs[-1], system))
         x1 = goal
     else:
-        xs, us, dts = traj_opt(x1.x, x0.x)
+        xs, us, dts = traj_opt(x1.x, x0.x, x_init, u_init, t_init)
         """
         print('----------------backward----------------')
         print('trajectory opt:')
@@ -185,15 +185,15 @@ def pathSteerToBothDir(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_A, j
     return x1, edge
 
 
-def pathSteerToForwardOnly(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False):
+def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
     # jac_B: given x, u -> linearization B
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
-        xs, us, dts = traj_opt(x0.x, x1.x)
-        
+        xs, us, dts = traj_opt(x0.x, x1.x, x_init, u_init, t_init)
+
         print('----------------forward----------------')
         print('trajectory opt:')
         print('start:')
@@ -208,7 +208,7 @@ def pathSteerToForwardOnly(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_
         print(us)
         print('dts:')
         print(dts)
-        
+
         # ensure us and dts have length 1 less than xs
         if len(us) == len(xs):
             us = us[:-1]
@@ -229,8 +229,8 @@ def pathSteerToForwardOnly(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_
         goal = Node(wrap_angle(xs[-1], system))
         x1 = goal
     else:
-        xs, us, dts = traj_opt(x1.x, x0.x)
-        
+        xs, us, dts = traj_opt(x1.x, x0.x, x_init, u_init, t_init)
+
         print('----------------backward----------------')
         print('trajectory opt:')
         print('start:')
@@ -245,7 +245,7 @@ def pathSteerToForwardOnly(x0, x1, dynamics, enforce_bounds, IsInCollision, jac_
         print(us)
         print('dts:')
         print(dts)
-        
+
         if len(us) == len(xs):
             us = us[:-1]
         # try without propagating
