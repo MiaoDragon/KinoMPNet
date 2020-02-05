@@ -22,7 +22,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     # use the dynamics to interpolate the state x
     # can implement different interpolation method for this
     # ADDED: notice now for circular cases, we use the unmapped angle to ensure smoothness
-    
+
     # change propagation: maybe only using step_sz but not smaller is better (however, round for accuracy)
     new_xs = [x]
     new_us = []
@@ -88,9 +88,6 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
     # jac_B: given x, u -> linearization B
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
-        print(x_init.shape)
-        print(u_init.shape)
-        print(t_init.shape)
         xs, us, dts = traj_opt(x0.x, x1.x, x_init, u_init, t_init)
         """
         print('----------------forward----------------')
@@ -127,7 +124,7 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
         else:
             # check collision for the trajopt endpoint
             pass
-        # if the endpoint is too faraway from our guess, discard it 
+        # if the endpoint is too faraway from our guess, discard it
         # TODO: (need to provide distance bound)
         if valid and not node_nearby(xs[-1], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
             valid = False
@@ -180,7 +177,7 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         goal = x0
         x1 = start
-        
+
     if not endpoint and not valid:
         # for non-endpoint, we need to ensure it is always valid
         return x1, None
@@ -247,7 +244,7 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             print(dts)
         # if the endpoint is too faraway, count as invalid
         if valid and not node_nearby(xs[-1], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
-            valid = False        
+            valid = False
         edge_dt = np.sum(dts)
         start = x0
         goal = Node(wrap_angle(xs[-1], system))
@@ -286,7 +283,11 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             print('dts:')
             print(dts)
         if valid and not node_nearby(xs[0], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
-            valid = False  
+            valid = False
+        if valid and not node_nearby(xs[-1], x0.x, x0.S0, x0.rho0*0.5, system):
+            # if the endpoint is too far from the the starting endpoint in terms of funnel distance
+            # then discard it to prevent losing too much funnel size
+            valid = False
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         # the next node is the x0

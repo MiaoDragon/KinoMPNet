@@ -28,7 +28,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
     hl_back, = ax.plot([], [], 'r')
     hl_for_mpnet, = ax.plot([], [], 'lightgreen')
     hl_back_mpnet, = ax.plot([], [], 'salmon')
-    
+
     ax_ani = fig.add_subplot(122)
     vis._init(ax_ani)
 
@@ -38,10 +38,10 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
         h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
         #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
         #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
-        
+
     def remove_last_k(h, ax, k):
         h.set_data(h.get_xdata()[:-k], h.get_ydata()[:-k])
-        
+
     def draw_update_line(ax):
         ax.relim()
         ax.autoscale_view()
@@ -53,7 +53,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
         vis._animate(states[-1], ax_ani)
         draw_update_line(ax_ani)
 
-        
+
     #update_line(hl, ax, x0.x)
     #draw_update_line(ax)
     for i in range(len(data)):
@@ -73,11 +73,11 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
     goal = xG
     funnel_node = goal
     BVP_TOLERANCE = 1e-6
-    
+
     for_in_collision_nums = [0]  # forward in collision number
     for_prev_scatter = []
     back_in_collision_nums = [0]
-    back_prev_scatter = None
+    back_prev_scatter = []
     while target_reached==0 and itr<MAX_LENGTH:
         itr=itr+1  # prevent the path from being too long
         print('iter: %d' % (itr))
@@ -118,10 +118,10 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
                 tree = 1
                 itr += 1
                 continue
-            
+
             # otherwise, create a new collision_num
             for_in_collision_nums.append(0)
-            
+
             # if the bvp solver solution is too faraway, then ignore it
             if np.linalg.norm(e.xs[0] - x0.x) > BVP_TOLERANCE:
                 # ignore it
@@ -136,7 +136,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
             for_prev_scat = ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='g')
             for_prev_scatter.append(for_prev_scat)
-            
+
             draw_update_line(ax)
             animation(e.xs, e.us)
             #plt.waitforbuttonpress()
@@ -147,9 +147,6 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             x0 = x
             tree=1
         else:
-            tree=0
-            # 先用forward
-            continue
             # the informed initialization is in the forward direction
             xw, x_init, u_init, t_init = informer(env, xG, x0, direction=1)
             # plot the informed point
@@ -157,12 +154,31 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             draw_update_line(ax)
             x, e = pathSteerToForwardOnly(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                     jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
-            if e is None:
-                # in collision
+            if back_in_collision_nums[-1] >= 2 and xG.next is not None:
+                # backtrace, this include direct incollision nodes and indirect ones (parent)
+                print('backward--too many collisions... backtracing')
+                # pop the last collision num
+                back_in_collision_nums.pop(-1)
+                # since the next state has collision, increase one for its parent
+                back_in_collision_nums[-1] += 1
+                back_prev_scatter[-1].remove()
+                back_prev_scatter = back_prev_scatter[:-1]
+                # remove line as well
+                if xG.edge is not None:
+                    remove_last_k(hl_back, ax, len(xG.edge.xs))
+                    draw_update_line(ax)
+                xG = xG.next
                 tree = 0
                 itr += 1
                 continue
-
+            if e is None:
+                # in collision
+                back_in_collision_nums[-1] += 1
+                tree = 0
+                itr += 1
+                continue
+            # otherwise, create a new collision_num
+            back_in_collision_nums.append(0)
             print('after backward search...')
             print('endpoint:')
             print(e.xs[-1])
@@ -177,13 +193,16 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             print('rho0:')
             print(xG.rho0)
             # check if the edge endpoint is near the next node
-            if not node_nearby(e.xs[-1], xG.x, xG.S0, xG.rho0, system):
-                # not in the region try next time
-                itr += 1
-                tree=0
-                continue
-                # or we can also directly back propagate
-                print('backward not nearby, propagate using the trajopt')
+            # we already take care of this during propagation
+            #if not node_nearby(e.xs[-1], xG.x, xG.S0, xG.rho0, system):
+            #    # not in the region try next time
+            #    itr += 1
+            #    tree=0
+            #    continue
+            #    # or we can also directly back propagate
+            #    print('backward not nearby, propagate using the trajopt')
+
+
                 #x, e = pathSteerToBothDir(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
             # directly compute funnel to connect
             funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
@@ -194,7 +213,9 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             xs_to_plot = np.array(e.xs[::10])
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
-            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='r')
+            back_prev_scat = ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='r')
+            back_prev_scatter.append(back_prev_scat)
+
             draw_update_line(ax)
             #plt.waitforbuttonpress()
             x.next = xG
@@ -267,7 +288,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             #ax.scatter(e.xs[::10,0], e.xs[::10,1], c='salmon')
             draw_update_line(ax)
 
-            
+
             # since the nearby nodes are on the edge, need to extract the node index
             if min_node.edge is not None:
                 # need to extract subset of x1.edge
