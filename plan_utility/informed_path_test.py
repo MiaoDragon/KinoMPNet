@@ -14,6 +14,7 @@ from plan_utility.informed_path import *
 from plan_utility.plan_general import *
 from plan_utility.data_structure import *
 from plan_utility import pendulum, acrobot_obs
+from sparse_rrt.systems.acrobot import Acrobot
 
 from tvlqr.python_lyapunov import *
 import matplotlib.pyplot as plt
@@ -29,7 +30,13 @@ def plot_ellipsoid(ax, S, rho, x0, alpha=1.0):
     X = np.sqrt(rho)*X + x0
     ax.plot(X[:,0],X[:,1], alpha=alpha)
 
-
+def animation_acrobot(fig, ax, animator, xs, obs):
+    animator.obs = obs
+    animator._init(ax)
+    for i in range(len(xs)):
+        animator._animate(xs[i], ax)
+        animator.draw_update_line(fig, ax)
+    
 def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, step_sz):
 
     plot_ellipsoid(ax, goal.S0, goal.rho0, goal.x, alpha=0.1)
@@ -38,31 +45,33 @@ def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, st
     # rho_t = rho0+(rho1-rho0)/(t1-t0)*t
     node = start
     while node.edge is not None:
-        rho0s = node.edge.rho0s[node.edge.i0:]
-        rho1s = node.edge.rho1s[node.edge.i0:]
-        time_knot = node.edge.time_knot[node.edge.i0:]
-        S = node.edge.S
-        for i in range(len(rho0s)):
-            rho0 = rho0s[i]
-            rho1 = rho1s[i]
-            t0 = time_knot[i]
-            t1 = time_knot[i+1]
-            rho_t = rho0
-            S_t = S(t0).reshape(len(node.x),len(node.x))
-            x_t = node.edge.xtraj(t0)
-            u_t = node.edge.utraj(t0)
-            # plot
-            plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
-            rho_t = rho1
-            S_t = S(t1).reshape(len(node.x),len(node.x))
-            x_t = node.edge.xtraj(t1)
-            u_t = node.edge.utraj(t1)
-            # plot
-            plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
+        if node.edge.S is not None:
+            rho0s = node.edge.rho0s[node.edge.i0:]
+            rho1s = node.edge.rho1s[node.edge.i0:]
+            time_knot = node.edge.time_knot[node.edge.i0:]
+            S = node.edge.S
+            for i in range(len(rho0s)):
+                rho0 = rho0s[i]
+                rho1 = rho1s[i]
+                t0 = time_knot[i]
+                t1 = time_knot[i+1]
+                rho_t = rho0
+                S_t = S(t0).reshape(len(node.x),len(node.x))
+                x_t = node.edge.xtraj(t0)
+                u_t = node.edge.utraj(t0)
+                # plot
+                plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
+                rho_t = rho1
+                S_t = S(t1).reshape(len(node.x),len(node.x))
+                x_t = node.edge.xtraj(t1)
+                u_t = node.edge.utraj(t1)
+                # plot
+                plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
         node = node.next
     node = start
     actual_x = node.x
     xs = []
+    us = []
     valid = True
     while node.edge is not None:
         # printout which node it is
@@ -71,26 +80,32 @@ def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, st
         print(node.x)
         print('node.next.x:')
         print(node.next.x)
-        # see if it can go to the goal region starting from start
-        dt = node.edge.dts[node.edge.i0:]
-        num = np.sum(dt)/step_sz
-        time_span = np.linspace(node.edge.t0, node.edge.t0+np.sum(dt), num+1)
-        delta_t = step_sz
-        xs.append(actual_x)
-        controller = node.edge.controller
-        print('number of time knots: %d' % (len(time_span)))
-        # plot data
-        for i in range(len(time_span)):
-            u = controller(time_span[i], actual_x)
-            xdot = dynamics(actual_x, u)
-            actual_x = actual_x + xdot * delta_t
+        # if node does not have controller defined, we use open-loop traj
+        if node.edge.S is None:
+            xs += node.edge.xs.tolist()
+            actual_x = xs[-1]
+        else:
+            # then we use the controller
+            # see if it can go to the goal region starting from start
+            dt = node.edge.dts[node.edge.i0:]
+            num = np.sum(dt)/step_sz
+            time_span = np.linspace(node.edge.t0, node.edge.t0+np.sum(dt), num+1)
+            delta_t = step_sz
             xs.append(actual_x)
-            actual_x = enforce_bounds(actual_x)
-            print('actual x:')
-            print(actual_x)
-            if IsInCollision(actual_x):
-                print('In Collision Booooo!!')
-                valid = False
+            controller = node.edge.controller
+            print('number of time knots: %d' % (len(time_span)))
+            # plot data
+            for i in range(len(time_span)):
+                u = controller(time_span[i], actual_x)
+                xdot = dynamics(actual_x, u)
+                actual_x = actual_x + xdot * delta_t
+                xs.append(actual_x)
+                actual_x = enforce_bounds(actual_x)
+                print('actual x:')
+                print(actual_x)
+                if IsInCollision(actual_x):
+                    print('In Collision Booooo!!')
+                    valid = False
         node = node.next
     xs = np.array(xs)
     ax.plot(xs[:,0], xs[:,1], 'black', label='using controller')
@@ -103,7 +118,7 @@ def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, st
         print('in Collision Boommm!!!')
 
     plt.waitforbuttonpress()
-
+    return xs
 
 env_type = 'acrobot_obs'
 data_folder = '../data/acrobot_obs/'
@@ -151,9 +166,9 @@ jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 
 
-test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=0, obs_f=obs_f)
+test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=50, obs_f=obs_f)
 # data_type: seen or unseen
-obc, obs, paths, path_lengths, controls, costs = test_data
+obc, obs, paths, sgs, path_lengths, controls, costs = test_data
 
 fes_env = []   # list of list
 valid_env = []
@@ -184,8 +199,7 @@ for i in range(len(paths)):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 20
-        traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, \
-                                                        step_sz*1, step_sz*5*num_steps, x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*5*num_steps, x_init, u_init, t_init)
         #goal_S0 = np.identity(4)
         goal_S0 = np.diag([1.,1.,0.,0.])
         goal_rho0 = 1.5
@@ -208,24 +222,61 @@ for i in range(len(paths)):
         # obtain the sequence
         p_start = paths[i][j][0]
         detail_paths = [p_start]
+        detail_controls = []
+        detail_costs = []
+        state = [p_start]
+        control = []
+        cost = []
         for k in range(len(controls[i][j])):
-            state_i.append(len(detail_paths)-1)
-            for step in range(int(costs[i][j][k]/step_sz)):
+            #state_i.append(len(detail_paths)-1)
+            max_steps = int(costs[i][j][k]/step_sz)
+            accum_cost = 0.
+            print('p_start:')
+            print(p_start)
+            print('data:')
+            print(paths[i][j][k])
+            # modify it because of small difference between data and actual propagation
+            state[-1] = paths[i][j][k]
+            for step in range(1,max_steps+1):
                 p_start = p_start + step_sz*dynamics(p_start, controls[i][j][k])
-                p_start = enforce_bounds(p_start)
+                p_start = enforce_bounds(p_start)          
                 detail_paths.append(p_start)
-        state_i.append(len(detail_paths)-1)
+                detail_controls.append(controls[i][j])
+                detail_costs.append(step_sz)
+                accum_cost += step_sz
+                if (step % 20 == 0) or (step == max_steps):
+                    state.append(p_start)
+                    control.append(controls[i][j])
+                    cost.append(accum_cost)
+                    accum_cost = 0.
+        print('p_start:')
+        print(p_start)
+        print('data:')
+        print(paths[i][j][-1])
+        state[-1] = paths[i][j][-1]
+
         #detail_paths.append(paths[i][j][-1])
         #state = detail_paths[::200]
-        state = paths[i][j]
+        #state = paths[i][j]
+        #control = controls[i][j]
+        #cost = costs[i][j]
+        #state = detail_paths
+        #control = detail_controls
+        #cost = detail_costs
+        print('cost:')
+        print(cost)
+        max_ahead = 2
         def informer(env, x0, xG, direction):
             # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
-            dis = np.abs(x0.x - state)
+            dis = x0.x - state
             circular = system.is_circular_topology()
             for i in range(len(x0.x)):
                 if circular[i]:
-                    # if it is angle
-                    dis[:,i] = (dis[:,i] > np.pi) * (2*np.pi - dis[:,i]) + (dis[:,i] <= np.pi) * dis[:,i]
+                    # if it is angle, should map to -pi to pi
+                    # map to [-pi, pi]
+                    dis[:,i] = dis[:,i] - np.floor(dis[:,i] / (2*np.pi))*(2*np.pi)
+                    # should not change the "sign" of the delta_x
+                    dis[:,i] = (dis[:,i] > np.pi) * (dis[:,i] - 2*np.pi) + (dis[:,i] <= np.pi) * dis[:,i]
             #S = np.identity(len(x0.x))
             S = np.diag([1.,1.,0.,0.])
             #S = np.diag([1/30./30., 1/40./40., 1., 1.])
@@ -243,28 +294,81 @@ for i in range(len(paths)):
 
             if direction == 0:
                 # forward
-                if max_d_i+1 == len(state):
-                    next_idx = max_d_i
-                else:
-                    next_idx = max_d_i+1
-                res = Node(state[next_idx])
+                next_indices = np.minimum(np.arange(start=max_d_i+1, stop=max_d_i+max_ahead+1, step=1, dtype=int), len(state)-1)
+                next_idx = np.random.choice(next_indices)      
+                next_state = state[next_idx]
+                cov = np.diag([0.01,0.01,0.0,0.0])
+                mean = next_state
+                next_state = np.random.multivariate_normal(mean=mean,cov=cov)
                 # initial: from max_d_i to max_d_i+1
-                x_init = detail_paths[state_i[max_d_i]:state_i[next_idx]]
+                delta_x = next_state - x0.x
+                # can be either clockwise or counterclockwise, take shorter one
+                for i in range(len(delta_x)):
+                    if circular[i]:
+                        delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                        if delta_x[i] > np.pi:
+                            delta_x[i] = delta_x[i] - 2*np.pi
+                        # randomly pick either direction
+                        rand_d = np.random.randint(2)
+                        if rand_d < 1:
+                            if delta_x[i] > 0.:
+                                delta_x[i] = delta_x[i] - 2*np.pi
+                            if delta_x[i] <= 0.:
+                                delta_x[i] = delta_x[i] + 2*np.pi
+                res = Node(next_state)
+                x_init = np.linspace(x0.x, x0.x+delta_x, num_steps)
+                #x_init = np.array(detail_paths[state_i[max_d_i]:state_i[next_idx]])
                 # action: copy over to number of steps
-                u_init = np.repeat(controls[i][j][max_d_i], num_steps, axis=0)
-                t_init = np.linspace(0, costs[i][j][max_d_i], num_steps)
+                if max_d_i < len(control):
+                    u_init_i = control[max_d_i]
+                    cost_i = cost[max_d_i]
+                else:
+                    u_init_i = np.array(control[max_d_i-1])*0.
+                    cost_i = step_sz
+                # add gaussian to u
+                u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
+                u_init = u_init + np.random.normal(scale=1.)
+                t_init = np.linspace(0, cost_i, num_steps)
             else:
                 if max_d_i-1 == -1:
                     next_idx = max_d_i
                 else:
                     next_idx = max_d_i-1
-                res = Node(state[next_idx])
+                next_indices = np.maximum(np.arange(start=max_d_i-1, stop=max_d_i-max_ahead-1, step=-1, dtype=int), 0)
+                next_idx = np.random.choice(next_indices)                          
+                next_state = state[next_idx]
+                cov = np.diag([0.01,0.01,0.0,0.0])
+                mean = next_state
+                next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                delta_x = x0.x - next_state
+                # can be either clockwise or counterclockwise, take shorter one
+                for i in range(len(delta_x)):
+                    if circular[i]:
+                        delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                        if delta_x[i] > np.pi:
+                            delta_x[i] = delta_x[i] - 2*np.pi  
+                        # randomly pick either direction
+                        rand_d = np.random.randint(2)
+                        if rand_d < 1:
+                            if delta_x[i] > 0.:
+                                delta_x[i] = delta_x[i] - 2*np.pi
+                            if delta_x[i] <= 0.:
+                                delta_x[i] = delta_x[i] + 2*np.pi
+                #next_state = state[max_d_i] + delta_x               
+                res = Node(next_state)
                 # initial: from max_d_i to max_d_i+1
-                x_init = detail_paths[state_i[next_idx]:state_i[max_d_i]]
+                x_init = np.linspace(next_state, next_state + delta_x, num_steps)
                 # action: copy over to number of steps
-                u_init = np.repeat(controls[i][j][next_idx], num_steps, axis=0)
-                t_init = np.linspace(0, costs[i][j][next_idx], num_steps)
-
+                if max_d_i > 0:
+                    u_init_i = control[max_d_i-1]
+                    cost_i = cost[max_d_i-1]
+                else:
+                    u_init_i = np.array(control[max_d_i])*0.
+                    cost_i = step_sz               
+                u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
+                u_init = u_init + np.random.normal(scale=1.)                
+                t_init = np.linspace(0, cost_i, num_steps)
+                #t_init = np.linspace(0, step_sz*(num_steps-1), num_steps)
             return res, x_init, u_init, t_init
 
         time0 = time.time()
@@ -289,12 +393,18 @@ for i in range(len(paths)):
             #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
             start = Node(path[0])
-            goal = Node(paths[i][j][-2])
+            goal = Node(sgs[i][j][1])  # using the start and goal read from data
+            print('detailed distance: %f' % (node_h_dist(state[-1], sgs[i][j][1], goal_S0, goal_rho0, system)))
+            print("data distance: %f" % (node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)))  # should be <1
+            #goal_rho0 = np.sqrt(node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)) * goal_rho0*1.05
+            #print("data distance: %f" % (node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)))  # should be <1
+            
+            #goal = Node(paths[i][j][-2])
             #goal = Node(path[-1])
             goal.S0 = goal_S0
             goal.rho0 = goal_rho0    # change this later
 
-            control = []
+            #control = []
             time_step = []
 
             MAX_NEURAL_REPLAN = 11
@@ -317,18 +427,26 @@ for i in range(len(paths)):
                     obs_pt.append(obs_i[k][0]+obs_width/2)
                     obs_pt.append(obs_i[k][1]-obs_width/2)
                     new_obs_i.append(obs_pt)
-                obs_i = new_obs_i
-            collision_check = lambda x: IsInCollision(x, obs_i)
+            collision_check = lambda x: IsInCollision(x, new_obs_i)
+            
             for t in range(MAX_NEURAL_REPLAN):
                 # adaptive step size on replanning attempts
-                res, path_list = plan(None, start, goal, detail_paths, informer, system, dynamics, \
+                res, path_list = plan(obs_i, start, goal, detail_paths, informer, system, dynamics, \
                            enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
                 fig = plt.figure()
                 ax = fig.add_subplot(111)
                 # after plan, generate the trajectory, and check if it is within the region
-                plot_trajectory(ax, start, goal, dynamics, enforce_bounds, collision_check, step_sz)
-
-
+                xs = plot_trajectory(ax, start, goal, dynamics, enforce_bounds, collision_check, step_sz)
+                
+                params = {}
+                params['obs_w'] = 6.
+                params['obs_h'] = 6.
+                params['integration_step'] = step_sz
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+                animator = AcrobotVisualizer(Acrobot(), params)
+                animation_acrobot(fig, ax, animator, xs, obs_i)
+                plt.waitforbuttonpress()
                 #print('after neural replan:')
                 #print(path)
                 #path = lvc(path, obc[i], IsInCollision, step_sz=step_sz)

@@ -5,6 +5,8 @@ import numpy as np
 from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
+
+MAX_INVALID_THRESHOLD = 2.  # this should depend on the problem
 def wrap_angle(x, system):
     circular = system.is_circular_topology()
     res = np.array(x)
@@ -20,6 +22,8 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     # use the dynamics to interpolate the state x
     # can implement different interpolation method for this
     # ADDED: notice now for circular cases, we use the unmapped angle to ensure smoothness
+    
+    # change propagation: maybe only using step_sz but not smaller is better (however, round for accuracy)
     new_xs = [x]
     new_us = []
     new_dts = []
@@ -29,6 +33,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
         u = us[i]
         num_steps = int(dt / step_sz)
         last_step = dt - num_steps*step_sz
+
         for k in range(num_steps):
             x = x + step_sz*dynamics(x, u)
             # remember the angle value before mapping to [-2pi to 2pi], and use it after enforcing bounds
@@ -51,15 +56,18 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
             print('appended, i=%d' % (i))
         if not valid:
             break
-        x = x + last_step*dynamics(x, u)
-        before_enforce_x = np.array(x)
-        x = enforce_bounds(x)
-        if system is not None:
-            circular = system.is_circular_topology()
-            for xi in range(len(x)):
-                if circular[xi]:
-                    # use our previously saved version
-                    x[xi] = before_enforce_x[xi]
+        # here we apply round to last_step as in SST we use this method
+        if last_step > step_sz/2:
+            last_step = step_sz
+            x = x + last_step*dynamics(x, u)
+            before_enforce_x = np.array(x)
+            x = enforce_bounds(x)
+            if system is not None:
+                circular = system.is_circular_topology()
+                for xi in range(len(x)):
+                    if circular[xi]:
+                        # use our previously saved version
+                        x[xi] = before_enforce_x[xi]
         if IsInCollision(x):
             print('collision, i=%d' % (i))
             valid = False
@@ -71,15 +79,18 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     new_us = np.array(new_us)
     new_dts = np.array(new_dts)
     print('len(new_us): %d' % (len(new_us)))
-    return new_xs, new_us, new_dts
+    return new_xs, new_us, new_dts, valid
 
-def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False):
+def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.002, propagating=False, endpoint=False):
     # direciton 0 means forward from x0 to x1
     # direciton 1 means backward from x0 to x1
     # jac_A: given x, u -> linearization A
     # jac_B: given x, u -> linearization B
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
+        print(x_init.shape)
+        print(u_init.shape)
+        print(t_init.shape)
         xs, us, dts = traj_opt(x0.x, x1.x, x_init, u_init, t_init)
         """
         print('----------------forward----------------')
@@ -101,7 +112,7 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
         if len(us) == len(xs):
             us = us[:-1]
         if propagating:
-            xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
             """
                 print('propagation result:')
                 print('xs[0]:')
@@ -116,6 +127,10 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
         else:
             # check collision for the trajopt endpoint
             pass
+        # if the endpoint is too faraway from our guess, discard it 
+        # TODO: (need to provide distance bound)
+        if valid and not node_nearby(xs[-1], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
+            valid = False
         edge_dt = np.sum(dts)
         start = x0
         goal = Node(wrap_angle(xs[-1], system))
@@ -144,7 +159,7 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
             us = np.flip(us, axis=0)
             dts = np.flip(dts, axis=0)
             # reversely propagate the system
-            xs, us, dts = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
             xs = np.flip(xs, axis=0)
             us = np.flip(us, axis=0)
             dts = np.flip(dts, axis=0)
@@ -159,10 +174,16 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
                 print('dts:')
                 print(dts)
             """
+        if valid and not node_nearby(xs[0], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
+            valid = False
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         goal = x0
         x1 = start
+        
+    if not endpoint and not valid:
+        # for non-endpoint, we need to ensure it is always valid
+        return x1, None
     if len(us) == 0:
         return x1, None
     # after trajopt, make actions of dimension 2
@@ -214,7 +235,7 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             us = us[:-1]
         # try without propagating
         if propagating:
-            xs, us, dts = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
             print('propagation result:')
             print('xs[0]:')
             print(xs[0])
@@ -224,6 +245,9 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             print(us)
             print('dts:')
             print(dts)
+        # if the endpoint is too faraway, count as invalid
+        if valid and not node_nearby(xs[-1], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
+            valid = False        
         edge_dt = np.sum(dts)
         start = x0
         goal = Node(wrap_angle(xs[-1], system))
@@ -251,8 +275,7 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
         # try without propagating
         if propagating:
             # reversely propagate the system
-            xs, us, dts = propagate(xs[0], us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
-
+            xs, us, dts, valid = propagate(xs[0], us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
             print('propagation result:')
             print('xs[0]:')
             print(xs[0])
@@ -262,13 +285,17 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             print(us)
             print('dts:')
             print(dts)
-
+        if valid and not node_nearby(xs[0], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
+            valid = False  
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         # the next node is the x0
         goal = x0
         #goal = Node(wrap_angle(xs[-1], system))
         x1 = start
+    if not valid:
+        # in collision
+        return x1, None
     # after trajopt, make actions of dimension 2
     us = us.reshape(len(us), -1)
 

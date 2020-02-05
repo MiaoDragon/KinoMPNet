@@ -120,11 +120,13 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
     path_length_env = []
     control_env = []
     cost_env = []
+    sg_env = []
     for i in range(s,N+s):
         paths = []
         path_lengths = []
         costs = []
         controls = []
+        sgs = []
         for j in range(sp,NP+sp):
             dir = data_folder+str(i)+'/'
             path_file = dir+'path_%d' %(j) + ".pkl"
@@ -136,11 +138,11 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
             sg = p.load()
+            sgs.append(sg)
             file = open(path_file, 'rb')
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
             p = p.load()
-            p = np.append(p, [sg[1]], axis=0)
             paths.append(p)
             path_lengths.append(len(p))
             file = open(control_file, 'rb')
@@ -158,10 +160,11 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
         path_length_env.append(path_lengths)
         control_env.append(controls)
         cost_env.append(costs)
+        sg_env.append(sgs)
     if obs_list is not None:
         obs_list = np.array(obs_list)
         obc_list = np.array(obc_list)
-    return obc_list, obs_list, path_env, path_length_env, control_env, cost_env
+    return obc_list, obs_list, path_env, sg_env, path_length_env, control_env, cost_env
 
 
 
