@@ -4,7 +4,33 @@ This implements data loader for both training and testing procedures.
 import pickle
 import numpy as np
 import sys
-def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
+def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, step_sz, num_steps):
+    p_start = data_path[0]
+    detail_paths = [p_start]
+    detail_controls = []
+    detail_costs = []
+    state = [p_start]
+    control = []
+    cost = []
+    for k in range(len(data_control)):
+        #state_i.append(len(detail_paths)-1)
+        max_steps = int(data_cost/step_sz)
+        accum_cost = 0.
+        # modify it because of small difference between data and actual propagation
+        state[-1] = data_path[k]
+        for step in range(1,max_steps+1):
+            p_start = p_start + step_sz*dynamics(p_start, data_control[k])
+            p_start = enforce_bounds(p_start)
+            accum_cost += step_sz
+            if (step % num_steps == 0) or (step == max_steps):
+                state.append(p_start)
+                control.append(data_control[k])
+                cost.append(accum_cost)
+                accum_cost = 0.
+    state[-1] = data_path[-1]
+    return state, control, cost
+
+def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, step_sz=0.02, num_steps=20):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -40,9 +66,11 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
         obc_list = np.array(obc_list)
         obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
 
-    dataset = []
-    targets = []
+    waypoint_dataset = []
+    waypoint_targets = []
     env_indices = []
+    u_init_dataset = []  # (start, goal) -> control
+    t_init_dataset = []  # (start, goal) -> dt
 
 
     for i in range(N):
@@ -52,28 +80,59 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0):
             control_file = dir+'control_%d' %(j) + ".pkl"
             cost_file = dir+'cost_%d' %(j) + ".pkl"
             time_file = dir+'time_%d' %(j) + ".pkl"
-            file = open(path_file, 'rb')
-            #p = pickle.load(file, encoding='latin1')
+            sg_file = dir+'start_goal_%d' % (j) + '.pkl'
+            file = open(sg_file, 'rb')
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
-            p = p.load()
+            data_sg = p.load()
+            file = open(path_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            data_path = p.load()
+            file = open(control_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            data_control = p.load()
+            file = open(cost_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            data_cost = p.load()
+
+
+            if dynamics is not None:
+                # use dense input
+                data_path, data_control, data_cost = preprocess(system, data_path, data_control, data_cost, dynamics, enforce_bounds, step_sz, num_steps)
+            p = data_path
             if direction == 1:
                 # backward
                 p = np.flip(p, axis=0)
             for k in range(len(p)-1):
                 for l in range(k+1, len(p)):
-                    dataset.append(np.concatenate([p[k], p[l]]))
-                    targets.append(p[k+1])
+                    waypoint_dataset.append(np.concatenate([p[k], p[l]]))
+                    waypoint_targets.append(p[k+1])
                     env_indices.append(i)
+                u_init_dataset.append(np.concatenate([p[k], p[k+1]]))
+                u_init_targets.append(data_control[k])
+                t_init_dataset.append(np.concatenate([p[k], p[k+1]]))
+                t_init_targets.append(data_cost[k])
+        #path_env.append(paths)
+        #path_length_env.append(path_lengths)
+        #control_env.append(controls)
+        #cost_env.append(costs)
+        #sg_env.append(sgs)
     ## TODO: print out intermediate results to visualize
-
-    dataset = np.array(dataset)
-    targets = np.array(targets)
+    waypoint_dataset = np.array(waypoint_dataset)
+    waypoint_targets = np.array(waypoint_targets)
     env_indices = np.array(env_indices)
+    u_init_dataset = np.array(u_init_dataset)
+    u_init_targets = np.array(u_init_targets)
+    t_init_dataset = np.array(t_init_dataset)
+    t_init_targets = np.array(t_init_targets)
     if obs_list is not None:
         obs_list = np.array(obs_list)
         obc_list = np.array(obc_list)
-    return obc_list, dataset, targets, env_indices
+    return obc_list, waypoint_dataset, waypoint_targets, env_indices, \
+           u_init_dataset, u_init_targets, t_init_dataset, t_init_targets
 
 
 #def load_test_dataset(N, NP, folder):

@@ -28,33 +28,53 @@ def main(args):
     if args.env_type == 'pendulum':
         normalize = pendulum.normalize
         unnormalize = pendulum.unnormalize
+        dynamics = None
+        enforce_bounds = None
+        step_sz = 0.002
     elif args.env_type == 'cartpole':
         normalize = cart_pole.normalize
         unnormalize = cart_pole.unnormalize
+        dynamics = cartpole.dynamics
+        enforce_bounds = cartpole.enforce_bounds
+        step_sz = 0.002
     elif args.env_type == 'cartpole_obs':
         normalize = cart_pole_obs.normalize
         unnormalize = cart_pole_obs.unnormalize
+        dynamics = cartpole.dynamics
+        enforce_bounds = cartpole.enforce_bounds
+        step_sz = 0.002
     elif args.env_type == 'acrobot_obs':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         mlp = mlp_acrobot.MLP
         cae = CAE_acrobot_voxel_2d
+        dynamics = acrobot_obs.dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
+        step_sz = 0.02
     elif args.env_type == 'acrobot_obs_2':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         mlp = mlp_acrobot.MLP2
         cae = CAE_acrobot_voxel_2d_2
+        dynamics = acrobot_obs.dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
+        step_sz = 0.02
     elif args.env_type == 'acrobot_obs_3':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         mlp = mlp_acrobot.MLP3
         cae = CAE_acrobot_voxel_2d_2
+        dynamics = acrobot_obs.dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
+        step_sz = 0.02
     elif args.env_type == 'acrobot_obs_4':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         mlp = mlp_acrobot.MLP3
         cae = CAE_acrobot_voxel_2d_3
-
+        dynamics = acrobot_obs.dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
+        step_sz = 0.02
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
     # load net
@@ -93,9 +113,12 @@ def main(args):
 
     # load train and test data
     print('loading...')
-    obs, dataset, targets, env_indices = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
+    obs, _, _, _, \
+    u_init_dataset, u_init_targets, t_init_dataset, t_init_targets = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
                                                                         data_folder=args.path_folder, obs_f=True,
-                                                                        direction=args.direction)
+                                                                        direction=args.direction,
+                                                                        dynamics=dynamics, enforce_bounds=enforce_bounds,
+                                                                        step_sz=step_sz)
     # randomize the dataset before training
     data=list(zip(dataset,targets,env_indices))
     random.shuffle(data)
