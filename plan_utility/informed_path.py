@@ -147,6 +147,9 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             x0 = x
             tree=1
         else:
+            tree=0
+            # skip directly
+            continue
             # the informed initialization is in the forward direction
             xw, x_init, u_init, t_init = informer(env, xG, x0, direction=1)
             # plot the informed point
@@ -154,7 +157,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             draw_update_line(ax)
             x, e = pathSteerToForwardOnly(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                     jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
-            if back_in_collision_nums[-1] >= 2 and xG.next is not None:
+            if back_in_collision_nums[-1] >= 5 and xG.next is not None:
                 # backtrace, this include direct incollision nodes and indirect ones (parent)
                 print('backward--too many collisions... backtracing')
                 # pop the last collision num
@@ -179,19 +182,19 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
                 continue
             # otherwise, create a new collision_num
             back_in_collision_nums.append(0)
-            print('after backward search...')
-            print('endpoint:')
-            print(e.xs[-1])
-            print('goal:')
-            print(xG.x)
-            print('startpoint:')
-            print(e.xs[0])
-            print('distance:')
-            print(node_h_dist(e.xs[-1], xG.x, xG.S0, xG.rho0, system))
-            print('S0:')
-            print(xG.S0)
-            print('rho0:')
-            print(xG.rho0)
+            #print('after backward search...')
+            #print('endpoint:')
+            #print(e.xs[-1])
+            #print('goal:')
+            #print(xG.x)
+            #print('startpoint:')
+            #print(e.xs[0])
+            #print('distance:')
+            #print(node_h_dist(e.xs[-1], xG.x, xG.S0, xG.rho0, system))
+            #print('S0:')
+            #print(xG.S0)
+            #print('rho0:')
+            #print(xG.rho0)
             # check if the edge endpoint is near the next node
             # we already take care of this during propagation
             #if not node_nearby(e.xs[-1], xG.x, xG.S0, xG.rho0, system):
@@ -207,9 +210,9 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             # directly compute funnel to connect
             funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
 
-            for i in range(len(e.xs)):
+            for i in range(len(e.xs)-1,-1,-1):
                 update_line(hl_back, ax, e.xs[i])
-            update_line(hl_back, ax, xG.x)
+            #update_line(hl_back, ax, xG.x)
             xs_to_plot = np.array(e.xs[::10])
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)

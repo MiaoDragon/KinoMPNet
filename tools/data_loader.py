@@ -14,7 +14,7 @@ def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, ste
     cost = []
     for k in range(len(data_control)):
         #state_i.append(len(detail_paths)-1)
-        max_steps = int(data_cost/step_sz)
+        max_steps = int(data_cost[k]/step_sz)
         accum_cost = 0.
         # modify it because of small difference between data and actual propagation
         state[-1] = data_path[k]
@@ -71,9 +71,11 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
     env_indices = []
     u_init_dataset = []  # (start, goal) -> control
     t_init_dataset = []  # (start, goal) -> dt
-
+    u_init_targets = []
+    t_init_targets = []
 
     for i in range(N):
+        print('loading... env: %d' % (i))
         for j in range(NP):
             dir = data_folder+str(i)+'/'
             path_file = dir+'path_%d' %(j) + ".pkl"
@@ -101,7 +103,7 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
 
             if dynamics is not None:
                 # use dense input
-                data_path, data_control, data_cost = preprocess(system, data_path, data_control, data_cost, dynamics, enforce_bounds, step_sz, num_steps)
+                data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, step_sz, num_steps)
             p = data_path
             if direction == 1:
                 # backward

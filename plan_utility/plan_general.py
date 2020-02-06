@@ -24,6 +24,31 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     # ADDED: notice now for circular cases, we use the unmapped angle to ensure smoothness
 
     # change propagation: maybe only using step_sz but not smaller is better (however, round for accuracy)
+    
+    # try to round according to control up to difference being some threshold
+    near_u = 1e-1
+    new_us = [us[0]]
+    new_dts = [dts[0]]
+    for i in range(1,len(us)):
+        if np.linalg.norm(us[i]-new_us[-1]) <= near_u:
+            # if the new u and the previous u is very near, then add up the dt
+            new_dts[-1] += dts[i]
+        else:
+            # not near, append new dt
+            new_us.append(us[i])
+            new_dts.append(dts[i])
+    #print('before round...')
+    #print('us:')
+    #print(us)
+    #print('dts:')
+    #print(dts)
+    us = new_us
+    dts = new_dts
+    #print('after round...')
+    #print('us:')
+    #print(us)
+    #print('dts:')
+    #print(dts)            
     new_xs = [x]
     new_us = []
     new_dts = []
@@ -58,6 +83,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
             break
         # here we apply round to last_step as in SST we use this method
         if last_step > step_sz/2:
+            #if True:
             last_step = step_sz
             x = x + last_step*dynamics(x, u)
             before_enforce_x = np.array(x)
@@ -68,13 +94,14 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
                     if circular[xi]:
                         # use our previously saved version
                         x[xi] = before_enforce_x[xi]
+            new_xs.append(x)
+            new_us.append(u)
+            new_dts.append(last_step)
         if IsInCollision(x):
             print('collision, i=%d' % (i))
             valid = False
             break
-        new_xs.append(x)
-        new_us.append(u)
-        new_dts.append(last_step)
+
     new_xs = np.array(new_xs)
     new_us = np.array(new_us)
     new_dts = np.array(new_dts)
@@ -296,6 +323,8 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
         x1 = start
     if not valid:
         # in collision
+        return x1, None
+    if len(us) == 0:
         return x1, None
     # after trajopt, make actions of dimension 2
     us = us.reshape(len(us), -1)

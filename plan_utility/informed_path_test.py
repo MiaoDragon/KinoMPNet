@@ -83,7 +83,7 @@ def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, st
         # if node does not have controller defined, we use open-loop traj
         if node.edge.S is None:
             xs += node.edge.xs.tolist()
-            actual_x = xs[-1]
+            actual_x = np.array(xs[-1])
         else:
             # then we use the controller
             # see if it can go to the goal region starting from start
@@ -246,7 +246,9 @@ for i in range(len(paths)):
                 accum_cost += step_sz
                 if (step % 20 == 0) or (step == max_steps):
                     state.append(p_start)
-                    control.append(controls[i][j])
+                    print('control')
+                    print(controls[i][j])
+                    control.append(controls[i][j][k])
                     cost.append(accum_cost)
                     accum_cost = 0.
         print('p_start:')
@@ -296,10 +298,13 @@ for i in range(len(paths)):
                 # forward
                 next_indices = np.minimum(np.arange(start=max_d_i+1, stop=max_d_i+max_ahead+1, step=1, dtype=int), len(state)-1)
                 next_idx = np.random.choice(next_indices)      
-                next_state = state[next_idx]
+                next_state = np.array(state[next_idx])
                 cov = np.diag([0.01,0.01,0.0,0.0])
-                mean = next_state
-                next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                #mean = next_state
+                #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                mean = np.zeros(next_state.shape)
+                rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+                
                 # initial: from max_d_i to max_d_i+1
                 delta_x = next_state - x0.x
                 # can be either clockwise or counterclockwise, take shorter one
@@ -313,14 +318,15 @@ for i in range(len(paths)):
                         if rand_d < 1:
                             if delta_x[i] > 0.:
                                 delta_x[i] = delta_x[i] - 2*np.pi
-                            if delta_x[i] <= 0.:
+                            elif delta_x[i] <= 0.:
                                 delta_x[i] = delta_x[i] + 2*np.pi
                 res = Node(next_state)
-                x_init = np.linspace(x0.x, x0.x+delta_x, num_steps)
+                x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
                 #x_init = np.array(detail_paths[state_i[max_d_i]:state_i[next_idx]])
                 # action: copy over to number of steps
                 if max_d_i < len(control):
-                    u_init_i = control[max_d_i]
+                    u_init_i = np.random.uniform(low=[-4.], high=[4])
+                    #u_init_i = control[max_d_i]
                     cost_i = cost[max_d_i]
                 else:
                     u_init_i = np.array(control[max_d_i-1])*0.
@@ -336,10 +342,12 @@ for i in range(len(paths)):
                     next_idx = max_d_i-1
                 next_indices = np.maximum(np.arange(start=max_d_i-1, stop=max_d_i-max_ahead-1, step=-1, dtype=int), 0)
                 next_idx = np.random.choice(next_indices)                          
-                next_state = state[next_idx]
+                next_state = np.array(state[next_idx])
                 cov = np.diag([0.01,0.01,0.0,0.0])
-                mean = next_state
-                next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                #mean = next_state
+                #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                mean = np.zeros(next_state.shape)
+                rand_x_init = np.random.multivariate_normal(mean=mean,cov=cov, size=num_steps)
                 delta_x = x0.x - next_state
                 # can be either clockwise or counterclockwise, take shorter one
                 for i in range(len(delta_x)):
@@ -357,7 +365,7 @@ for i in range(len(paths)):
                 #next_state = state[max_d_i] + delta_x               
                 res = Node(next_state)
                 # initial: from max_d_i to max_d_i+1
-                x_init = np.linspace(next_state, next_state + delta_x, num_steps)
+                x_init = np.linspace(next_state, next_state + delta_x, num_steps) + rand_x_init
                 # action: copy over to number of steps
                 if max_d_i > 0:
                     u_init_i = control[max_d_i-1]
