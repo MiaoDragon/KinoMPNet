@@ -145,8 +145,8 @@ def main(args):
             mpNet1.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
     if args.start_epoch > 0:
         load_opt_state(mpNet1, os.path.join(args.model_path, model_path))
-        
-        
+
+
 
     # load data
     print('loading...')

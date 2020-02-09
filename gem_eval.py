@@ -15,15 +15,63 @@ from plan_utility.data_structure import *
 from plan_utility.informed_path import plan
 #import matplotlib.pyplot as plt
 #fig = plt.figure()
-
 def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normalize_func = lambda x:x, unnormalize_func=lambda x: x, dynamics=None, jac_A=None, jac_B=None, enforce_bounds=None, IsInCollision=None):
     # data_type: seen or unseen
-    obc, obs, paths, path_lengths, controls, costs = test_data
+    obc, obs, paths, sgs, path_lengths, controls, costs = test_data
     if obs is not None:
         obc = obc.astype(np.float32)
         obc = torch.from_numpy(obc)
     if torch.cuda.is_available():
         obc = obc.cuda()
+
+    if env_type == 'pendulum':
+        system = standard_cpp_systems.PSOPTPendulum()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
+        step_sz = 0.002
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 20, step_sz)
+
+    elif env_type == 'cartpole_obs':
+        #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+        system = _sst_module.CartPole()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.002
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif env_type == 'acrobot_obs':
+        #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+        obs_width = 6.0
+        system = _sst_module.PSOPTAcrobot()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 10, step_sz)
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_2':
+        system = _sst_module.PSOPTAcrobot()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.002
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_szs)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_3':
+        system = _sst_module.PSOPTAcrobot()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.002
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_4':
+        system = _sst_module.PSOPTAcrobot()
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.002
+        traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+
+
+
     def informer(env, x0, xG, direction):
         x0 = torch.from_numpy(x0.x).type(torch.FloatTensor)
         xG = torch.from_numpy(xG.x).type(torch.FloatTensor)
@@ -33,14 +81,61 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
         if direction == 0:
             x = torch.cat([x0,xG], dim=0)
             mpNet = mpNet0
+            if torch.cuda.is_available():
+                x = x.cuda()
+            next_state = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data.numpy()[0]
+            delta_x = next_state - x0.x
+            # can be either clockwise or counterclockwise, take shorter one
+            for i in range(len(delta_x)):
+                if circular[i]:
+                    delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                    if delta_x[i] > np.pi:
+                        delta_x[i] = delta_x[i] - 2*np.pi
+                    # randomly pick either direction
+                    rand_d = np.random.randint(2)
+                    if rand_d < 1:
+                        if delta_x[i] > 0.:
+                            delta_x[i] = delta_x[i] - 2*np.pi
+                        if delta_x[i] <= 0.:
+                            delta_x[i] = delta_x[i] + 2*np.pi
+            res = Node(next_state)
+            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps)
+            ## TODO: : change this to general case
+            u_init_i = np.random.uniform(low=[-4.], high=[4])
+            #u_init_i = control[max_d_i]
+            cost_i = num_steps*step_sz
+            u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
+            u_init = u_init + np.random.normal(scale=1.)
+            t_init = np.linspace(0, cost_i, num_steps)
         else:
             x = torch.cat([xG,x0], dim=0)
             mpNet = mpNet1
-        if torch.cuda.is_available():
-            x = x.cuda()
-        res = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data.numpy()[0]
-        res = Node(res)
-        return res
+            next_state = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data.numpy()[0]
+            delta_x = x0.x - next_state
+            # can be either clockwise or counterclockwise, take shorter one
+            for i in range(len(delta_x)):
+                if circular[i]:
+                    delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                    if delta_x[i] > np.pi:
+                        delta_x[i] = delta_x[i] - 2*np.pi
+                    # randomly pick either direction
+                    rand_d = np.random.randint(2)
+                    if rand_d < 1:
+                        if delta_x[i] > 0.:
+                            delta_x[i] = delta_x[i] - 2*np.pi
+                        elif delta_x[i] <= 0.:
+                            delta_x[i] = delta_x[i] + 2*np.pi
+            #next_state = state[max_d_i] + delta_x
+            res = Node(next_state)
+            # initial: from max_d_i to max_d_i+1
+            x_init = np.linspace(next_state, next_state + delta_x, num_steps) + rand_x_init
+            # action: copy over to number of steps
+            u_init_i = np.random.uniform(low=[-4.], high=[4])
+            cost_i = num_steps*step_sz
+            u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
+            u_init = u_init + np.random.normal(scale=1.)
+            t_init = np.linspace(0, cost_i, num_steps)
+        return res, x_init, u_init, t_init
 
     fes_env = []   # list of list
     valid_env = []
@@ -52,53 +147,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
         valid_path = []      # if the feasibility is valid or not
         # save paths to different files, indicated by i
         #print(obs, flush=True)
-
         # feasible paths for each env
-        if env_type == 'pendulum':
-            system = standard_cpp_systems.PSOPTPendulum()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-            step_sz = 0.002
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 20, step_sz)
-
-        elif env_type == 'cartpole_obs':
-            #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
-            system = _sst_module.CartPole()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.002
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
-            goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
-        elif env_type == 'acrobot_obs':
-            #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
-            obs_width = 6.0
-            system = _sst_module.PSOPTAcrobot()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.02
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 10, step_sz)
-            goal_S0 = np.diag([1.,1.,0,0])
-            #goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
-        elif args.env_type == 'acrobot_obs_2':
-            system = _sst_module.PSOPTAcrobot()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.002
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_szs)
-            goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
-        elif args.env_type == 'acrobot_obs_3':
-            system = _sst_module.PSOPTAcrobot()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.002
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
-            goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
-        elif args.env_type == 'acrobot_obs_4':
-            system = _sst_module.PSOPTAcrobot()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.002
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 500, 20, 1, 50, step_sz)
-            goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
         for j in range(len(paths[0])):
             time0 = time.time()
             time_norm = 0.
@@ -121,7 +170,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
                 #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
                 start = Node(path[0])
-                goal = Node(path[-1])
+                goal = Node(sgs[i][j][1])
                 goal.S0 = goal_S0
                 goal.rho0 = goal_rho0    # change this later
 
@@ -149,10 +198,10 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
                         obs_pt.append(obs_i[k][1]-obs_width/2)
                         new_obs_i.append(obs_pt)
                     obs_i = new_obs_i
-                collision_check = lambda x: IsInCollision(x, obs_i)
+                collision_check = lambda x: IsInCollision(x, new_obs_i)
                 for t in range(MAX_NEURAL_REPLAN):
                     # adaptive step size on replanning attempts
-                    
+
                     res, path_list = plan(obc[i], start, goal, paths[i][j], informer, system, dynamics, \
                                enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
                     #print('after neural replan:')
