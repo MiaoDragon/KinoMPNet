@@ -236,6 +236,7 @@ for i in range(len(paths)):
             print('data:')
             print(paths[i][j][k])
             # modify it because of small difference between data and actual propagation
+            p_start = paths[i][j][k]
             state[-1] = paths[i][j][k]
             for step in range(1,max_steps+1):
                 p_start = p_start + step_sz*dynamics(p_start, controls[i][j][k])
@@ -360,7 +361,7 @@ for i in range(len(paths)):
                         if rand_d < 1:
                             if delta_x[i] > 0.:
                                 delta_x[i] = delta_x[i] - 2*np.pi
-                            if delta_x[i] <= 0.:
+                            elif delta_x[i] <= 0.:
                                 delta_x[i] = delta_x[i] + 2*np.pi
                 #next_state = state[max_d_i] + delta_x               
                 res = Node(next_state)
@@ -379,6 +380,75 @@ for i in range(len(paths)):
                 #t_init = np.linspace(0, step_sz*(num_steps-1), num_steps)
             return res, x_init, u_init, t_init
 
+        def init_informer(env, x0, xG, direction):
+            # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
+            circular = system.is_circular_topology()
+            if direction == 0:
+                # forward
+                next_state = xG.x
+                cov = np.diag([0.01,0.01,0.0,0.0])
+                #mean = next_state
+                #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                mean = np.zeros(next_state.shape)
+                rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+                # initial: from max_d_i to max_d_i+1
+                delta_x = next_state - x0.x
+                # can be either clockwise or counterclockwise, take shorter one
+                for i in range(len(delta_x)):
+                    if circular[i]:
+                        delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                        if delta_x[i] > np.pi:
+                            delta_x[i] = delta_x[i] - 2*np.pi
+                        # randomly pick either direction
+                        rand_d = np.random.randint(2)
+                        if rand_d < 1:
+                            if delta_x[i] > 0.:
+                                delta_x[i] = delta_x[i] - 2*np.pi
+                            elif delta_x[i] <= 0.:
+                                delta_x[i] = delta_x[i] + 2*np.pi
+                x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
+                #x_init = np.array(detail_paths[state_i[max_d_i]:state_i[next_idx]])
+                # action: copy over to number of steps
+                u_init_i = np.random.uniform(low=[-4.], high=[4])
+                #u_init_i = control[max_d_i]
+                cost_i = step_sz*num_steps*2
+                # add gaussian to u
+                u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
+                u_init = u_init + np.random.normal(scale=1.)
+                t_init = np.linspace(0, cost_i, num_steps)
+            else:
+                next_state = xG.x
+                cov = np.diag([0.01,0.01,0.0,0.0])
+                #mean = next_state
+                #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                mean = np.zeros(next_state.shape)
+                rand_x_init = np.random.multivariate_normal(mean=mean,cov=cov, size=num_steps)
+                delta_x = x0.x - next_state
+                # can be either clockwise or counterclockwise, take shorter one
+                for i in range(len(delta_x)):
+                    if circular[i]:
+                        delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
+                        if delta_x[i] > np.pi:
+                            delta_x[i] = delta_x[i] - 2*np.pi  
+                        # randomly pick either direction
+                        rand_d = np.random.randint(2)
+                        if rand_d < 1:
+                            if delta_x[i] > 0.:
+                                delta_x[i] = delta_x[i] - 2*np.pi
+                            if delta_x[i] <= 0.:
+                                delta_x[i] = delta_x[i] + 2*np.pi
+                # initial: from max_d_i to max_d_i+1
+                x_init = np.linspace(next_state, next_state + delta_x, num_steps) + rand_x_init
+                u_init_i = np.random.uniform(low=[-4.], high=[4])
+                cost_i = step_sz*num_steps*2           
+                u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
+                u_init = u_init + np.random.normal(scale=1.)                
+                t_init = np.linspace(0, cost_i, num_steps)
+                #t_init = np.linspace(0, step_sz*(num_steps-1), num_steps)
+            return x_init, u_init, t_init
+
+        
+       
         time0 = time.time()
         time_norm = 0.
         fp = 0 # indicator for feasibility
@@ -401,12 +471,16 @@ for i in range(len(paths)):
             #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
             start = Node(path[0])
+            #goal = Node(path[-1])
             goal = Node(sgs[i][j][1])  # using the start and goal read from data
             print('detailed distance: %f' % (node_h_dist(state[-1], sgs[i][j][1], goal_S0, goal_rho0, system)))
             print("data distance: %f" % (node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)))  # should be <1
             #goal_rho0 = np.sqrt(node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)) * goal_rho0*1.05
             #print("data distance: %f" % (node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)))  # should be <1
-            
+            print('endpoint:')
+            print(goal.x)
+            print('detail[-1]:')
+            print(state[-1])
             #goal = Node(paths[i][j][-2])
             #goal = Node(path[-1])
             goal.S0 = goal_S0
@@ -439,7 +513,7 @@ for i in range(len(paths)):
             
             for t in range(MAX_NEURAL_REPLAN):
                 # adaptive step size on replanning attempts
-                res, path_list = plan(obs_i, start, goal, detail_paths, informer, system, dynamics, \
+                res, path_list = plan(obs_i, start, goal, detail_paths, informer, init_informer, system, dynamics, \
                            enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
                 fig = plt.figure()
                 ax = fig.add_subplot(111)

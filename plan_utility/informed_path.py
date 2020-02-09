@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from visual.acrobot_vis import *
 from sparse_rrt.systems.acrobot import Acrobot
 # this one predicts one individual path using informer and trajopt
-def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInCollision, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
+def plan(env, x0, xG, data, informer, init_informer, system, dynamics, enforce_bounds, IsInCollision, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
     # jac_A: given (x, u) -> linearization A
     # jac B: given (x, u) -> linearization B
@@ -155,6 +155,8 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             # plot the informed point
             ax.scatter(xw.x[0], xw.x[1], c='yellow')
             draw_update_line(ax)
+            #x, e = pathSteerToBothDir(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+            #                        jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
             x, e = pathSteerToForwardOnly(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                     jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
             if back_in_collision_nums[-1] >= 5 and xG.next is not None:
@@ -182,6 +184,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
                 continue
             # otherwise, create a new collision_num
             back_in_collision_nums.append(0)
+            print('success back')
             #print('after backward search...')
             #print('endpoint:')
             #print(e.xs[-1])
@@ -229,6 +232,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
             tree=0
 
         # steer endpoint
+        x_init, u_init, t_init = init_informer(env, x0, xG, direction=0)
         xG_, e = pathSteerToBothDir(x0, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                 jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, \
                                 propagating=True, endpoint=True)
@@ -272,6 +276,7 @@ def plan(env, x0, xG, data, informer, system, dynamics, enforce_bounds, IsInColl
                 min_d = dis
                 min_node = node
             node = node.next
+        print('min_d: %f' %(min_d))
         if min_d > 1.0:
             itr += 1
             continue

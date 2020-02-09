@@ -187,17 +187,21 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
             xs = np.flip(xs, axis=0)
             us = np.flip(us, axis=0)
             dts = np.flip(dts, axis=0)
-            """
-                print('propagation result:')
-                print('xs[0]:')
-                print(xs[0])
-                print('xs[-1]:')
-                print(xs[-1])
-                print('us:')
-                print(us)
-                print('dts:')
-                print(dts)
-            """
+            print('backward...')
+            print('from:')
+            print(x0.x)
+            print('to:')
+            print(x1.x)
+            print('propagation result:')
+            print('xs[0]:')
+            print(xs[0])
+            print('xs[-1]:')
+            print(xs[-1])
+            print('us:')
+            print(us)
+            print('dts:')
+            print(dts)
+
         if valid and not node_nearby(xs[0], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
             valid = False
         edge_dt = np.sum(dts)
@@ -311,10 +315,12 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             print(dts)
         if valid and not node_nearby(xs[0], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
             valid = False
+            print('not valid because node not neary indety')
         if valid and not node_nearby(xs[-1], x0.x, x0.S0, x0.rho0*0.5, system):
             # if the endpoint is too far from the the starting endpoint in terms of funnel distance
             # then discard it to prevent losing too much funnel size
             valid = False
+            print('not valid because node not neary S0')
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         # the next node is the x0
@@ -326,6 +332,7 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
         return x1, None
     if len(us) == 0:
         return x1, None
+    print('free!')
     # after trajopt, make actions of dimension 2
     us = us.reshape(len(us), -1)
 
@@ -474,6 +481,12 @@ def node_nearby(x0, x1, S, rho, system):
         print('xTSx: %f' % (xTSx))
         print('rho^2: %f' % (rho*rho))
         return True
+    else:
+        print('nearby:')
+        print('S:')
+        print(S)
+        print('xTSx: %f' % (xTSx))
+        print('rho^2: %f' % (rho*rho))
     return False
 
 def line_nearby(x0, x1, system):
