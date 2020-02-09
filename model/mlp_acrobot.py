@@ -53,7 +53,7 @@ class MLP3(nn.Module):
 
 class MLP4(nn.Module):
     def __init__(self, input_size, output_size):
-        super(MLP, self).__init__()
+        super(MLP4, self).__init__()
         self.fc = nn.Sequential(
                     nn.Linear(input_size, 2048), nn.PReLU(), nn.Dropout(),
                     nn.Linear(2048, 1024), nn.PReLU(), nn.Dropout(),
