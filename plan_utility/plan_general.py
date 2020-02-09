@@ -6,7 +6,7 @@ from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
 
-MAX_INVALID_THRESHOLD = 2.  # this should depend on the problem
+MAX_INVALID_THRESHOLD = .5  # this should depend on the problem
 def wrap_angle(x, system):
     circular = system.is_circular_topology()
     res = np.array(x)

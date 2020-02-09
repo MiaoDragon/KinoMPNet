@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from visual.acrobot_vis import *
 from sparse_rrt.systems.acrobot import Acrobot
 # this one predicts one individual path using informer and trajopt
-def plan(env, x0, xG, data, informer, init_informer, system, dynamics, enforce_bounds, IsInCollision, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
+def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enforce_bounds, IsInCollision, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
     # jac_A: given (x, u) -> linearization A
     # jac B: given (x, u) -> linearization B
@@ -17,7 +17,7 @@ def plan(env, x0, xG, data, informer, init_informer, system, dynamics, enforce_b
     params['obs_h'] = 6.
     params['integration_step'] = step_sz
     vis = AcrobotVisualizer(Acrobot(), params)
-    vis.obs = env
+    vis.obs = obs
     plt.ion()
     fig = plt.figure()
     ax = fig.add_subplot(121)
@@ -32,7 +32,7 @@ def plan(env, x0, xG, data, informer, init_informer, system, dynamics, enforce_b
     ax_ani = fig.add_subplot(122)
     vis._init(ax_ani)
 
-    print(env)
+    print(obs)
     def update_line(h, ax, new_data):
         new_data = wrap_angle(new_data, system)
         h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))

@@ -17,6 +17,8 @@ from plan_utility import pendulum, acrobot_obs
 from sparse_rrt.systems.acrobot import Acrobot
 
 from tvlqr.python_lyapunov import *
+from visual.acrobot_vis import *
+#from visual.vis_tools import *
 import matplotlib.pyplot as plt
 
 def plot_ellipsoid(ax, S, rho, x0, alpha=1.0):
@@ -513,7 +515,7 @@ for i in range(len(paths)):
             
             for t in range(MAX_NEURAL_REPLAN):
                 # adaptive step size on replanning attempts
-                res, path_list = plan(obs_i, start, goal, detail_paths, informer, init_informer, system, dynamics, \
+                res, path_list = plan(obs_i, obc_i, start, goal, detail_paths, informer, init_informer, system, dynamics, \
                            enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
                 fig = plt.figure()
                 ax = fig.add_subplot(111)
