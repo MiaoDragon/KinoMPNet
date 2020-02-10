@@ -35,7 +35,7 @@ def plot_ellipsoid(ax, S, rho, x0, alpha=1.0):
 def animation_acrobot(fig, ax, animator, xs, obs):
     animator.obs = obs
     animator._init(ax)
-    for i in range(len(xs)):
+    for i in range(0,len(xs)):
         animator._animate(xs[i], ax)
         animator.draw_update_line(fig, ax)
     
@@ -168,9 +168,11 @@ jac_A = jax.jacfwd(jax_dynamics, argnums=0)
 jac_B = jax.jacfwd(jax_dynamics, argnums=1)
 
 
-test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=50, obs_f=obs_f)
+test_data = data_loader.load_test_dataset(1, 5, data_folder, sp=51, obs_f=obs_f)
+
 # data_type: seen or unseen
 obc, obs, paths, sgs, path_lengths, controls, costs = test_data
+
 
 fes_env = []   # list of list
 valid_env = []
@@ -201,10 +203,10 @@ for i in range(len(paths)):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 20
-        traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*5*num_steps, x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, 0.02*1, 0.02*5*num_steps, x_init, u_init, t_init)
         #goal_S0 = np.identity(4)
         goal_S0 = np.diag([1.,1.,0.,0.])
-        goal_rho0 = 1.5
+        goal_rho0 = 0.5
     elif env_type == 'acrobot_obs_2':
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
@@ -218,9 +220,42 @@ for i in range(len(paths)):
         goal_S0 = np.identity(4)
         goal_rho0 = 1.0
 
+    if obs is None:
+        obs_i = None
+        obc_i = None
+    else:
+        obs_i = obs[i]
+        obc_i = obc[i]
+        # convert obs_i center to points
+        new_obs_i = []
+        for k in range(len(obs_i)):
+            obs_pt = []
+            obs_pt.append(obs_i[k][0]-obs_width/2)
+            obs_pt.append(obs_i[k][1]-obs_width/2)
+            obs_pt.append(obs_i[k][0]-obs_width/2)
+            obs_pt.append(obs_i[k][1]+obs_width/2)
+            obs_pt.append(obs_i[k][0]+obs_width/2)
+            obs_pt.append(obs_i[k][1]+obs_width/2)
+            obs_pt.append(obs_i[k][0]+obs_width/2)
+            obs_pt.append(obs_i[k][1]-obs_width/2)
+            new_obs_i.append(obs_pt)
+    collision_check = lambda x: IsInCollision(x, new_obs_i)
+        
+        
+        
     for j in range(len(paths[0])):
+        #paths[i][j] = paths[i][j].astype(np.float32)
+        #controls[i][j] = controls[i][j].astype(np.float32)
+        #costs[i][j] = costs[i][j].astype(np.float32)
         state_i = []
         state = paths[i][j]
+        # collision check for waypoint data
+        print('checking data waypoint for collision...')
+        for k in range(len(state)):
+            print('InCollision: ')
+            print(collision_check(state[k]))
+        
+        
         # obtain the sequence
         p_start = paths[i][j][0]
         detail_paths = [p_start]
@@ -229,25 +264,27 @@ for i in range(len(paths)):
         state = [p_start]
         control = []
         cost = []
+        data_step_sz = 0.02
         for k in range(len(controls[i][j])):
             #state_i.append(len(detail_paths)-1)
-            max_steps = int(costs[i][j][k]/step_sz)
+            print('before int: %f' %(costs[i][j][k]/data_step_sz))
+            max_steps = int(np.round(costs[i][j][k]/data_step_sz))
             accum_cost = 0.
             print('p_start:')
             print(p_start)
             print('data:')
             print(paths[i][j][k])
             # modify it because of small difference between data and actual propagation
-            p_start = paths[i][j][k]
+            p_start = paths[i][j][k]   #uncomment this to allow smaller discrepency
             state[-1] = paths[i][j][k]
             for step in range(1,max_steps+1):
-                p_start = p_start + step_sz*dynamics(p_start, controls[i][j][k])
+                p_start = p_start + data_step_sz*dynamics(p_start, controls[i][j][k])
                 p_start = enforce_bounds(p_start)          
                 detail_paths.append(p_start)
                 detail_controls.append(controls[i][j])
-                detail_costs.append(step_sz)
-                accum_cost += step_sz
-                if (step % 20 == 0) or (step == max_steps):
+                detail_costs.append(data_step_sz)
+                accum_cost += data_step_sz
+                if (step % 20 == 0) or (step == max_steps):  #TOEDIT: 200->20
                     state.append(p_start)
                     print('control')
                     print(controls[i][j])
@@ -258,7 +295,11 @@ for i in range(len(paths)):
         print(p_start)
         print('data:')
         print(paths[i][j][-1])
-        state[-1] = paths[i][j][-1]
+        state[-1] = paths[i][j][-1]        
+        print('checking dense waypoint for collision...')
+        for k in range(len(state)):
+            print('InCollision: ')
+            print(collision_check(state[k]))
 
         #detail_paths.append(paths[i][j][-1])
         #state = detail_paths[::200]
@@ -270,7 +311,7 @@ for i in range(len(paths)):
         #cost = detail_costs
         print('cost:')
         print(cost)
-        max_ahead = 2
+        max_ahead = 1
         def informer(env, x0, xG, direction):
             # here we find the nearest point to x0 in the data, and depending on direction, find the adjacent node
             dis = x0.x - state
@@ -331,6 +372,7 @@ for i in range(len(paths)):
                     u_init_i = np.random.uniform(low=[-4.], high=[4])
                     #u_init_i = control[max_d_i]
                     cost_i = cost[max_d_i]
+                    print(cost_i)
                 else:
                     u_init_i = np.array(control[max_d_i-1])*0.
                     cost_i = step_sz
@@ -449,7 +491,21 @@ for i in range(len(paths)):
                 #t_init = np.linspace(0, step_sz*(num_steps-1), num_steps)
             return x_init, u_init, t_init
 
+        """
+        fig = plt.figure()
+        ax = fig.add_subplot(111)        
+        state_pre, control_pre, cost_pre = data_loader.preprocess(paths[i][j], controls[i][j], costs[i][j], dynamics, enforce_bounds, step_sz, num_steps)
+        xs_to_plot = np.array(state_pre)
+        for i in range(len(xs_to_plot)):
+            xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+        ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='red')
         
+        xs_to_plot = np.array(state)
+        for i in range(len(xs_to_plot)):
+            xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+        ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='blue')
+        plt.waitforbuttonpress()
+        """
        
         time0 = time.time()
         time_norm = 0.
@@ -473,8 +529,8 @@ for i in range(len(paths)):
             #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
             start = Node(path[0])
-            #goal = Node(path[-1])
-            goal = Node(sgs[i][j][1])  # using the start and goal read from data
+            goal = Node(path[-1])
+            #goal = Node(sgs[i][j][1])  # using the start and goal read from data
             print('detailed distance: %f' % (node_h_dist(state[-1], sgs[i][j][1], goal_S0, goal_rho0, system)))
             print("data distance: %f" % (node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)))  # should be <1
             #goal_rho0 = np.sqrt(node_h_dist(paths[i][j][-1], sgs[i][j][1], goal_S0, goal_rho0, system)) * goal_rho0*1.05
@@ -492,26 +548,6 @@ for i in range(len(paths)):
             time_step = []
 
             MAX_NEURAL_REPLAN = 11
-            if obs is None:
-                obs_i = None
-                obc_i = None
-            else:
-                obs_i = obs[i]
-                obc_i = obc[i]
-                # convert obs_i center to points
-                new_obs_i = []
-                for k in range(len(obs_i)):
-                    obs_pt = []
-                    obs_pt.append(obs_i[k][0]-obs_width/2)
-                    obs_pt.append(obs_i[k][1]-obs_width/2)
-                    obs_pt.append(obs_i[k][0]-obs_width/2)
-                    obs_pt.append(obs_i[k][1]+obs_width/2)
-                    obs_pt.append(obs_i[k][0]+obs_width/2)
-                    obs_pt.append(obs_i[k][1]+obs_width/2)
-                    obs_pt.append(obs_i[k][0]+obs_width/2)
-                    obs_pt.append(obs_i[k][1]-obs_width/2)
-                    new_obs_i.append(obs_pt)
-            collision_check = lambda x: IsInCollision(x, new_obs_i)
             
             for t in range(MAX_NEURAL_REPLAN):
                 # adaptive step size on replanning attempts

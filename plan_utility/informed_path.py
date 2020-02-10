@@ -155,10 +155,11 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             # plot the informed point
             ax.scatter(xw.x[0], xw.x[1], c='yellow')
             draw_update_line(ax)
-            #x, e = pathSteerToBothDir(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
-            #                        jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
-            x, e = pathSteerToForwardOnly(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+            x, e = pathSteerToBothDir(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                     jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
+            #x, e = pathSteerToForwardOnly(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+            #                        jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
+            
             if back_in_collision_nums[-1] >= 5 and xG.next is not None:
                 # backtrace, this include direct incollision nodes and indirect ones (parent)
                 print('backward--too many collisions... backtracing')
@@ -210,8 +211,9 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
 
 
                 #x, e = pathSteerToBothDir(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
-            # directly compute funnel to connect
-            funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
+            
+            ### directly compute funnel to connect
+            #funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
 
             for i in range(len(e.xs)-1,-1,-1):
                 update_line(hl_back, ax, e.xs[i])
@@ -283,7 +285,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
         # otherwise it is a nearby node
         if min_node.S0 is None:
             lazyFunnel(min_node, funnel_node, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=system, step_sz=step_sz)
-            funnel_node = min_node
+            #funnel_node = min_node
 
         reached, node_i0, node_i1 = nearby(xG_, min_node, system)
         if reached:

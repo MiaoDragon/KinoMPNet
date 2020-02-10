@@ -6,7 +6,7 @@ from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
 
-MAX_INVALID_THRESHOLD = .5  # this should depend on the problem
+MAX_INVALID_THRESHOLD = 1.  # this should depend on the problem
 def wrap_angle(x, system):
     circular = system.is_circular_topology()
     res = np.array(x)
@@ -161,6 +161,13 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
         x1 = goal
     else:
         xs, us, dts = traj_opt(x1.x, x0.x, x_init, u_init, t_init)
+        print('######backward######')
+        print('xs len:')
+        print(len(xs))
+        print('us len:')
+        print(len(us))
+        print('dts len:')
+        print(len(dts))
         """
         print('----------------backward----------------')
         print('trajectory opt:')
@@ -179,6 +186,8 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
         """
         if len(us) == len(xs):
             us = us[:-1]
+        if len(dts) == len(xs):
+            dts = dts[:-1]
         if propagating:
             us = np.flip(us, axis=0)
             dts = np.flip(dts, axis=0)
@@ -209,7 +218,8 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
         goal = x0
         x1 = start
 
-    if not endpoint and not valid:
+    #if not endpoint and not valid:
+    if not valid:
         # for non-endpoint, we need to ensure it is always valid
         return x1, None
     if len(us) == 0:

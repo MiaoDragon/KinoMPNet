@@ -53,6 +53,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
         step_sz = 0.02
         num_steps = 20
         traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*5*num_steps, x_init, u_init, t_init)
+        #step_sz = 0.002
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
@@ -93,7 +94,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
             ## TODO: : change this to general case
             u_init_i = np.random.uniform(low=[-4.], high=[4])
             #u_init_i = control[max_d_i]
-            cost_i = num_steps*step_sz
+            cost_i = num_steps*step_sz  #TOEDIT
             u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
             u_init = u_init + np.random.normal(scale=1.)
             t_init = np.linspace(0, cost_i, num_steps)
@@ -594,6 +595,7 @@ def eval_tasks_mpnet(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, n
                 #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
                 start = Node(path[0])
+                #goal = Node(path[-1])
                 goal = Node(sgs[i][j][1])
                 goal.S0 = goal_S0
                 goal.rho0 = goal_rho0    # change this later
