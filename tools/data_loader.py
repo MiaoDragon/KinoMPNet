@@ -4,7 +4,7 @@ This implements data loader for both training and testing procedures.
 import pickle
 import numpy as np
 import sys
-def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, step_sz, num_steps):
+def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps):
     p_start = data_path[0]
     detail_paths = [p_start]
     detail_controls = []
@@ -14,13 +14,13 @@ def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, ste
     cost = []
     for k in range(len(data_control)):
         #state_i.append(len(detail_paths)-1)
-        max_steps = int(data_cost[k]/step_sz)
+        max_steps = int(np.round(data_cost[k]/step_sz))
         accum_cost = 0.
         # modify it because of small difference between data and actual propagation
+        p_start = data_path[k]
         state[-1] = data_path[k]
         for step in range(1,max_steps+1):
-            p_start = p_start + step_sz*dynamics(p_start, data_control[k])
-            p_start = enforce_bounds(p_start)
+            p_start = dynamics(p_start, data_control[k], step_sz)
             accum_cost += step_sz
             if (step % num_steps == 0) or (step == max_steps):
                 state.append(p_start)
@@ -30,7 +30,7 @@ def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, ste
     state[-1] = data_path[-1]
     return state, control, cost
 
-def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, step_sz=0.02, num_steps=20):
+def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, system=None, step_sz=0.02, num_steps=20):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -103,7 +103,7 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
 
             if dynamics is not None:
                 # use dense input
-                data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, step_sz, num_steps)
+                data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps)
             p = data_path
             if direction == 1:
                 # backward

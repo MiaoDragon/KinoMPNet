@@ -2,6 +2,9 @@
 This implements the Kinodynamic Planning using MPNet, by using MPNet
 to generate random samples, that will guide the SST algorithm.
 """
+import sys
+sys.path.append('deps/sparse_rrt')
+sys.path.append('.')
 import torch
 import model.AE.identity as cae_identity
 from model.mlp import MLP
@@ -15,6 +18,7 @@ import argparse
 import numpy as np
 import random
 import os
+from sparse_rrt import _sst_module
 
 from tensorboardX import SummaryWriter
 
@@ -25,23 +29,28 @@ def main(args):
     # environment setting
     cae = cae_identity
     mlp = MLP
+    cpp_propagator = _sst_module.SystemPropagator()
     if args.env_type == 'pendulum':
         normalize = pendulum.normalize
         unnormalize = pendulum.unnormalize
+        system = standard_cpp_systems.PSOPTPendulum()
         dynamics = None
         enforce_bounds = None
         step_sz = 0.002
         num_steps = 20
+        
     elif args.env_type == 'cartpole':
         normalize = cart_pole.normalize
         unnormalize = cart_pole.unnormalize
         dynamics = cartpole.dynamics
+        system = _sst_module.CartPole()
         enforce_bounds = cartpole.enforce_bounds
         step_sz = 0.002
         num_steps = 20
     elif args.env_type == 'cartpole_obs':
         normalize = cart_pole_obs.normalize
         unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.CartPole()
         dynamics = cartpole.dynamics
         enforce_bounds = cartpole.enforce_bounds
         step_sz = 0.002
@@ -49,54 +58,66 @@ def main(args):
     elif args.env_type == 'acrobot_obs':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
+        system = _sst_module.PSOPTAcrobot()
         mlp = mlp_acrobot.MLP
         cae = CAE_acrobot_voxel_2d
-        dynamics = acrobot_obs.dynamics
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
     elif args.env_type == 'acrobot_obs_2':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
+        system = _sst_module.PSOPTAcrobot()
         mlp = mlp_acrobot.MLP2
         cae = CAE_acrobot_voxel_2d_2
-        dynamics = acrobot_obs.dynamics
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
     elif args.env_type == 'acrobot_obs_3':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
+        system = _sst_module.PSOPTAcrobot()
         mlp = mlp_acrobot.MLP3
         cae = CAE_acrobot_voxel_2d_2
-        dynamics = acrobot_obs.dynamics
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
     elif args.env_type == 'acrobot_obs_4':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
+        system = _sst_module.PSOPTAcrobot()
         mlp = mlp_acrobot.MLP3
         cae = CAE_acrobot_voxel_2d_3
-        dynamics = acrobot_obs.dynamics
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
     elif args.env_type == 'acrobot_obs_5':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
+        system = _sst_module.PSOPTAcrobot()
         mlp = mlp_acrobot.MLP
         cae = CAE_acrobot_voxel_2d_3
-        dynamics = acrobot_obs.dynamics
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
     elif args.env_type == 'acrobot_obs_6':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
+        system = _sst_module.PSOPTAcrobot()
         mlp = mlp_acrobot.MLP4
         cae = CAE_acrobot_voxel_2d_3
-        dynamics = acrobot_obs.dynamics
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
@@ -144,7 +165,7 @@ def main(args):
                                                 data_folder=args.path_folder, obs_f=True,
                                                 direction=args.direction,
                                                 dynamics=dynamics, enforce_bounds=enforce_bounds,
-                                                step_sz=step_sz, num_steps=num_steps)
+                                                system=system, step_sz=step_sz, num_steps=num_steps)
     # randomize the dataset before training
     data=list(zip(waypoint_dataset,waypoint_targets,env_indices))
     random.shuffle(data)

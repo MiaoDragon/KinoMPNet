@@ -99,8 +99,7 @@ def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, st
             # plot data
             for i in range(len(time_span)):
                 u = controller(time_span[i], actual_x)
-                xdot = dynamics(actual_x, u)
-                actual_x = actual_x + xdot * delta_t
+                actual_x = dynamics(actual_x, u, step_sz)
                 xs.append(actual_x)
                 actual_x = enforce_bounds(actual_x)
                 print('actual x:')
@@ -157,7 +156,8 @@ elif env_type == 'acrobot_obs':
     unnormalize = acrobot_obs.unnormalize
     obs_file = True
     obc_file = True
-    dynamics = acrobot_obs.dynamics
+    cpp_propagator = _sst_module.SystemPropagator()
+    
     jax_dynamics = acrobot_obs.jax_dynamics
     enforce_bounds = acrobot_obs.enforce_bounds
     obs_f = True
@@ -203,6 +203,7 @@ for i in range(len(paths)):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 20
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, 0.02*1, 0.02*5*num_steps, x_init, u_init, t_init)
         #goal_S0 = np.identity(4)
         goal_S0 = np.diag([1.,1.,0.,0.])
@@ -278,13 +279,20 @@ for i in range(len(paths)):
             p_start = paths[i][j][k]   #uncomment this to allow smaller discrepency
             state[-1] = paths[i][j][k]
             for step in range(1,max_steps+1):
-                p_start = p_start + data_step_sz*dynamics(p_start, controls[i][j][k])
+                print('before propagation:')
+                print(p_start)
+                print('after cpp propagation:')
+                p_start = cpp_propagator.propagate(system, p_start, controls[i][j][k], step_sz)
+                print(p_start)
+                #p_start = p_start + data_step_sz*dynamics(p_start, controls[i][j][k])
+                #print('after python propagation:')
+                #print(p_start)
                 p_start = enforce_bounds(p_start)          
                 detail_paths.append(p_start)
                 detail_controls.append(controls[i][j])
                 detail_costs.append(data_step_sz)
                 accum_cost += data_step_sz
-                if (step % 20 == 0) or (step == max_steps):  #TOEDIT: 200->20
+                if (step % 10 == 0) or (step == max_steps):  #TOEDIT: 200->20
                     state.append(p_start)
                     print('control')
                     print(controls[i][j])
@@ -343,12 +351,14 @@ for i in range(len(paths)):
                 next_indices = np.minimum(np.arange(start=max_d_i+1, stop=max_d_i+max_ahead+1, step=1, dtype=int), len(state)-1)
                 next_idx = np.random.choice(next_indices)      
                 next_state = np.array(state[next_idx])
-                cov = np.diag([0.01,0.01,0.0,0.0])
+                cov = np.diag([0.01,0.01,0.01,0.01])
                 #mean = next_state
-                #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
                 mean = np.zeros(next_state.shape)
                 rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
-                
+                rand_x_init[0] = rand_x_init[0]*0.
+                rand_x_init[-1] = rand_x_init[-1]*0.
+                #next_state = next_state + rand_x_init
                 # initial: from max_d_i to max_d_i+1
                 delta_x = next_state - x0.x
                 # can be either clockwise or counterclockwise, take shorter one
@@ -369,8 +379,8 @@ for i in range(len(paths)):
                 #x_init = np.array(detail_paths[state_i[max_d_i]:state_i[next_idx]])
                 # action: copy over to number of steps
                 if max_d_i < len(control):
-                    u_init_i = np.random.uniform(low=[-4.], high=[4])
-                    #u_init_i = control[max_d_i]
+                    #u_init_i = np.random.uniform(low=[-4.], high=[4])
+                    u_init_i = control[max_d_i]
                     cost_i = cost[max_d_i]
                     print(cost_i)
                 else:
@@ -378,7 +388,7 @@ for i in range(len(paths)):
                     cost_i = step_sz
                 # add gaussian to u
                 u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
-                u_init = u_init + np.random.normal(scale=1.)
+                u_init = u_init + np.random.normal(scale=.5)
                 t_init = np.linspace(0, cost_i, num_steps)
             else:
                 if max_d_i-1 == -1:

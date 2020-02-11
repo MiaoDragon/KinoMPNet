@@ -26,22 +26,17 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     # change propagation: maybe only using step_sz but not smaller is better (however, round for accuracy)
     
     # try to round according to control up to difference being some threshold
-
     near_u = 1e-1
     new_us = [us[0]]
-    last_us = [us[0]]
     new_dts = [dts[0]]
     for i in range(1,len(us)):
         if np.linalg.norm(us[i]-new_us[-1]) <= near_u:
             # if the new u and the previous u is very near, then add up the dt
             new_dts[-1] += dts[i]
-            last_us.append(us[i])
         else:
             # not near, append new dt
-            new_us.append(np.mean(last_us, axis=0))
-            last_us = [us[i]]
+            new_us.append(us[i])
             new_dts.append(dts[i])
-
     #print('before round...')
     #print('us:')
     #print(us)
@@ -53,8 +48,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     #print('us:')
     #print(us)
     #print('dts:')
-    #print(dts)      
-
+    #print(dts)            
     new_xs = [x]
     new_us = []
     new_dts = []
@@ -66,8 +60,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
         last_step = dt - num_steps*step_sz
 
         for k in range(num_steps):
-            x = dynamics(x, u, step_sz)
-            """
+            x = x + step_sz*dynamics(x, u)
             # remember the angle value before mapping to [-2pi to 2pi], and use it after enforcing bounds
             before_enforce_x = np.array(x)
             x = enforce_bounds(x)
@@ -77,7 +70,6 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
                     if circular[xi]:
                         # use our previously saved version
                         x[xi] = before_enforce_x[xi]
-            """
             if IsInCollision(x):
                 # the ccurrent state is in collision, abort
                 print('collision, i=%d, num_steps=%d' % (i, k))
@@ -93,9 +85,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
         if last_step > step_sz/2:
             #if True:
             last_step = step_sz
-            #x = x + last_step*dynamics(x, u)
-            x = dynamics(x, u, last_step)
-            """
+            x = x + last_step*dynamics(x, u)
             before_enforce_x = np.array(x)
             x = enforce_bounds(x)
             if system is not None:
@@ -104,7 +94,6 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
                     if circular[xi]:
                         # use our previously saved version
                         x[xi] = before_enforce_x[xi]
-            """
             new_xs.append(x)
             new_us.append(u)
             new_dts.append(last_step)
@@ -203,7 +192,7 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
             us = np.flip(us, axis=0)
             dts = np.flip(dts, axis=0)
             # reversely propagate the system
-            xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=lambda x, u, t: -dynamics(x, u, t), enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=lambda x, u: -dynamics(x, u), enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
             xs = np.flip(xs, axis=0)
             us = np.flip(us, axis=0)
             dts = np.flip(dts, axis=0)
