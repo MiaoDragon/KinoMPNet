@@ -6,7 +6,7 @@ from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
 
-MAX_INVALID_THRESHOLD = 1.  # this should depend on the problem
+MAX_INVALID_THRESHOLD = 2.  # this should depend on the problem
 def wrap_angle(x, system):
     circular = system.is_circular_topology()
     res = np.array(x)
@@ -62,7 +62,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     for i in range(len(us)):
         dt = dts[i]
         u = us[i]
-        num_steps = int(dt / step_sz)
+        num_steps = int(np.round(dt / step_sz))
         last_step = dt - num_steps*step_sz
 
         for k in range(num_steps):
@@ -86,7 +86,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
             new_xs.append(x)
             new_us.append(u)
             new_dts.append(step_sz)
-            print('appended, i=%d' % (i))
+            #print('appended, i=%d' % (i))
         if not valid:
             break
         # here we apply round to last_step as in SST we use this method
@@ -506,6 +506,12 @@ def node_nearby(x0, x1, S, rho, system):
         print('nearby:')
         print('S:')
         print(S)
+        print('x0:')
+        print(x0)
+        print('x1:')
+        print(x1)
+        print('delta_x:')
+        print(delta_x)
         print('xTSx: %f' % (xTSx))
         print('rho^2: %f' % (rho*rho))
     return False

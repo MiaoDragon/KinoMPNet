@@ -48,14 +48,14 @@ def tvlqr(x, u, dt, func, jac_A, jac_B, system=None, Qf=None):
         A = np.asarray(A)
         B = np.asarray(B)
         #I = np.identity(len(x[0]))
-        Q = 1*np.identity(len(x[0]))
+        Q = 0.01*np.identity(len(x[0]))
         #Q = np.diag([100.,100.,1.,1.])
         S_ = S_.reshape(Q.shape)
         res = -(Q - S_ @ B @ B.T @ S_ + S_ @ A + A.T @ S_)
         res = res.flatten()
         return res
     if Qf is None:
-        S_0 = 1*np.identity(len(x[0])).flatten()
+        S_0 = 1.*np.identity(len(x[0])).flatten()
     else:
         # maybe we are using Qf to connect to the next funnel
         S_0 = Qf.flatten()

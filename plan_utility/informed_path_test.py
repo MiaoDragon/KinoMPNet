@@ -266,6 +266,7 @@ for i in range(len(paths)):
         control = []
         cost = []
         data_step_sz = 0.02
+        in_collision = False
         for k in range(len(controls[i][j])):
             #state_i.append(len(detail_paths)-1)
             print('before int: %f' %(costs[i][j][k]/data_step_sz))
@@ -292,7 +293,11 @@ for i in range(len(paths)):
                 detail_controls.append(controls[i][j])
                 detail_costs.append(data_step_sz)
                 accum_cost += data_step_sz
-                if (step % 10 == 0) or (step == max_steps):  #TOEDIT: 200->20
+                
+                if collision_check(p_start):
+                    in_collision = True
+                
+                if (step % 20 == 0) or (step == max_steps):  #TOEDIT: 200->20
                     state.append(p_start)
                     print('control')
                     print(controls[i][j])
@@ -308,6 +313,8 @@ for i in range(len(paths)):
         for k in range(len(state)):
             print('InCollision: ')
             print(collision_check(state[k]))
+        print('ever in collision:')
+        print(in_collision)
 
         #detail_paths.append(paths[i][j][-1])
         #state = detail_paths[::200]
@@ -351,9 +358,9 @@ for i in range(len(paths)):
                 next_indices = np.minimum(np.arange(start=max_d_i+1, stop=max_d_i+max_ahead+1, step=1, dtype=int), len(state)-1)
                 next_idx = np.random.choice(next_indices)      
                 next_state = np.array(state[next_idx])
-                cov = np.diag([0.01,0.01,0.01,0.01])
+                cov = np.diag([0.01,0.01,0.0,0.0])
                 #mean = next_state
-                #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+                next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
                 mean = np.zeros(next_state.shape)
                 rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
                 rand_x_init[0] = rand_x_init[0]*0.
@@ -388,7 +395,7 @@ for i in range(len(paths)):
                     cost_i = step_sz
                 # add gaussian to u
                 u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
-                u_init = u_init + np.random.normal(scale=.5)
+                u_init = u_init + np.random.normal(scale=1.)
                 t_init = np.linspace(0, cost_i, num_steps)
             else:
                 if max_d_i-1 == -1:
