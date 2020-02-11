@@ -70,8 +70,8 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
     ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
     ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
 
-
-
+        
+        
     #update_line(hl, ax, x0.x)
     #draw_update_line(ax)
     for i in range(len(data)):
@@ -96,11 +96,11 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
     for_prev_scatter = []
     back_in_collision_nums = [0]
     back_prev_scatter = []
-
-
-
-
-
+    
+    
+    
+    
+    
     while target_reached==0 and itr<MAX_LENGTH:
         itr=itr+1  # prevent the path from being too long
         print('iter: %d' % (itr))
@@ -170,14 +170,19 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             x0 = x
             tree=1
         else:
-            #tree=0
+            tree=0
             # skip directly
-            #continue
+            continue
             # the informed initialization is in the forward direction
             xw, x_init, u_init, t_init = informer(env, xG, x0, direction=1)
             # plot the informed point
             ax.scatter(xw.x[0], xw.x[1], c='yellow')
             draw_update_line(ax)
+            x, e = pathSteerToBothDir(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                    jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
+            #x, e = pathSteerToForwardOnly(xG, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+            #                        jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
+            
             if back_in_collision_nums[-1] >= 5 and xG.next is not None:
                 # backtrace, this include direct incollision nodes and indirect ones (parent)
                 print('backward--too many collisions... backtracing')
@@ -185,13 +190,17 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
                 back_in_collision_nums.pop(-1)
                 # since the next state has collision, increase one for its parent
                 back_in_collision_nums[-1] += 1
-                #back_prev_scatter[-1].remove()
-                #back_prev_scatter = back_prev_scatter[:-1]
+                back_prev_scatter[-1].remove()
+                back_prev_scatter = back_prev_scatter[:-1]
+                # remove line as well
+                if xG.edge is not None:
+                    remove_last_k(hl_back, ax, len(xG.edge.xs))
+                    draw_update_line(ax)
                 xG = xG.next
                 tree = 0
                 itr += 1
                 continue
-            if IsInCollision(xw):
+            if e is None:
                 # in collision
                 back_in_collision_nums[-1] += 1
                 tree = 0
@@ -199,126 +208,145 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
                 continue
             # otherwise, create a new collision_num
             back_in_collision_nums.append(0)
-            #update_line(hl_back, ax, xG.x)
-            #xs_to_plot = np.array(e.xs[::10])
-            #for i in range(len(xs_to_plot)):
-            #    xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
-            #back_prev_scat = ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='r')
-            #back_prev_scatter.append(back_prev_scat)
+            print('success back')
+            #print('after backward search...')
+            #print('endpoint:')
+            #print(e.xs[-1])
+            #print('goal:')
+            #print(xG.x)
+            #print('startpoint:')
+            #print(e.xs[0])
+            #print('distance:')
+            #print(node_h_dist(e.xs[-1], xG.x, xG.S0, xG.rho0, system))
+            #print('S0:')
+            #print(xG.S0)
+            #print('rho0:')
+            #print(xG.rho0)
+            # check if the edge endpoint is near the next node
+            # we already take care of this during propagation
+            #if not node_nearby(e.xs[-1], xG.x, xG.S0, xG.rho0, system):
+            #    # not in the region try next time
+            #    itr += 1
+            #    tree=0
+            #    continue
+            #    # or we can also directly back propagate
+            #    print('backward not nearby, propagate using the trajopt')
 
-            #draw_update_line(ax)
+
+                #x, e = pathSteerToBothDir(xG, xw, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=1, propagating=True)
+            
+            ### directly compute funnel to connect
+            #funnelSteerTo(x, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
+
+            for i in range(len(e.xs)-1,-1,-1):
+                update_line(hl_back, ax, e.xs[i])
+            #update_line(hl_back, ax, xG.x)
+            xs_to_plot = np.array(e.xs[::10])
+            for i in range(len(xs_to_plot)):
+                xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+            back_prev_scat = ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='r')
+            back_prev_scatter.append(back_prev_scat)
+
+            draw_update_line(ax)
             #plt.waitforbuttonpress()
-            xw.next = xG
+            x.next = xG
             xG.prev = x
+            e.next = xG
+            x.edge = e
             xG = x
             tree=0
 
-        # try connecting to goal
-        x_init, u_init, t_init = init_informer(env, x0, goal, direction=0)
-        xG_, e = pathSteerToBothDir(x0, goal, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+        # steer endpoint
+        x_init, u_init, t_init = init_informer(env, x0, xG, direction=0)
+        xG_, e = pathSteerToBothDir(x0, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                 jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, \
                                 propagating=True, endpoint=True)
+        if e is None:
+            # in collision
+            print('EndPoint SteerTo in collision!')
+            itr += 1
+            continue
 
-        if e is not None:
-            # check if the BVP is successful
-            if np.linalg.norm(e.xs[0] - x0.x) > BVP_TOLERANCE:
-                # try propagating
-                xG_, e = pathSteerToBothDir(x0, goal, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
-                                    jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
-                #itr += 1
-                #continue
-
-
-            # add xG_ to the start tree
-            x0.next = xG_
-            xG_.prev = x0
-            x0.edge = e
-            x0.edge.next = xG_
+        # check if the BVP is successful
+        if np.linalg.norm(e.xs[0] - x0.x) > BVP_TOLERANCE:
+            # try propagating
+            xG_, e = pathSteerToBothDir(x0, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
+            #itr += 1
+            #continue
 
 
-            print('endpoint steering...')
-            print('x0:')
-            print(x0.x)
-            print('goal:')
-            print(goal.x)
-            print('xG_:')
-            print(xG_.x)
-            # find the nearest point from xG_ to points on the goal tree
-            if h_dist(xG_, goal, goal.S0, goal.rho0, system) <= 1.0:
-                # otherwise it is a nearby node
-                #if min_node.S0 is None:
-                #    lazyFunnel(min_node, funnel_node, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=system, step_sz=step_sz)
-                #    #funnel_node = min_node
-                min_node = goal
-                reached, node_i0, node_i1 = nearby(xG_, min_node, system)
-                if reached:
-                    target_reached = True
-                    xs_to_plot = np.array(e.xs[::10])
-                    for i in range(len(xs_to_plot)):
-                        xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
-                    ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='salmon')
-
-                    #ax.scatter(e.xs[::10,0], e.xs[::10,1], c='salmon')
-                    draw_update_line(ax)
-                    # since the nearby nodes are on the edge, need to extract the node index
-                    if min_node.edge is not None:
-                        # need to extract subset of x1.edge
-                        # change the t0 of edge starting from node to be time_knot[node_i] (use subset of edge)
-                        edge = min_node.edge
-                        edge.t0 = edge.time_knot[node_i1]
-                        edge.i0 = node_i1
-                        # change the node to be xs[node_i], S0 to be S(time_knot[node_i]), rho0 to be rho0s[node_i]
-                        new_node = Node(wrap_angle(edge.xs[node_i1], system))
-                        new_node.S0 = edge.S(edge.t0).reshape((len(edge.xs[node_i1]),len(edge.xs[node_i1])))
-                        new_node.rho0 = edge.rho0s[node_i1]
-                        new_node.edge = edge
-                        new_node.next = min_node.next
-                        min_node = new_node
-                    xG = min_node
-                    x0 = xG_
-                    # again print out the xTSx
-                    print('xTSx:')
-                    print(node_h_dist(x0.x, xG.x, xG.S0, xG.rho0, system))
-                    # print for the edge endpoint
-                    print('for edge endpoint:')
-                    print('xTSx/rho0^2:')
-                    print(node_h_dist(x0.prev.edge.xs[-1], xG.x, xG.S0, xG.rho0, system))
-                    break
+        # add xG_ to the start tree
+        x0.next = xG_
+        xG_.prev = x0
+        x0.edge = e
+        x0.edge.next = xG_
 
 
-        # try to connect from x0 to one node on the goal tree (nearest)
+        print('endpoint steering...')
+        print('x0:')
+        print(x0.x)
+        print('xG:')
+        print(xG.x)
+        print('xG_:')
+        print(xG_.x)
+        # find the nearest point from xG_ to points on the goal tree
         node = xG
         min_node = node
         min_d = 1e6
         # min_d: normalized distance xTSx / (rho^2)
         while node is not None:
-            dis = h_dist(x0, node, goal.S0, goal.rho0, system)
+            dis = h_dist(xG_, node, goal.S0, goal.rho0, system)
             if dis < min_d:
                 min_d = dis
                 min_node = node
             node = node.next
         print('min_d: %f' %(min_d))
-        # try to connect x0 to min_node
-        x_init, u_init, t_init = init_informer(env, x0, min_node, direction=0)
-        xG_, e = pathSteerToBothDir(x0, min_node, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
-                                jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, \
-                                propagating=True)
-        # if xG_ is near enough to min_node, then connected
-        if e is None:
+        if min_d > 1.0:
             itr += 1
             continue
-        # otherwise valid
-        if h_dist(xG_, min_node, goal.S0, goal.rho0, system) <= 1.0:
-            print('start tree is connected to one node in goal tree')
-            xG = xG.next
-            x0.edge = e
-            x0.next = xG_
-            xG_.prev = x0
-            x0 = x0.next
-            if min_node.next is not None:
-                xG = min_node.next
-        itr += 1
+        # otherwise it is a nearby node
+        if min_node.S0 is None:
+            lazyFunnel(min_node, funnel_node, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=system, step_sz=step_sz)
+            #funnel_node = min_node
 
+        reached, node_i0, node_i1 = nearby(xG_, min_node, system)
+        if reached:
+            target_reached = True
+            xs_to_plot = np.array(e.xs[::10])
+            for i in range(len(xs_to_plot)):
+                xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='salmon')
+
+            #ax.scatter(e.xs[::10,0], e.xs[::10,1], c='salmon')
+            draw_update_line(ax)
+
+
+            # since the nearby nodes are on the edge, need to extract the node index
+            if min_node.edge is not None:
+                # need to extract subset of x1.edge
+                # change the t0 of edge starting from node to be time_knot[node_i] (use subset of edge)
+                edge = min_node.edge
+                edge.t0 = edge.time_knot[node_i1]
+                edge.i0 = node_i1
+                # change the node to be xs[node_i], S0 to be S(time_knot[node_i]), rho0 to be rho0s[node_i]
+                new_node = Node(wrap_angle(edge.xs[node_i1], system))
+                new_node.S0 = edge.S(edge.t0).reshape((len(edge.xs[node_i1]),len(edge.xs[node_i1])))
+                new_node.rho0 = edge.rho0s[node_i1]
+                new_node.edge = edge
+                new_node.next = min_node.next
+                min_node = new_node
+            xG = min_node
+            x0 = xG_
+            # again print out the xTSx
+            print('xTSx:')
+            print(node_h_dist(x0.x, xG.x, xG.S0, xG.rho0, system))
+            # print for the edge endpoint
+            print('for edge endpoint:')
+            print('xTSx/rho0^2:')
+            print(node_h_dist(x0.prev.edge.xs[-1], xG.x, xG.S0, xG.rho0, system))
+            break
+        itr += 1
 
     if target_reached:
         print('target reached.')
