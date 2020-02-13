@@ -6,8 +6,7 @@ from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
 
-MAX_INVALID_THRESHOLD = .6  # this should depend on the problem
-invalid_mat = np.diag([1.,1.,0.,0.])
+MAX_INVALID_THRESHOLD = 2  # this should depend on the problem
 def wrap_angle(x, system):
     circular = system.is_circular_topology()
     res = np.array(x)
@@ -27,7 +26,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     # change propagation: maybe only using step_sz but not smaller is better (however, round for accuracy)
     
     # try to round according to control up to difference being some threshold
-    """
+
     near_u = 1e-1
     new_us = [us[0]]
     last_us = [us[0]]
@@ -55,7 +54,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     #print(us)
     #print('dts:')
     #print(dts)      
-    """
+
     new_xs = [x]
     new_us = []
     new_dts = []
@@ -91,9 +90,9 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
         if not valid:
             break
         # here we apply round to last_step as in SST we use this method
-        #if last_step > step_sz/2:
-        if True:
-            #last_step = step_sz
+        if last_step > step_sz/2:
+            #if True:
+            last_step = step_sz
             #x = x + last_step*dynamics(x, u)
             x = dynamics(x, u, last_step)
             """
@@ -128,28 +127,28 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
         xs, us, dts = traj_opt(x0.x, x1.x, x_init, u_init, t_init)
-        if endpoint:
-            print('----------------forward----------------')
-            print('trajectory opt:')
-            print('start:')
-            print(x0.x)
-            print('end:')
-            print(x1.x)
-            print('xs[0]:')
-            print(xs[0])
-            print('xs[-1]:')
-            print(xs[-1])
-            print('us:')
-            print(us)
-            print('dts:')
-            print(dts)
-
+        """
+        print('----------------forward----------------')
+        print('trajectory opt:')
+        print('start:')
+        print(x0.x)
+        print('end:')
+        print(x1.x)
+        print('xs[0]:')
+        print(xs[0])
+        print('xs[-1]:')
+        print(xs[-1])
+        print('us:')
+        print(us)
+        print('dts:')
+        print(dts)
+        """
         # ensure us and dts have length 1 less than xs
         if len(us) == len(xs):
             us = us[:-1]
         if propagating:
             xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
-            if endpoint:
+            """
                 print('propagation result:')
                 print('xs[0]:')
                 print(xs[0])
@@ -159,17 +158,13 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
                 print(us)
                 print('dts:')
                 print(dts)
+            """
         else:
             # check collision for the trajopt endpoint
-            valid = True
-            for i in range(len(xs)):
-                if IsInCollision(xs[i]):
-                    valid = False
-                    break
-            
+            pass
         # if the endpoint is too faraway from our guess, discard it
         # TODO: (need to provide distance bound)
-        if valid and not node_nearby(xs[-1], x1.x, invalid_mat, MAX_INVALID_THRESHOLD, system):
+        if valid and not node_nearby(xs[-1], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
             valid = False
         edge_dt = np.sum(dts)
         start = x0
@@ -227,7 +222,7 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
             print('dts:')
             print(dts)
 
-        if valid and not node_nearby(xs[0], x1.x, invalid_mat, MAX_INVALID_THRESHOLD, system):
+        if valid and not node_nearby(xs[0], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
             valid = False
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
@@ -300,7 +295,7 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             print('dts:')
             print(dts)
         # if the endpoint is too faraway, count as invalid
-        if valid and not node_nearby(xs[-1], x1.x, invalid_mat, MAX_INVALID_THRESHOLD, system):
+        if valid and not node_nearby(xs[-1], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
             valid = False
         edge_dt = np.sum(dts)
         start = x0
@@ -339,7 +334,7 @@ def pathSteerToForwardOnly(x0, x1, x_init, u_init, t_init, dynamics, enforce_bou
             print(us)
             print('dts:')
             print(dts)
-        if valid and not node_nearby(xs[0], x1.x, invalid_mat, MAX_INVALID_THRESHOLD, system):
+        if valid and not node_nearby(xs[0], x1.x, np.identity(len(x1.x)), MAX_INVALID_THRESHOLD, system):
             valid = False
             print('not valid because node not neary indety')
         if valid and not node_nearby(xs[-1], x0.x, x0.S0, x0.rho0*0.5, system):

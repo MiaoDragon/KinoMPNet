@@ -202,9 +202,9 @@ for i in range(len(paths)):
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
-        num_steps = 20
+        num_steps = 21
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, 0.02*1, 0.02*5*num_steps, x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         #goal_S0 = np.identity(4)
         goal_S0 = np.diag([1.,1.,0.,0.])
         goal_rho0 = 0.5
@@ -265,6 +265,11 @@ for i in range(len(paths)):
         state = [p_start]
         control = []
         cost = []
+        
+        back_state = []
+        back_control = []
+        back_cost = []
+        back_accum_cost = 0.
         data_step_sz = 0.02
         in_collision = False
         for k in range(len(controls[i][j])):
@@ -283,7 +288,7 @@ for i in range(len(paths)):
                 print('before propagation:')
                 print(p_start)
                 print('after cpp propagation:')
-                p_start = cpp_propagator.propagate(system, p_start, controls[i][j][k], step_sz)
+                p_start = cpp_propagator.propagate(system, p_start, controls[i][j][k], data_step_sz)
                 print(p_start)
                 #p_start = p_start + data_step_sz*dynamics(p_start, controls[i][j][k])
                 #print('after python propagation:')
@@ -293,17 +298,24 @@ for i in range(len(paths)):
                 detail_controls.append(controls[i][j])
                 detail_costs.append(data_step_sz)
                 accum_cost += data_step_sz
-                
+                back_accum_cost += data_step_sz
                 if collision_check(p_start):
                     in_collision = True
                 
-                if (step % 20 == 0) or (step == max_steps):  #TOEDIT: 200->20
+                if (step % 10 == 0) or (step == max_steps):  #TOEDIT: 200->20
                     state.append(p_start)
                     print('control')
                     print(controls[i][j])
                     control.append(controls[i][j][k])
                     cost.append(accum_cost)
                     accum_cost = 0.
+                if (step % 10 == 0) or (step == max_steps):
+                    back_state.append(p_start)
+                    print('control')
+                    print(controls[i][j])
+                    back_control.append(controls[i][j][k])
+                    back_cost.append(back_accum_cost)
+                    back_accum_cost = 0.                    
         print('p_start:')
         print(p_start)
         print('data:')
@@ -358,9 +370,9 @@ for i in range(len(paths)):
                 next_indices = np.minimum(np.arange(start=max_d_i+1, stop=max_d_i+max_ahead+1, step=1, dtype=int), len(state)-1)
                 next_idx = np.random.choice(next_indices)      
                 next_state = np.array(state[next_idx])
-                cov = np.diag([0.01,0.01,0.0,0.0])
+                cov = np.diag([0.02,0.02,0.02,0.02])
                 #mean = next_state
-                next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+                #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
                 mean = np.zeros(next_state.shape)
                 rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
                 rand_x_init[0] = rand_x_init[0]*0.
@@ -376,7 +388,7 @@ for i in range(len(paths)):
                             delta_x[i] = delta_x[i] - 2*np.pi
                         # randomly pick either direction
                         rand_d = np.random.randint(2)
-                        if rand_d < 1:
+                        if rand_d < 1 and np.abs(delta_x[i]) >= np.pi*0.5:
                             if delta_x[i] > 0.:
                                 delta_x[i] = delta_x[i] - 2*np.pi
                             elif delta_x[i] <= 0.:
@@ -392,24 +404,47 @@ for i in range(len(paths)):
                     print(cost_i)
                 else:
                     u_init_i = np.array(control[max_d_i-1])*0.
-                    cost_i = step_sz
+                    cost_i = data_step_sz
                 # add gaussian to u
                 u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
                 u_init = u_init + np.random.normal(scale=1.)
                 t_init = np.linspace(0, cost_i, num_steps)
             else:
+                dis = x0.x - back_state
+                circular = system.is_circular_topology()
+                for i in range(len(x0.x)):
+                    if circular[i]:
+                        # if it is angle, should map to -pi to pi
+                        # map to [-pi, pi]
+                        dis[:,i] = dis[:,i] - np.floor(dis[:,i] / (2*np.pi))*(2*np.pi)
+                        # should not change the "sign" of the delta_x
+                        dis[:,i] = (dis[:,i] > np.pi) * (dis[:,i] - 2*np.pi) + (dis[:,i] <= np.pi) * dis[:,i]
+                #S = np.identity(len(x0.x))
+                S = np.diag([1.,1.,0.,0.])
+                #S = np.diag([1/30./30., 1/40./40., 1., 1.])
+                #dif = np.sqrt(dis.T@S@dis)
+                dif = []
+                for i in range(len(dis)):
+                    dif.append(np.sqrt(dis[i].T@S@dis[i]))
+                dif = np.array(dif)
+                #dif = np.linalg.norm(dis, axis=1)
+                max_d_i = np.argmin(dif)
+               
+                
                 if max_d_i-1 == -1:
                     next_idx = max_d_i
                 else:
                     next_idx = max_d_i-1
                 next_indices = np.maximum(np.arange(start=max_d_i-1, stop=max_d_i-max_ahead-1, step=-1, dtype=int), 0)
                 next_idx = np.random.choice(next_indices)                          
-                next_state = np.array(state[next_idx])
-                cov = np.diag([0.01,0.01,0.0,0.0])
+                next_state = np.array(back_state[next_idx])
+                cov = np.diag([0.01,0.01,0.01,0.01])
                 #mean = next_state
-                #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
+                #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
                 mean = np.zeros(next_state.shape)
                 rand_x_init = np.random.multivariate_normal(mean=mean,cov=cov, size=num_steps)
+                rand_x_init[0] = rand_x_init[0] * 0.
+                rand_x_init[-1] = rand_x_init[-1] * 0.
                 delta_x = x0.x - next_state
                 # can be either clockwise or counterclockwise, take shorter one
                 for i in range(len(delta_x)):
@@ -419,7 +454,7 @@ for i in range(len(paths)):
                             delta_x[i] = delta_x[i] - 2*np.pi  
                         # randomly pick either direction
                         rand_d = np.random.randint(2)
-                        if rand_d < 1:
+                        if rand_d < 1 and np.abs(delta_x[i]) >= np.pi*0.5:
                             if delta_x[i] > 0.:
                                 delta_x[i] = delta_x[i] - 2*np.pi
                             elif delta_x[i] <= 0.:
@@ -428,17 +463,20 @@ for i in range(len(paths)):
                 res = Node(next_state)
                 # initial: from max_d_i to max_d_i+1
                 x_init = np.linspace(next_state, next_state + delta_x, num_steps) + rand_x_init
+                
                 # action: copy over to number of steps
                 if max_d_i > 0:
-                    u_init_i = control[max_d_i-1]
-                    cost_i = cost[max_d_i-1]
+                    u_init_i = back_control[max_d_i-1]
+                    cost_i = back_cost[max_d_i-1]
                 else:
-                    u_init_i = np.array(control[max_d_i])*0.
-                    cost_i = step_sz               
+                    u_init_i = np.array(back_control[max_d_i])*0.
+                    cost_i = data_step_sz               
                 u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
-                u_init = u_init + np.random.normal(scale=1.)                
+                u_init = u_init# + np.random.normal(scale=1.)                
                 t_init = np.linspace(0, cost_i, num_steps)
                 #t_init = np.linspace(0, step_sz*(num_steps-1), num_steps)
+            print('x_init:')
+            print(x_init)
             return res, x_init, u_init, t_init
 
         def init_informer(env, x0, xG, direction):
@@ -447,11 +485,13 @@ for i in range(len(paths)):
             if direction == 0:
                 # forward
                 next_state = xG.x
-                cov = np.diag([0.01,0.01,0.0,0.0])
+                cov = np.diag([0.02,0.02,0.02,0.02])
                 #mean = next_state
                 #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
                 mean = np.zeros(next_state.shape)
                 rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+                rand_x_init[0] = rand_x_init[0] * 0.
+                rand_x_init[-1] = rand_x_init[-1] * 0.
                 # initial: from max_d_i to max_d_i+1
                 delta_x = next_state - x0.x
                 # can be either clockwise or counterclockwise, take shorter one
@@ -462,7 +502,7 @@ for i in range(len(paths)):
                             delta_x[i] = delta_x[i] - 2*np.pi
                         # randomly pick either direction
                         rand_d = np.random.randint(2)
-                        if rand_d < 1:
+                        if rand_d < 1 and np.abs(delta_x[i]) >= np.pi*0.5:
                             if delta_x[i] > 0.:
                                 delta_x[i] = delta_x[i] - 2*np.pi
                             elif delta_x[i] <= 0.:
@@ -472,14 +512,15 @@ for i in range(len(paths)):
                 # action: copy over to number of steps
                 u_init_i = np.random.uniform(low=[-4.], high=[4])
                 #u_init_i = control[max_d_i]
-                cost_i = step_sz*num_steps*2
+                cost_i = step_sz*num_steps
                 # add gaussian to u
                 u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
                 u_init = u_init + np.random.normal(scale=1.)
                 t_init = np.linspace(0, cost_i, num_steps)
             else:
+
                 next_state = xG.x
-                cov = np.diag([0.01,0.01,0.0,0.0])
+                cov = np.diag([0.01,0.01,0.01,0.01])
                 #mean = next_state
                 #next_state = np.random.multivariate_normal(mean=mean,cov=cov)
                 mean = np.zeros(next_state.shape)
@@ -493,7 +534,7 @@ for i in range(len(paths)):
                             delta_x[i] = delta_x[i] - 2*np.pi  
                         # randomly pick either direction
                         rand_d = np.random.randint(2)
-                        if rand_d < 1:
+                        if rand_d < 1 and np.abs(delta_x[i]) >= np.pi*0.5:
                             if delta_x[i] > 0.:
                                 delta_x[i] = delta_x[i] - 2*np.pi
                             if delta_x[i] <= 0.:
