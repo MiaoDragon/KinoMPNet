@@ -132,7 +132,17 @@ def main(args):
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
-
+    elif args.env_type == 'acrobot_obs_8':
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        system = _sst_module.PSOPTAcrobot()
+        mlp = mlp_acrobot.MLP6
+        cae = CAE_acrobot_voxel_2d_3
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = acrobot_obs.enforce_bounds
+        step_sz = 0.02
+        num_steps = 20
 
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
