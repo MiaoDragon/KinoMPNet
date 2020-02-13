@@ -85,7 +85,8 @@ def main(args):
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
-        dynamics = acrobot_obs.dynamics
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d
@@ -99,7 +100,9 @@ def main(args):
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
-        dynamics = acrobot_obs.dynamics
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d_2
@@ -197,7 +200,7 @@ if __name__ == '__main__':
     parser.add_argument('--seen_N', type=int, default=1)
     parser.add_argument('--seen_NP', type=int, default=10)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=0)
+    parser.add_argument('--seen_sp', type=int, default=5)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)
@@ -213,7 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=200)
+    parser.add_argument('--start_epoch', type=int, default=500)
     parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')

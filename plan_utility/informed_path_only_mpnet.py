@@ -52,11 +52,28 @@ def plan_mpnet(obs, env, x0, xG, data, informer, init_informer, system, dynamics
     def animation(states, actions):
         vis._animate(states[-1], ax_ani)
         draw_update_line(ax_ani)
+    dtheta = 0.1
+    feasible_points = []
+    infeasible_points = []
+    imin = 0
+    imax = int(2*np.pi/dtheta)
+    for i in range(imin, imax):
+        for j in range(imin, imax):
+            x = np.array([dtheta*i-np.pi, dtheta*j-np.pi, 0., 0.])
+            if IsInCollision(x):
+                infeasible_points.append(x)
+            else:
+                feasible_points.append(x)
+    feasible_points = np.array(feasible_points)
+    infeasible_points = np.array(infeasible_points)
+    ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
+    ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
 
 
     #update_line(hl, ax, x0.x)
     #draw_update_line(ax)
     for i in range(len(data)):
+        print(data[i])
         update_line(hl, ax, data[i])
     draw_update_line(ax)
     update_line(hl_for, ax, x0.x)
@@ -91,6 +108,7 @@ def plan_mpnet(obs, env, x0, xG, data, informer, init_informer, system, dynamics
 
             # the informed initialization is in the forward direction
             xw, x_init, u_init, t_init = informer(env, x0, xG, direction=0)
+            
             ax.scatter(xw.x[0], xw.x[1], c='lightgreen')
             draw_update_line(ax)
             plt.waitforbuttonpress()
