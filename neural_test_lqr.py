@@ -130,6 +130,22 @@ def main(args):
         obs_f = True
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+    elif args.env_type == 'acrobot_obs_8':
+        IsInCollision =acrobot_obs.IsInCollision
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        jax_dynamics = acrobot_obs.jax_dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
+        cae = CAE_acrobot_voxel_2d_3
+        mlp = mlp_acrobot.MLP6
+        obs_f = True
+        #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
+        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
 
         
         
@@ -166,7 +182,7 @@ def main(args):
 
 
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet1, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -237,7 +253,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
+    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_8_lr0.010000_SGD/',help='path for saving trained models')
     parser.add_argument('--seen_N', type=int, default=1)
     parser.add_argument('--seen_NP', type=int, default=10)
     parser.add_argument('--seen_s', type=int, default=0)
@@ -257,8 +273,8 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=500)
-    parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
+    parser.add_argument('--start_epoch', type=int, default=750)
+    parser.add_argument('--env_type', type=str, default='acrobot_obs_8', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
 

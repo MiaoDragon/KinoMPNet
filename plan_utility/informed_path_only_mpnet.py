@@ -107,7 +107,7 @@ def plan_mpnet(obs, env, x0, xG, data, informer, init_informer, system, dynamics
             # we are computing backward
 
             # the informed initialization is in the forward direction
-            xw, x_init, u_init, t_init = informer(env, x0, xG, direction=0)
+            xw, x_init, u_init, t_init = informer(env, x0, goal, direction=0)
             
             ax.scatter(xw.x[0], xw.x[1], c='lightgreen')
             draw_update_line(ax)
@@ -115,8 +115,13 @@ def plan_mpnet(obs, env, x0, xG, data, informer, init_informer, system, dynamics
             x0 = Node(xw.x)
             tree=1
         else:
+            xw, x_init, u_init, t_init = informer(env, xG, start, direction=1)
+            ax.scatter(xG.x[0], xG.x[1], c='black')
+            ax.scatter(start.x[0], start.x[1], c='blue')
+            
+            ax.scatter(xw.x[0], xw.x[1], c='red')
+            print(xw.x)
+            draw_update_line(ax)
+            plt.waitforbuttonpress()
+            xG = Node(xw.x)
             tree=0
-            # skip directly
-            continue
-
-        itr += 1

@@ -25,7 +25,7 @@ import numpy as np
 import argparse
 import os
 import torch
-from gem_eval import eval_tasks_mpnet
+from gem_eval_without_vis import eval_tasks
 from torch.autograd import Variable
 import copy
 import os
@@ -81,12 +81,13 @@ def main(args):
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
     elif args.env_type == 'acrobot_obs':
-        system = _sst_module.PSOPTAcrobot()
         IsInCollision =acrobot_obs.IsInCollision
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        #dynamics = acrobot_obs.dynamics
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         jax_dynamics = acrobot_obs.jax_dynamics
@@ -94,6 +95,7 @@ def main(args):
         cae = CAE_acrobot_voxel_2d
         mlp = mlp_acrobot.MLP
         obs_f = True
+        
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
     elif args.env_type == 'acrobot_obs_2':
@@ -102,9 +104,9 @@ def main(args):
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
+        system = _sst_module.PSOPTAcrobot()
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d_2
@@ -112,24 +114,43 @@ def main(args):
         obs_f = True
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-    elif args.env_type == 'acrobot_obs_8':
-        system = _sst_module.PSOPTAcrobot()
+    elif args.env_type == 'acrobot_obs_5':
         IsInCollision =acrobot_obs.IsInCollision
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
+        system = _sst_module.PSOPTAcrobot()
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
-        mlp = mlp_acrobot.MLP6
         cae = CAE_acrobot_voxel_2d_3
+        mlp = mlp_acrobot.MLP
+        obs_f = True
+        #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
+        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+    elif args.env_type == 'acrobot_obs_8':
+        IsInCollision =acrobot_obs.IsInCollision
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        jax_dynamics = acrobot_obs.jax_dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
+        cae = CAE_acrobot_voxel_2d_3
+        mlp = mlp_acrobot.MLP6
         obs_f = True
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
 
+        
+        
+        
+        
     jac_A = jax.jacfwd(jax_dynamics, argnums=0)
     jac_B = jax.jacfwd(jax_dynamics, argnums=1)
     mpNet0 = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
@@ -182,9 +203,7 @@ def main(args):
     if args.start_epoch > 0:
         load_opt_state(mpNet1, os.path.join(args.model_path, model_path))
 
-        
-        
-    _, waypoint_dataset, waypoint_targets, _, _, _, _, _ = data_loader.load_train_dataset(1, 2, args.data_folder, obs_f, 1, dynamics, enforce_bounds, system, 0.02, 20)
+
 
     # load data
     print('loading...')
@@ -202,26 +221,43 @@ def main(args):
     seen_test_suc_rate = 0.
     unseen_test_suc_rate = 0.
     T = 1
-    # unnormalize function
-    normalize_func=lambda x: normalize(x, args.world_size)
-    unnormalize_func=lambda x: unnormalize(x, args.world_size)
-    # seen
+    for _ in range(T):
+        # unnormalize function
+        normalize_func=lambda x: normalize(x, args.world_size)
+        unnormalize_func=lambda x: unnormalize(x, args.world_size)
+        # seen
+        if args.seen_N > 0:
+            time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, seen_test_data, args.model_path, 'seen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds, IsInCollision)
+            valid_path = valid_path_.flatten()
+            fes_path = fes_path_.flatten()   # notice different environments are involved
+            seen_test_suc_rate += fes_path.sum() / valid_path.sum()
+        # unseen
+        if args.unseen_N > 0:
+            time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, args.env_type, unseen_test_data, args.model_path, 'unseen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds, IsInCollision)
+            valid_path = valid_path_.flatten()
+            fes_path = fes_path_.flatten()   # notice different environments are involved
+            unseen_test_suc_rate += fes_path.sum() / valid_path.sum()
     if args.seen_N > 0:
-        time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
-        fes_path_, valid_path_ = eval_tasks_mpnet(mpNet0, mpNet1, args.env_type, seen_test_data, args.model_path, 'seen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds, IsInCollision)
-    # unseen
+        seen_test_suc_rate = seen_test_suc_rate / T
+        f = open(os.path.join(args.model_path,'seen_accuracy_epoch_%d.txt' % (args.start_epoch)), 'w')
+        f.write(str(seen_test_suc_rate))
+        f.close()
     if args.unseen_N > 0:
-        time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
-        fes_path_, valid_path_ = eval_tasks_mpnet(mpNet0, mpNet1, args.env_type, unseen_test_data, args.model_path, 'unseen', normalize_func, unnormalize_func, dynamics, jac_A, jac_B, enforce_bounds, IsInCollision)
+        unseen_test_suc_rate = unseen_test_suc_rate / T    # Save the models
+        f = open(os.path.join(args.model_path,'unseen_accuracy_epoch_%d.txt' % (args.start_epoch)), 'w')
+        f.write(str(unseen_test_suc_rate))
+        f.close()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
     parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_8_lr0.010000_SGD/',help='path for saving trained models')
-    parser.add_argument('--seen_N', type=int, default=1)
-    parser.add_argument('--seen_NP', type=int, default=10)
+    parser.add_argument('--seen_N', type=int, default=10)
+    parser.add_argument('--seen_NP', type=int, default=200)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=5)
+    parser.add_argument('--seen_sp', type=int, default=800)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)

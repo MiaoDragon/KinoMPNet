@@ -105,9 +105,13 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
                 # use dense input
                 data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps)
             p = data_path
+            #print('before flip:')
+            #print(p)
             if direction == 1:
                 # backward
                 p = np.flip(p, axis=0)
+            #print('after flip:')
+            #print(p)
             for k in range(len(p)-1):
                 for l in range(k+1, len(p)):
                     waypoint_dataset.append(np.concatenate([p[k], p[l]]))
@@ -174,8 +178,8 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             obc = obc.reshape(-1, 2)
             obs_list.append(obs)
             obc_list.append(obc)
-            obc_list = np.array(obc_list)
-            obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
+        obc_list = np.array(obc_list)
+        obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
 
     path_env = []
     path_length_env = []

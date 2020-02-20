@@ -302,14 +302,14 @@ for i in range(len(paths)):
                 if collision_check(p_start):
                     in_collision = True
                 
-                if (step % 10 == 0) or (step == max_steps):  #TOEDIT: 200->20
+                if (step % 20 == 0) or (step == max_steps):  #TOEDIT: 200->20
                     state.append(p_start)
                     print('control')
                     print(controls[i][j])
                     control.append(controls[i][j][k])
                     cost.append(accum_cost)
                     accum_cost = 0.
-                if (step % 10 == 0) or (step == max_steps):
+                if (step % 20 == 0) or (step == max_steps):
                     back_state.append(p_start)
                     print('control')
                     print(controls[i][j])
@@ -407,7 +407,7 @@ for i in range(len(paths)):
                     cost_i = data_step_sz
                 # add gaussian to u
                 u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
-                u_init = u_init + np.random.normal(scale=1.)
+                u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
                 t_init = np.linspace(0, cost_i, num_steps)
             else:
                 dis = x0.x - back_state
@@ -475,8 +475,8 @@ for i in range(len(paths)):
                 u_init = u_init# + np.random.normal(scale=1.)                
                 t_init = np.linspace(0, cost_i, num_steps)
                 #t_init = np.linspace(0, step_sz*(num_steps-1), num_steps)
-            print('x_init:')
-            print(x_init)
+            #print('x_init:')
+            #print(x_init)
             return res, x_init, u_init, t_init
 
         def init_informer(env, x0, xG, direction):
@@ -510,12 +510,13 @@ for i in range(len(paths)):
                 x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
                 #x_init = np.array(detail_paths[state_i[max_d_i]:state_i[next_idx]])
                 # action: copy over to number of steps
-                u_init_i = np.random.uniform(low=[-4.], high=[4])
+                #u_init_i = np.random.uniform(low=[-4.], high=[4])
                 #u_init_i = control[max_d_i]
-                cost_i = step_sz*num_steps
+                cost_i = step_sz*(num_steps-1)
                 # add gaussian to u
-                u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
-                u_init = u_init + np.random.normal(scale=1.)
+                #u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
+                u_init = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
+                #u_init = u_init + np.random.normal(scale=1.)
                 t_init = np.linspace(0, cost_i, num_steps)
             else:
 

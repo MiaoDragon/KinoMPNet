@@ -46,7 +46,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
         traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*50, x_init, u_init, t_init)
         goal_S0 = np.identity(4)
         goal_rho0 = 1.0
-    elif env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4']:
+    elif env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         obs_width = 6.0
         system = _sst_module.PSOPTAcrobot()
@@ -76,6 +76,13 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
                 x = x.cuda()
             next_state = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
             next_state = unnormalize_func(next_state).numpy()[0]
+            cov = np.diag([0.01,0.01,0.01,0.01])
+            #mean = next_state
+            #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+            mean = np.zeros(next_state.shape)
+            rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+            rand_x_init[0] = rand_x_init[0]*0.
+            rand_x_init[-1] = rand_x_init[-1]*0.
             delta_x = next_state - x0.x
             # can be either clockwise or counterclockwise, take shorter one
             for i in range(len(delta_x)):
@@ -91,7 +98,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
                         if delta_x[i] <= 0.:
                             delta_x[i] = delta_x[i] + 2*np.pi
             res = Node(next_state)
-            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps)
+            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
             ## TODO: : change this to general case
             u_init_i = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
             u_init = u_init_i
@@ -100,11 +107,19 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
             #u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
             #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
             t_init = np.linspace(0, cost_i, num_steps)
+            #t_init = np.append(t_init, 0.)
         else:
-            x = torch.cat([xG_x,x0_x], dim=0)
+            x = torch.cat([x0_x,xG_x], dim=0)
             mpNet = mpNet1
             next_state = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
             next_state = unnormalize_func(next_state).numpy()[0]
+            cov = np.diag([0.01,0.01,0.01,0.01])
+            #mean = next_state
+            #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+            mean = np.zeros(next_state.shape)
+            rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+            rand_x_init[0] = rand_x_init[0]*0.
+            rand_x_init[-1] = rand_x_init[-1]*0.
             delta_x = x0.x - next_state
             # can be either clockwise or counterclockwise, take shorter one
             for i in range(len(delta_x)):
@@ -136,6 +151,13 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
         if direction == 0:
             next_state = xG.x
             delta_x = next_state - x0.x
+            cov = np.diag([0.01,0.01,0.01,0.01])
+            #mean = next_state
+            #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+            mean = np.zeros(next_state.shape)
+            rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+            rand_x_init[0] = rand_x_init[0]*0.
+            rand_x_init[-1] = rand_x_init[-1]*0.
             # can be either clockwise or counterclockwise, take shorter one
             for i in range(len(delta_x)):
                 if circular[i]:
@@ -150,7 +172,7 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
                         if delta_x[i] <= 0.:
                             delta_x[i] = delta_x[i] + 2*np.pi
             res = Node(next_state)
-            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps)
+            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
             ## TODO: : change this to general case
             u_init_i = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
             u_init = u_init_i
@@ -159,8 +181,16 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
             #u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
             #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
             t_init = np.linspace(0, cost_i, num_steps)
+            #t_init = np.append(t_init, 0.)
         else:
             next_state = xG.x
+            cov = np.diag([0.01,0.01,0.01,0.01])
+            #mean = next_state
+            #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+            mean = np.zeros(next_state.shape)
+            rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+            rand_x_init[0] = rand_x_init[0]*0.
+            rand_x_init[-1] = rand_x_init[-1]*0.
             delta_x = x0.x - next_state
             # can be either clockwise or counterclockwise, take shorter one
             for i in range(len(delta_x)):
@@ -266,7 +296,8 @@ def eval_tasks(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, normali
                 #plt.plot(paths[i][j][:,0], paths[i][j][:,1])
 
                 start = Node(path[0])
-                goal = Node(sgs[i][j][1])
+                goal = Node(path[-1])
+                #goal = Node(sgs[i][j][1])
                 goal.S0 = goal_S0
                 goal.rho0 = goal_rho0    # change this later
 
@@ -386,7 +417,7 @@ def eval_tasks_mpnet(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, n
         num_steps = 20
         goal_S0 = np.identity(4)
         goal_rho0 = 1.0
-    elif env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4']:
+    elif env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         obs_width = 6.0
         system = _sst_module.PSOPTAcrobot()
@@ -442,7 +473,7 @@ def eval_tasks_mpnet(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, n
             u_init = u_init + np.random.normal(scale=1.)
             t_init = np.linspace(0, cost_i, num_steps)
         else:
-            x = torch.cat([xG_x,x0_x], dim=0)
+            x = torch.cat([x0_x,xG_x], dim=0)
             mpNet = mpNet1
             next_state = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
             print('next state:')
@@ -467,7 +498,7 @@ def eval_tasks_mpnet(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, n
             #next_state = state[max_d_i] + delta_x
             res = Node(next_state)
             # initial: from max_d_i to max_d_i+1
-            x_init = np.linspace(next_state, next_state + delta_x, num_steps) + rand_x_init
+            x_init = np.linspace(next_state, next_state + delta_x, num_steps)# + rand_x_init
             # action: copy over to number of steps
             u_init_i = np.random.uniform(low=[-4.], high=[4])
             cost_i = num_steps*step_sz
@@ -521,7 +552,7 @@ def eval_tasks_mpnet(mpNet0, mpNet1, env_type, test_data, save_dir, data_type, n
             #next_state = state[max_d_i] + delta_x
             res = Node(next_state)
             # initial: from max_d_i to max_d_i+1
-            x_init = np.linspace(next_state, next_state + delta_x, num_steps) + rand_x_init
+            x_init = np.linspace(next_state, next_state + delta_x, num_steps)# + rand_x_init
             # action: copy over to number of steps
             u_init_i = np.random.uniform(low=[-4.], high=[4])
             cost_i = num_steps*step_sz
