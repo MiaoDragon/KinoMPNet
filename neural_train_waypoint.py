@@ -149,7 +149,7 @@ def main(args):
     # load net
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
-    model_dir = model_dir+args.env_type+"_lr%f_%s/" % (args.learning_rate, args.opt)
+    model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
     model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
@@ -187,7 +187,7 @@ def main(args):
                                                 data_folder=args.path_folder, obs_f=True,
                                                 direction=args.direction,
                                                 dynamics=dynamics, enforce_bounds=enforce_bounds,
-                                                system=system, step_sz=step_sz, num_steps=num_steps)
+                                                system=system, step_sz=step_sz, num_steps=args.num_steps)
     # randomize the dataset before training
     data=list(zip(waypoint_dataset,waypoint_targets,env_indices))
     random.shuffle(data)
@@ -211,7 +211,7 @@ def main(args):
 
     # Train the Models
     print('training...')
-    writer_fname = 'cont_%s_%f_%s_direction_%d' % (args.env_type, args.learning_rate, args.opt, args.direction)
+    writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps)
     writer = SummaryWriter('./runs/'+writer_fname)
     record_i = 0
     val_record_i = 0
@@ -298,7 +298,7 @@ def main(args):
                 val_loss_avg_i = 0
         # Save the models
         if epoch > 0 and epoch % 50 == 0:
-            model_path='kmpnet_epoch_%d_direction_%d.pkl' %(epoch, args.direction)
+            model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(epoch, args.direction, args.num_steps)
             #save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
             save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(model_dir,model_path))
     writer.export_scalars_to_json("./all_scalars.json")
@@ -310,6 +310,7 @@ parser.add_argument('--model_dir', type=str, default='/media/arclabdl1/HD1/YLmia
 parser.add_argument('--no_env', type=int, default=100,help='directory for obstacle images')
 parser.add_argument('--no_motion_paths', type=int,default=4000,help='number of optimal paths in each environment')
 parser.add_argument('--no_val_paths', type=int,default=50,help='number of optimal paths in each environment')
+parser.add_argument('--num_steps', type=int, default=20)
 
 # Model parameters
 parser.add_argument('--total_input_size', type=int, default=2800+4, help='dimension of total input')
