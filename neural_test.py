@@ -146,6 +146,27 @@ def main(args):
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_6':
+        IsInCollision =acrobot_obs.IsInCollision
+        normalize = acrobot_obs.normalize
+        unnormalize = acrobot_obs.unnormalize
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        jax_dynamics = acrobot_obs.jax_dynamics
+        enforce_bounds = acrobot_obs.enforce_bounds
+        cae = CAE_acrobot_voxel_2d_3
+        mlp = mlp_acrobot.MLP4
+        obs_f = True
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        num_steps = 21
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
     elif args.env_type == 'acrobot_obs_8':
         IsInCollision =acrobot_obs.IsInCollision
         normalize = acrobot_obs.normalize
@@ -163,6 +184,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
+        #num_steps = args.num_steps+2
         traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         goal_rho0 = 1.0        
@@ -175,6 +197,7 @@ def main(args):
                    cae, mlp)
 
     # load previously trained model if start epoch > 0
+    #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
     model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet0, os.path.join(args.model_path, model_path))
@@ -198,6 +221,7 @@ def main(args):
 
 
     # load previously trained model if start epoch > 0
+    #model_path='kmpnet_epoch_%d_direction_1_step_%d.pkl' %(args.start_epoch, args.num_steps)
     model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet1, os.path.join(args.model_path, model_path))
@@ -425,10 +449,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=450)
+    parser.add_argument('--start_epoch', type=int, default=500)
     parser.add_argument('--env_type', type=str, default='acrobot_obs_8', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
+    #parser.add_argument('--num_steps', type=int, default=10)
 
     args = parser.parse_args()
     print(args)

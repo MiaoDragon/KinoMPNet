@@ -85,6 +85,7 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                 fp = 0
                 valid_path.append(1)
                 start_node = Node(paths[i][j][0])
+                #goal_node = Node(sgs[i][j][1])
                 goal_node = Node(paths[i][j][-1])
                 print(goal_check(goal_node, Node(sgs[i][j][1])))
                 #goal_node.S0 = np.diag([1.,1.,0,0])
@@ -106,7 +107,7 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                         #step_sz = 0.1
                         step_sz = 0.02
                         #num_steps = num_steps * 2
-                    path = neural_replan(mpNet1, mpNet2, path, obc[i], obs[i], IsInCollision, \
+                    path = neural_replan(mpNet1, mpNet2, path, Node(sgs[i][j][1]), obc[i], obs[i], IsInCollision, \
                                         normalize_func, unnormalize_func, t==0, step_sz, num_steps, \
                                         informer, init_informer, system, dynamics, enforce_bounds, traj_opt, state)
                     if feasibility_check(path, obc[i], IsInCollision, system):

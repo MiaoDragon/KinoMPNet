@@ -232,12 +232,12 @@ def removeCollision(path, obc, IsInCollision):
             new_path.append(path[i])
     return new_path
 
-def neural_replan(mpNet1, mpNet2, path, obc, obs, IsInCollision, normalize, unnormalize, init_plan_flag, step_sz, num_steps, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, data):
+def neural_replan(mpNet1, mpNet2, path, goal_node, obc, obs, IsInCollision, normalize, unnormalize, init_plan_flag, step_sz, num_steps, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, data):
     if init_plan_flag:
         # if it is the initial plan, then we just do neural_replan
         MAX_LENGTH = 30
         #MAX_LENGTH = 3000
-        mini_path = neural_replanner(mpNet1, mpNet2, path[0], path[-1], obc, obs, IsInCollision, \
+        mini_path = neural_replanner(mpNet1, mpNet2, path[0], path[-1], goal_node, obc, obs, IsInCollision, \
                                     normalize, unnormalize, MAX_LENGTH, step_sz, num_steps, \
                                     informer, init_informer, system, dynamics, enforce_bounds, traj_opt, data)
         return removeCollision(mini_path, obc, IsInCollision)
@@ -246,13 +246,13 @@ def neural_replan(mpNet1, mpNet2, path, obc, obs, IsInCollision, normalize, unno
     # replan segments of paths
     new_path = [path[0]]
     # directly connecting the endpoint
-    mini_path = neural_replanner(mpNet1, mpNet2, path[-2], path[-1], obc, obs, IsInCollision, \
+    mini_path = neural_replanner(mpNet1, mpNet2, path[-2], path[-1], goal_node, obc, obs, IsInCollision, \
                                  normalize, unnormalize, MAX_LENGTH, step_sz, num_steps, \
                                 informer, init_informer, system, dynamics, enforce_bounds, traj_opt, data)
     path = path[:-2] + mini_path
     return path
 
-def neural_replanner(mpNet1, mpNet2, start_node, goal_node, obc, obs, IsInCollisionWithObs, normalize, unnormalize, MAX_LENGTH, step_sz, num_steps, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, data):
+def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc, obs, IsInCollisionWithObs, normalize, unnormalize, MAX_LENGTH, step_sz, num_steps, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, data):
     # visualization
     print('step_sz: %f' % (step_sz))
     params = {}
@@ -352,7 +352,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, obc, obs, IsInCollis
     start = torch.from_numpy(start_node.x).type(torch.FloatTensor)
     goal = torch.from_numpy(goal_node.x).type(torch.FloatTensor)
     #--- compute MPNet waypoints connecting start and goal
-    while target_reached==0 and itr<MAX_LENGTH:
+    while target_reached==0 and itr<MAX_LENGTH*4:
         itr=itr+1  # prevent the path from being too long
         if tree==0:
             ip1 = torch.cat((start, goal)).unsqueeze(0)
@@ -376,6 +376,8 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, obc, obs, IsInCollis
             pA.append(start.numpy())
             tree=1
         else:
+            #tree=0
+            #continue
             ip2 = torch.cat((goal, start)).unsqueeze(0)
             ob2 = torch.FloatTensor(obc).unsqueeze(0)
             #ip2=torch.cat((obs,goal,start)).unsqueeze(0)
@@ -426,7 +428,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, obc, obs, IsInCollis
         next_node, edge, cf = pathSteerTo(node, goal_node, x_init, u_init, t_init, \
                                        dynamics, enforce_bounds, IsInCollision, traj_opt, 0, system,
                                        step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=True)        
-        if cf and goal_check(next_node, goal_node):
+        if cf and goal_check(next_node, real_goal_node):
             node.next = next_node
             next_node.prev = node
             node.edge = edge
@@ -439,23 +441,26 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, obc, obs, IsInCollis
         min_d = 1e8
         min_i = -1
         for i in range(current_idx, len(mpnet_path)):
-            if node_d(node.x, mpnet_path[i], np.diag([1.,1.,0.1,0.1]), system) <= min_d:
-                min_d = node_d(node.x, mpnet_path[i], np.diag([1.,1.,0.1,0.1]), system)
+            if node_d(node.x, mpnet_path[i], np.diag([1.,1.,0.5,0.5]), system) <= min_d:
+                min_d = node_d(node.x, mpnet_path[i], np.diag([1.,1.,0.5,0.5]), system)
                 min_i = i
         if min_i == len(mpnet_path)-1:
             min_i = min_i - 1
-        if min_d > 4.:
+        if min_d > 1.:
             print('too far')
             print(min_d)
             node_list = node_list[:-3]
-            break
-            
+            break            
         print('min_i:%d, len(mpnet_path):%d' % (min_i, len(mpnet_path)))
         # connect to min_i+1
         x_init, u_init, t_init = init_informer(obs, node, Node(mpnet_path[min_i+1]), direction=0)
         next_node, edge, cf = pathSteerTo(node, Node(mpnet_path[min_i+1]), x_init, u_init, t_init, \
                                        dynamics, enforce_bounds, IsInCollision, traj_opt, 0, system,
-                                       step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=False)
+                                       step_sz=step_sz, num_steps=num_steps, propagating=False, endpoint=False)
+        if not node_nearby(edge.xs[0], node.x, np.identity(len(node.x)), 1e-2, system):
+            next_node, edge, cf = pathSteerTo(node, Node(mpnet_path[min_i+1]), x_init, u_init, t_init, \
+                                           dynamics, enforce_bounds, IsInCollision, traj_opt, 0, system,
+                                           step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=False)            
         for i in range(len(edge.xs)):
             update_line(hl_for, ax, edge.xs[i])
         xs_to_plot = np.array(edge.xs[::10])
@@ -470,7 +475,10 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, obc, obs, IsInCollis
             print('in collision as cf is false')
             node_list = node_list[:-3]  # delete several nodes
             break
-            
+        if min_i+1 == len(mpnet_path)-1 and not goal_check(next_node, real_goal_node):
+            print('endpoint not at goal')
+            node_list = node_list[:-1]  # remove last node
+            break
         #next_node = Node(next_x)
         node.edge = edge
         node.next = next_node

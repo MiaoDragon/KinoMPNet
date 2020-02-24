@@ -253,7 +253,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_8_lr0.010000_SGD/',help='path for saving trained models')
+    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_8_lr0.010000_SGD_step_10/',help='path for saving trained models')
     parser.add_argument('--seen_N', type=int, default=1)
     parser.add_argument('--seen_NP', type=int, default=10)
     parser.add_argument('--seen_s', type=int, default=0)
@@ -273,11 +273,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=750)
+    parser.add_argument('--start_epoch', type=int, default=650)
     parser.add_argument('--env_type', type=str, default='acrobot_obs_8', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
-
+    parser.add_argument('--num_step', type=int, default=10)
     args = parser.parse_args()
     print(args)
     main(args)
