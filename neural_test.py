@@ -185,9 +185,15 @@ def main(args):
         step_sz = 0.02
         num_steps = 21
         #num_steps = args.num_steps+2
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
+        def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
+            u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+            xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            return xs, us, dts
+        traj_opt = cem_trajopt
         goal_S0 = np.diag([1.,1.,0,0])
-        goal_rho0 = 1.0        
+        goal_rho0 = 1.0    
         
         
 
@@ -197,8 +203,8 @@ def main(args):
                    cae, mlp)
 
     # load previously trained model if start epoch > 0
-    #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
+    #model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet0, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -221,8 +227,8 @@ def main(args):
 
 
     # load previously trained model if start epoch > 0
-    #model_path='kmpnet_epoch_%d_direction_1_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_1_step_%d.pkl' %(args.start_epoch, args.num_steps)
+    #model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet1, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -429,7 +435,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_8_lr0.010000_SGD/',help='path for saving trained models')
+    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_8_lr0.010000_SGD_step_10/',help='path for saving trained models')
     parser.add_argument('--seen_N', type=int, default=1)
     parser.add_argument('--seen_NP', type=int, default=10)
     parser.add_argument('--seen_s', type=int, default=0)
@@ -449,11 +455,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=500)
+    parser.add_argument('--start_epoch', type=int, default=850)
     parser.add_argument('--env_type', type=str, default='acrobot_obs_8', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
-    #parser.add_argument('--num_steps', type=int, default=10)
+    parser.add_argument('--num_steps', type=int, default=10)
 
     args = parser.parse_args()
     print(args)
