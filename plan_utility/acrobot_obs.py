@@ -3,7 +3,12 @@ import numpy as np
 import sys
 sys.path.append('..')
 import jax
-from plan_utility.line_line_cc import line_line_cc 
+from plan_utility.line_line_cc import line_line_cc
+
+
+import julia
+from julia.api import Julia
+
 def normalize(x, bound):
     # normalize to -1 ~ 1  (bound can be a tensor)
     #return x
@@ -203,3 +208,15 @@ def IsInCollision(x, obc, obc_width=6.):
             if line_line_cc(pole_x1, pole_y1, pole_x2, pole_y2, x1, y1, x2, y2):
                 return True
     return False
+
+def trajopt(x0, x1, num_itrs, num_steps, t_min, t_max, x_init, u_init, t_init):
+    #x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init
+    jl = Julia(compiled_modules=False)
+    j = julia.Julia(runtime="julia")
+
+    # model = 'cartpole'
+    model = 'acrobot'
+    cem = j.include("julia_based/CEM_{}.jl".format(model))
+    u, t = cem(x0, x1)
+    print('after CEM:')
+    print(u, t)
