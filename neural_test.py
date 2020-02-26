@@ -178,6 +178,7 @@ def main(args):
         system = _sst_module.PSOPTAcrobot()
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        xdot = acrobot_obs.dynamics
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d_3
@@ -195,9 +196,9 @@ def main(args):
         #    return xs, us, dts
         #traj_opt = cem_trajopt
         goal_S0 = np.diag([1.,1.,0,0])
-        goal_rho0 = 1.0    
-        
-        
+        goal_rho0 = 1.0
+
+
 
     mpNet0 = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
@@ -251,7 +252,7 @@ def main(args):
     if args.start_epoch > 0:
         load_opt_state(mpNet1, os.path.join(args.model_path, model_path))
 
-    
+
     # define informer
     circular = system.is_circular_topology()
     def informer(env, x0, xG, direction):
@@ -329,7 +330,7 @@ def main(args):
         if direction == 0:
             next_state = xG.x
             delta_x = next_state - x0.x
-            
+
             # can be either clockwise or counterclockwise, take shorter one
             for i in range(len(delta_x)):
                 if circular[i]:
@@ -383,10 +384,10 @@ def main(args):
             #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
             t_init = np.linspace(0, cost_i, num_steps)
         return x_init, u_init, t_init
-        
-        
-        
-        
+
+
+
+
 
 
     # load data
@@ -412,14 +413,14 @@ def main(args):
         # seen
         if args.seen_N > 0:
             time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, seen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, seen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             seen_test_suc_rate += fes_path.sum() / valid_path.sum()
         # unseen
         if args.unseen_N > 0:
             time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, unseen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, unseen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             unseen_test_suc_rate += fes_path.sum() / valid_path.sum()

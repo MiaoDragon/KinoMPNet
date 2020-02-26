@@ -8,6 +8,10 @@ from visual.acrobot_vis import *
 from sparse_rrt.systems.acrobot import Acrobot
 from plan_utility.data_structure import *
 
+from tvlqr.python_tvlqr import tvlqr
+from tvlqr.python_lyapunov import sample_tv_verify
+
+
 import torch
 from torch.autograd import Variable
 #from utility import *
@@ -39,7 +43,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     # ADDED: notice now for circular cases, we use the unmapped angle to ensure smoothness
 
     # change propagation: maybe only using step_sz but not smaller is better (however, round for accuracy)
-    
+
     # try to round according to control up to difference being some threshold
     new_xs = [x]
     new_us = []
@@ -146,7 +150,7 @@ def pathSteerTo(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCo
                 if IsInCollision(xs[i]):
                     valid = False
                     print('in collision')
-                    break            
+                    break
         edge_dt = np.sum(dts)
         start = Node(wrap_angle(xs[0], system))  # after flipping, the first in xs is the start
         goal = x0
@@ -222,7 +226,7 @@ def feasibility_check(path, goal, obc, IsInCollision, system):
     res = res and goal_check(path[-1], goal)
     print('feasibility: ', res)
     return res
-    
+
 def goal_check(node, goal):
     LENGTH = 20.
     point1 = node.x
@@ -238,8 +242,8 @@ def goal_check(node, goal):
         return 1
     else:
         return 0
-    
-    
+
+
 def removeCollision(path, obc, IsInCollision):
     return path
     new_path = []
@@ -248,6 +252,115 @@ def removeCollision(path, obc, IsInCollision):
         if not IsInCollision(path[i].numpy(),obc):
             new_path.append(path[i])
     return new_path
+
+
+# funnel
+def funnelSteerTo(x0, x1, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction, system=None, step_sz=0.02):
+    start = x0
+    goal = x1
+    if direction == 0:
+        start = x0
+        goal = x1
+    else:
+        start = x1
+        goal = x0
+    # recursively backpropagate the funnel computation
+    # build funnel for one step
+    # assuming we haven't computed tvlqr for start->goal
+    edge = start.edge
+    xs = edge.xs
+    us = edge.us
+    dts = edge.dts
+    Qf = goal.S0
+    if Qf is not None:
+        Qf = np.array(Qf)
+    controller, xtraj, utraj, S = tvlqr(xs, us, dts, dynamics, jac_A, jac_B, system=system, Qf=Qf)
+    start.S0 = S(0).reshape((len(start.x),len(start.x)))
+    edge.xtraj = xtraj
+    edge.utraj = utraj
+    edge.S = S
+    edge.controller = controller
+    upper_x = goal.x
+    upper_S = goal.S0
+    upper_rho = goal.rho0  # the rho0 of goal will be come the upper_rho currently
+    time_knot = start.edge.time_knot
+    i0 = start.edge.i0  # the edge may be partly available
+    xtraj = start.edge.xtraj
+    utraj = start.edge.utraj
+    rho0s = []
+    rho1s = []
+    S = start.edge.S
+    #print('time_knot: %d' % (len(time_knot)))
+    #todo: to add rho0s and rho1s list to edge
+    # reversely construct the funnel
+    for i in range(len(time_knot)-1, i0, -1):
+        t0 = time_knot[i-1]
+        t1 = time_knot[i]
+        x0 = xtraj(t0)
+        u0 = utraj(t0)
+        x1 = xtraj(t1)
+        #print('x1:')
+        #print(x1)
+        #print('xs[i]:')
+        #print(edge.xs[i])
+        #if i == len(time_knot)-1:
+        #    x1 = goal.x
+        u1 = utraj(t1)
+        A0 = jac_A(x0, u0)
+        B0 = jac_B(x0, u0)
+        A1 = jac_A(x1, u1)
+        B1 = jac_B(x1, u1)
+        A0 = np.asarray(A0)
+        B0 = np.asarray(B0)
+        A1 = np.asarray(A1)
+        B1 = np.asarray(B1)
+        S0 = S(t0).reshape(len(x0),len(x0))
+        S1 = S(t1).reshape(len(x0),len(x0))
+        Q = np.identity(len(x0))
+        R = np.identity(len(u0))
+        rho0, rho1 = sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1, R, Q, x0, x1, u0, u1, func=dynamics, system=system, numSample=100)
+        rho0s.append(rho0)
+        rho1s.append(rho1)
+        #print('upper_rho: %f' % (upper_rho))
+        #print('rho0: %f' % (rho0))
+        #print('rho1: %f' % (rho1))
+        upper_rho = rho0
+        upper_x = x0
+        upper_S = S0
+        if i == len(time_knot)-1:
+            # the endpoint
+            start.edge.rho1 = rho1
+            goal.rho1 = rho1
+            goal.S1 = S1
+    start.edge.rho0 = rho0
+    start.rho0 = rho0
+    rho0s.reverse()
+    rho1s.reverse()
+    start.edge.rho0s = rho0s
+    start.edge.rho1s = rho1s
+
+
+
+def lazyFunnel(xg, xG, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, system=None, step_sz=0.02):
+    # compute funnel backward until xg
+    # recursively backpropagate the funnel computation
+    start = xG.prev
+    goal = xG
+    while start is not None:
+        # already at xg
+        funnelSteerTo(start, goal, dynamics, enforce_bounds, jac_A, jac_B, traj_opt, direction=0, system=system, step_sz=step_sz)
+        # if this node is the same as xg, then break
+        if np.linalg.norm(xg.x - start.x) <= 1e-6:
+            break
+
+        start = start.prev
+        goal = goal.prev
+
+
+
+
+
+
 
 def neural_replan(mpNet1, mpNet2, path, goal_node, obc, obs, IsInCollision, normalize, unnormalize, init_plan_flag, step_sz, num_steps, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, data):
     #TODO: debug this
@@ -264,7 +377,7 @@ def neural_replan(mpNet1, mpNet2, path, goal_node, obc, obs, IsInCollision, norm
     # replan segments of paths
     # first check if the path is connected: if edge exists, then check if next node is next node
     new_path = []
-    
+
     # remove identical nodes
     for i in range(len(path)):
         if len(new_path)>0:
@@ -275,14 +388,14 @@ def neural_replan(mpNet1, mpNet2, path, goal_node, obc, obs, IsInCollision, norm
         else:
             new_path.append(path[i])
     path = new_path
-    
+
     #####
     new_path = []
     for i in range(len(path)-1):
         start = path[i]
         goal = path[i+1]
         if start.edge is not None and start.next is goal:
-            # start and goal are connected 
+            # start and goal are connected
             new_path.append(start)
         else:
             # plan mini path
@@ -393,7 +506,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
     draw_update_line(ax)
     update_line(hl_back, ax, goal_node.x)
     draw_update_line(ax)
-    
+
     # plan a mini path from start to goal
     # obs: tensor
     start = start_node.x
@@ -406,7 +519,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
     target_reached=0
     tree=0
     new_path = []
-    
+
     # extract the state for the node
     start = torch.from_numpy(start_node.x).type(torch.FloatTensor)
     goal = torch.from_numpy(goal_node.x).type(torch.FloatTensor)
@@ -415,7 +528,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
     x_init, u_init, t_init = init_informer(obs, Node(start_numpy), Node(goal_numpy), direction=0)
     goal_numpy__node, edge, cf = pathSteerTo(Node(start_numpy), Node(goal_numpy), x_init, u_init, t_init, \
                                    dynamics, enforce_bounds, IsInCollision, traj_opt, 0, system,
-                                   step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=True)     
+                                   step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=True)
     target_reached=cf and node_nearby(goal_numpy__node.x, goal_numpy, np.diag([1.,1.,0.1,0.1]), np.sqrt(2), system)
     #--- compute MPNet waypoints connecting start and goal
     while target_reached==0 and itr<MAX_LENGTH*4:
@@ -472,7 +585,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
         x_init, u_init, t_init = init_informer(obs, Node(start_numpy), Node(goal_numpy), direction=0)
         goal_numpy__node, edge, cf = pathSteerTo(Node(start_numpy), Node(goal_numpy), x_init, u_init, t_init, \
                                        dynamics, enforce_bounds, IsInCollision, traj_opt, 0, system,
-                                       step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=True)     
+                                       step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=True)
         target_reached=cf and node_nearby(goal_numpy__node.x, goal_numpy, np.diag([1.,1.,0.1,0.1]), np.sqrt(2), system)
         # might have some terminal conditions for MPNet endpoints
 
@@ -489,7 +602,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
     pB_scat = ax.scatter(pB[:,0], pB[:,1], c='red')
     draw_update_line(ax)
 
-    
+
     mpnet_path = np.concatenate([pA,pB], axis=0)
     mpnet_path_node = []
     for i in range(len(mpnet_path)):
@@ -503,7 +616,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
         x_init, u_init, t_init = init_informer(obs, node, goal_node, direction=0)
         next_node, edge, cf = pathSteerTo(node, goal_node, x_init, u_init, t_init, \
                                        dynamics, enforce_bounds, IsInCollision, traj_opt, 0, system,
-                                       step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=True)        
+                                       step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=True)
         if cf and goal_check(next_node, real_goal_node):
             node.next = next_node
             next_node.prev = node
@@ -511,7 +624,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
             edge.next = next_node
             node_list.append(next_node)
             break
-        
+
         # find the min node
         min_d = 1e8
         min_i = -1
@@ -525,7 +638,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
             print('too far')
             print(min_d)
             node_list = node_list[:-2]
-            break  
+            break
         current_idx = min_i
         print('min_i:%d, len(mpnet_path):%d' % (min_i, len(mpnet_path)))
         # connect to min_i+1
@@ -536,7 +649,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
         if not node_nearby(edge.xs[0], node.x, np.identity(len(node.x)), 1e-2, system):
             next_node, edge, cf = pathSteerTo(node, mpnet_path_node[min_i+1], x_init, u_init, t_init, \
                                            dynamics, enforce_bounds, IsInCollision, traj_opt, 0, system,
-                                           step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=False)            
+                                           step_sz=step_sz, num_steps=num_steps, propagating=True, endpoint=False)
         for i in range(len(edge.xs)):
             update_line(hl_for, ax, edge.xs[i])
         xs_to_plot = np.array(edge.xs[::10])
@@ -545,7 +658,7 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
         ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='g')
         draw_update_line(ax)
         animation(edge.xs, edge.us)
-        
+
         # might add some terminal condition: if too faraway OR collision
         if not cf:
             print('in collision as cf is false')
@@ -575,4 +688,3 @@ def neural_replanner(mpNet1, mpNet2, start_node, goal_node, real_goal_node, obc,
     pA_scat.remove()
     pB_scat.remove()
     return node_list
-

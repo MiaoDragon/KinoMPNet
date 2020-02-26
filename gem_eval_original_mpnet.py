@@ -12,7 +12,118 @@ import math
 import time
 from plan_utility.plan_general_original_mpnet import *
 
-def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, enforce_bounds, traj_opt, step_sz, num_steps):
+import jax
+from tvlqr.python_lyapunov import *
+from visual.acrobot_vis import *
+#from visual.vis_tools import *
+import matplotlib.pyplot as plt
+
+
+
+def plot_ellipsoid(ax, S, rho, x0, alpha=1.0):
+    theta = np.linspace(0, np.pi*2, 100)
+    U = [np.cos(theta), np.sin(theta), np.zeros(100), np.zeros(100)]
+    U = np.array(U).T
+    tmp = np.linalg.pinv(S)
+    tmp = scipy.linalg.sqrtm(tmp.T @ tmp)
+    S_invsqrt = scipy.linalg.sqrtm(tmp)
+    X = U @ S_invsqrt  # 100x2
+    X = np.sqrt(rho)*X + x0
+    ax.plot(X[:,0],X[:,1], alpha=alpha)
+
+def animation_acrobot(fig, ax, animator, xs, obs):
+    animator.obs = obs
+    animator._init(ax)
+    for i in range(0,len(xs)):
+        animator._animate(xs[i], ax)
+        animator.draw_update_line(fig, ax)
+
+def plot_trajectory(ax, start, goal, dynamics, enforce_bounds, IsInCollision, step_sz):
+
+    plot_ellipsoid(ax, goal.S0, goal.rho0, goal.x, alpha=0.1)
+
+    # plot funnel
+    # rho_t = rho0+(rho1-rho0)/(t1-t0)*t
+    node = start
+    while node.edge is not None:
+        if node.edge.S is not None:
+            rho0s = node.edge.rho0s[node.edge.i0:]
+            rho1s = node.edge.rho1s[node.edge.i0:]
+            time_knot = node.edge.time_knot[node.edge.i0:]
+            S = node.edge.S
+            for i in range(len(rho0s)):
+                rho0 = rho0s[i]
+                rho1 = rho1s[i]
+                t0 = time_knot[i]
+                t1 = time_knot[i+1]
+                rho_t = rho0
+                S_t = S(t0).reshape(len(node.x),len(node.x))
+                x_t = node.edge.xtraj(t0)
+                u_t = node.edge.utraj(t0)
+                # plot
+                plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
+                rho_t = rho1
+                S_t = S(t1).reshape(len(node.x),len(node.x))
+                x_t = node.edge.xtraj(t1)
+                u_t = node.edge.utraj(t1)
+                # plot
+                plot_ellipsoid(ax, S_t, rho_t, x_t, alpha=0.1)
+        node = node.next
+    node = start
+    actual_x = node.x
+    xs = []
+    us = []
+    valid = True
+    while node.edge is not None:
+        # printout which node it is
+        print('steering node...')
+        print('node.x:')
+        print(node.x)
+        print('node.next.x:')
+        print(node.next.x)
+        # if node does not have controller defined, we use open-loop traj
+        if node.edge.S is None:
+            xs += node.edge.xs.tolist()
+            actual_x = np.array(xs[-1])
+        else:
+            # then we use the controller
+            # see if it can go to the goal region starting from start
+            dt = node.edge.dts[node.edge.i0:]
+            num = np.sum(dt)/step_sz
+            time_span = np.linspace(node.edge.t0, node.edge.t0+np.sum(dt), num+1)
+            delta_t = step_sz
+            xs.append(actual_x)
+            controller = node.edge.controller
+            print('number of time knots: %d' % (len(time_span)))
+            # plot data
+            for i in range(len(time_span)):
+                u = controller(time_span[i], actual_x)
+                actual_x = dynamics(actual_x, u, step_sz)
+                xs.append(actual_x)
+                actual_x = enforce_bounds(actual_x)
+                print('actual x:')
+                print(actual_x)
+                if IsInCollision(actual_x):
+                    print('In Collision Booooo!!')
+                    valid = False
+        node = node.next
+    xs = np.array(xs)
+    ax.plot(xs[:,0], xs[:,1], 'black', label='using controller')
+    plt.show()
+    print('start:')
+    print(start.x)
+    print('goal:')
+    print(goal.x)
+    if not valid:
+        print('in Collision Boommm!!!')
+
+    plt.waitforbuttonpress()
+    return xs
+
+
+
+
+def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps):
     obc, obs, paths, sgs, path_lengths, controls, costs = test_data
     obc = obc.astype(np.float32)
     obc = torch.from_numpy(obc)
@@ -20,6 +131,9 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
     valid_env = []
     time_env = []
     time_total = []
+    jac_A = jax.jacfwd(jax_dynamics, argnums=0)
+    jac_B = jax.jacfwd(jax_dynamics, argnums=1)
+
     for i in range(len(paths)):
         time_path = []
         fes_path = []   # 1 for feasible, 0 for not feasible
@@ -62,7 +176,7 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                     state[-1] = paths[i][j][k]
                     for step in range(1,max_steps+1):
                         p_start = dynamics(p_start, controls[i][j][k], step_sz)
-                        p_start = enforce_bounds(p_start)          
+                        p_start = enforce_bounds(p_start)
                         detail_paths.append(p_start)
                         detail_controls.append(controls[i][j])
                         detail_costs.append(step_sz)
@@ -79,9 +193,9 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                 print('data:')
                 print(paths[i][j][-1])
                 state[-1] = paths[i][j][-1]
-                
-                
-                
+
+
+
                 fp = 0
                 valid_path.append(1)
                 start_node = Node(paths[i][j][0])
@@ -116,6 +230,29 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                         break
             if fp:
                 # only for successful paths
+
+                # goal compute the stability region
+                path[-1].x = sgs[i][j][1]  # change to real goal
+                path[-1].S0 = np.diag([1.,1.,0.,0.])
+                path[-1].rho0 = 1.0
+                # reversely construct funnel
+
+                lazyFunnel(path[0], path[-1], xdot, enforce_bounds, jac_A, jac_B, traj_opt, system=system, step_sz=step_sz)
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+                # after plan, generate the trajectory, and check if it is within the region
+                xs = plot_trajectory(ax, path[0], path[-1], dynamics, enforce_bounds, collision_check, step_sz)
+
+                params = {}
+                params['obs_w'] = 6.
+                params['obs_h'] = 6.
+                params['integration_step'] = step_sz
+                fig = plt.figure()
+                ax = fig.add_subplot(111)
+                animator = AcrobotVisualizer(Acrobot(), params)
+                animation_acrobot(fig, ax, animator, xs, obs_i)
+                plt.waitforbuttonpress()
+
                 time1 = time.time() - time0
                 time1 -= time_norm
                 time_path.append(time1)
