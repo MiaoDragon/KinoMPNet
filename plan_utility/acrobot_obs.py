@@ -209,14 +209,39 @@ def IsInCollision(x, obc, obc_width=6.):
                 return True
     return False
 
+#jl = Julia(compiled_modules=False)
+#j = julia.Julia(runtime="julia")
+
+# model = 'cartpole'
+#model = 'acrobot'
+#cem = j.include("julia_based/CEM_{}.jl".format(model))
+#dx = j.include("julia_based/{}.jl".format(model))
+
 def trajopt(x0, x1, num_itrs, num_steps, t_min, t_max, x_init, u_init, t_init):
     #x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init
-    jl = Julia(compiled_modules=False)
-    j = julia.Julia(runtime="julia")
-
-    # model = 'cartpole'
-    model = 'acrobot'
-    cem = j.include("julia_based/CEM_{}.jl".format(model))
-    u, t = cem(x0, x1)
-    print('after CEM:')
-    print(u, t)
+    weights = np.array([1, 1, 0.3, 0.3])
+    mu_u, sigma_u, mu_t, sigma_t = 0, 8, 0.02, 0.05 #0.02
+    start = x0.copy()
+    goal = x1.copy()
+    x = x0.copy()
+    control = []
+    cost = []
+    for _ in range(100):
+        u0, t0, mu_u, sigma_u, mu_t, sigma_t = \
+            cem(start, goal, weights, mu_u, sigma_u, mu_t, sigma_t, False)
+        x = dx(x, u0, int(np.floor(t0/0.02))+1, 0.02)
+        for para in [mu_u, sigma_u, mu_t, sigma_t]:
+            if type(para) is list:
+                para[:-1] = para[1:]
+        start = x.copy()
+        loss = np.linalg.norm((np.array(start) - goal)*weights)
+        cost.append((int(np.floor(t0/0.02))+1)*0.02)
+        control.append(u0)
+        print('loss:', loss)
+        if(loss < 0.3):
+            break
+    print('cost:', cost, '\nsum', sum(cost))
+    print('control:', control)
+    control = np.array(control).reshape(len(control),1)
+    cost = np.array(cost)
+    return control, cost

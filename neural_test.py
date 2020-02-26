@@ -36,6 +36,7 @@ from plan_utility import pendulum, acrobot_obs
 #from sparse_rrt.systems import standard_cpp_systems
 #from sparse_rrt import _sst_module
 from plan_utility.data_structure import *
+from plan_utility.plan_general_original_mpnet import propagate
 from tools import data_loader
 import jax
 
@@ -169,6 +170,7 @@ def main(args):
         goal_rho0 = 1.0
     elif args.env_type == 'acrobot_obs_8':
         IsInCollision =acrobot_obs.IsInCollision
+        #IsInCollision = lambda x, obs: False
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
@@ -183,15 +185,15 @@ def main(args):
         obs_f = True
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
-        num_steps = 21
-        #num_steps = args.num_steps+2
-        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        #num_steps = 21
+        num_steps = args.num_steps+5
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
-        def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
-            u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-            xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
-            return xs, us, dts
-        traj_opt = cem_trajopt
+        #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
+        #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        #    xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=lambda x: False, system=system, step_sz=step_sz)
+        #    return xs, us, dts
+        #traj_opt = cem_trajopt
         goal_S0 = np.diag([1.,1.,0,0])
         goal_rho0 = 1.0    
         
@@ -455,7 +457,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=850)
+    parser.add_argument('--start_epoch', type=int, default=1200)
     parser.add_argument('--env_type', type=str, default='acrobot_obs_8', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')

@@ -110,7 +110,7 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                     path = neural_replan(mpNet1, mpNet2, path, Node(sgs[i][j][1]), obc[i], obs[i], IsInCollision, \
                                         normalize_func, unnormalize_func, t==0, step_sz, num_steps, \
                                         informer, init_informer, system, dynamics, enforce_bounds, traj_opt, state)
-                    if feasibility_check(path, obc[i], IsInCollision, system):
+                    if feasibility_check(path, Node(sgs[i][j][1]), obc[i], IsInCollision, system):
                         fp = 1
                         print('feasible, ok!')
                         break
