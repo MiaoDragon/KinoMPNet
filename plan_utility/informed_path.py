@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from visual.acrobot_vis import *
 from sparse_rrt.systems.acrobot import Acrobot
 # this one predicts one individual path using informer and trajopt
-MAX_INVALID_THRESHOLD = .1
-invalid_mat = np.diag([1.,1.,0.,0.])
+MAX_INVALID_THRESHOLD = 1.5
+invalid_mat = np.diag([1.,1.,0.1,0.1])
 def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enforce_bounds, IsInCollision, traj_opt, jac_A, jac_B, step_sz=0.02, MAX_LENGTH=1000):
     # informer: given (xt, x_desired) ->  x_t+1
     # jac_A: given (x, u) -> linearization A
@@ -105,11 +105,10 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
         back_global_xs = []
         global_for = [x0]
         global_back = [xG]
-        for i in range(10):
+        for i in range(100):
             xw, x_init, u_init, t_init = informer(env, global_for[-1], global_back[0], direction=0)
             if not IsInCollision(xw.x):
                 print('forward not in collision')
-                
                 global_for.append(xw)
                 for_global_xs.append(xw.x)
                 # if endpoint are close enough, then stop
@@ -124,6 +123,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
                 if node_nearby(global_for[-1].x, global_back[-1].x, invalid_mat, MAX_INVALID_THRESHOLD, system):
                     break
         for_global_xs = np.array(for_global_xs)
+        print(for_global_xs)
         back_global_xs = np.array(back_global_xs)
         for_global_scatter = ax.scatter(for_global_xs[:,0], for_global_xs[:,1], c='lightgreen')
         back_global_scatter = ax.scatter(back_global_xs[:,0], back_global_xs[:,1], c='red')
@@ -138,7 +138,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
         for i in range(len(global_waypoints)):
             xw = global_waypoints[i]
             x, e = pathSteerToBothDir(x0, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
-                                jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=False)        
+                                jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)        
             if e is not None and not node_nearby(e.xs[0], x0.x, np.identity(len(x0.x)), BVP_TOLERANCE, system):           
                 x, e = pathSteerToBothDir(x0, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                     jac_A, jac_B, traj_opt, step_sz=step_sz, system=system, direction=0, propagating=True)
@@ -151,13 +151,13 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
                     for j in range(1,5,1):
                         for_local_scatter[-j].remove()
                     for j in range(2,6,1):
-                        remove_last_k(hl_for, ax, len(local_for[-j].edge))
+                        remove_last_k(hl_for, ax, len(local_for[-j].edge.xs))
                 else:
                     x0 = local_for[0]
                     for j in range(len(for_local_scatter)):
                         for_local_scatter[j].remove()
                     for j in range(0,len(for_local_scatter)-1):
-                        remove_last_k(hl_for, ax, len(local_for[j].edge))
+                            remove_last_k(hl_for, ax, len(local_for[j].edge.xs))
                 break
             # update
             for i in range(len(e.xs)):

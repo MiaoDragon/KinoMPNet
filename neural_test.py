@@ -187,8 +187,8 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         #num_steps = 21
-        num_steps = args.num_steps+5
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        num_steps = 11#args.num_steps*2
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
         #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
         #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
@@ -196,9 +196,9 @@ def main(args):
         #    return xs, us, dts
         #traj_opt = cem_trajopt
         goal_S0 = np.diag([1.,1.,0,0])
-        goal_rho0 = 1.0
-
-
+        goal_rho0 = 1.0    
+        
+        
 
     mpNet0 = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
@@ -252,7 +252,7 @@ def main(args):
     if args.start_epoch > 0:
         load_opt_state(mpNet1, os.path.join(args.model_path, model_path))
 
-
+    
     # define informer
     circular = system.is_circular_topology()
     def informer(env, x0, xG, direction):
@@ -330,7 +330,7 @@ def main(args):
         if direction == 0:
             next_state = xG.x
             delta_x = next_state - x0.x
-
+            
             # can be either clockwise or counterclockwise, take shorter one
             for i in range(len(delta_x)):
                 if circular[i]:
@@ -352,7 +352,9 @@ def main(args):
             u_init_i = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
             u_init = u_init_i
             #u_init_i = control[max_d_i]
-            cost_i = (num_steps-1)*step_sz
+            cost_i = 10*step_sz
+            #cost_i = (num_steps-1)*step_sz
+            
             #u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
             #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
             t_init = np.linspace(0, cost_i, num_steps)
@@ -384,10 +386,10 @@ def main(args):
             #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
             t_init = np.linspace(0, cost_i, num_steps)
         return x_init, u_init, t_init
-
-
-
-
+        
+        
+        
+        
 
 
     # load data

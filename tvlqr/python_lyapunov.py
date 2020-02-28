@@ -147,9 +147,9 @@ def sample_tv_verify(t0, t1, upper_x, upper_S, upper_rho, S0, S1, A0, A1, B0, B1
     # here we use a more relaxed version, to deal with cases when upper_x is not x1
     # in this case, we only care about (x_bar + x1 - x_upper).T S1 (x_bar + x1 - x_upper) = upper_rho^2
     # then given our previous samples, x_bar = upper_rho * U1[i] + x_upper - x1
-    X1 = upper_rho * U1 + upper_x.reshape(1,-1) - x1.reshape(1,-1)
+    #X1 = upper_rho * U1 + upper_x.reshape(1,-1) - x1.reshape(1,-1)
     # below is using the inner ellipsoid
-    #X1 = rho1 * U1
+    X1 = rho1 * U1
     
     # we then obtain rhodot1 by setting it to be the following:
     #   max_{xTSx=rho1^2}(d/dt(xTSx))

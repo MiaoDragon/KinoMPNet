@@ -159,7 +159,7 @@ def main(args):
                    cae, mlp)
 
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
     if args.start_epoch > 0:
         load_net_state(mpNet0, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -182,7 +182,7 @@ def main(args):
 
 
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
+    model_path='kmpnet_epoch_%d_direction_1_step_%d.pkl' %(args.start_epoch, args.num_steps)
     if args.start_epoch > 0:
         load_net_state(mpNet1, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -277,7 +277,7 @@ if __name__ == '__main__':
     parser.add_argument('--env_type', type=str, default='acrobot_obs_8', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
-    parser.add_argument('--num_step', type=int, default=10)
+    parser.add_argument('--num_steps', type=int, default=10)
     args = parser.parse_args()
     print(args)
     main(args)

@@ -202,7 +202,7 @@ for i in range(len(paths)):
         system = _sst_module.PSOPTAcrobot()
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
-        num_steps = 21
+        num_steps = 35
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         #goal_S0 = np.identity(4)
@@ -302,14 +302,14 @@ for i in range(len(paths)):
                 if collision_check(p_start):
                     in_collision = True
                 
-                if (step % 20 == 0) or (step == max_steps):  #TOEDIT: 200->20
+                if (step % 2 == 0) or (step == max_steps):  #TOEDIT: 200->20
                     state.append(p_start)
                     print('control')
                     print(controls[i][j])
                     control.append(controls[i][j][k])
                     cost.append(accum_cost)
                     accum_cost = 0.
-                if (step % 20 == 0) or (step == max_steps):
+                if (step % 2 == 0) or (step == max_steps):
                     back_state.append(p_start)
                     print('control')
                     print(controls[i][j])
@@ -327,6 +327,8 @@ for i in range(len(paths)):
             print(collision_check(state[k]))
         print('ever in collision:')
         print(in_collision)
+        print('state:')
+        print(state)
 
         #detail_paths.append(paths[i][j][-1])
         #state = detail_paths[::200]
@@ -351,7 +353,7 @@ for i in range(len(paths)):
                     # should not change the "sign" of the delta_x
                     dis[:,i] = (dis[:,i] > np.pi) * (dis[:,i] - 2*np.pi) + (dis[:,i] <= np.pi) * dis[:,i]
             #S = np.identity(len(x0.x))
-            S = np.diag([1.,1.,0.,0.])
+            S = np.diag([1.,1.,0.1,0.1])
             #S = np.diag([1/30./30., 1/40./40., 1., 1.])
             #dif = np.sqrt(dis.T@S@dis)
             dif = []
@@ -360,10 +362,10 @@ for i in range(len(paths)):
             dif = np.array(dif)
             #dif = np.linalg.norm(dis, axis=1)
             max_d_i = np.argmin(dif)
-            #print('current state: ')
-            #print(x0.x)
-            #print('chosen data:')
-            #print(state[max_d_i])
+            print('current state: ')
+            print(x0.x)
+            print('chosen data:')
+            print(state[max_d_i])
 
             if direction == 0:
                 # forward
@@ -611,7 +613,7 @@ for i in range(len(paths)):
             for t in range(MAX_NEURAL_REPLAN):
                 # adaptive step size on replanning attempts
                 res, path_list = plan(obs_i, obc_i, start, goal, detail_paths, informer, init_informer, system, dynamics, \
-                           enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=1000)
+                           enforce_bounds, collision_check, traj_opt, jac_A, jac_B, step_sz=step_sz, MAX_LENGTH=2000)
                 fig = plt.figure()
                 ax = fig.add_subplot(111)
                 # after plan, generate the trajectory, and check if it is within the region

@@ -6,8 +6,8 @@ from tvlqr.python_tvlqr import tvlqr
 from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
 
-MAX_INVALID_THRESHOLD = 2.  # this should depend on the problem
-invalid_mat = np.diag([1.,1.,0.,0.])
+MAX_INVALID_THRESHOLD = 1.5  # this should depend on the problem
+invalid_mat = np.diag([1.,1.,0.1,0.1])
 def wrap_angle(x, system):
     circular = system.is_circular_topology()
     res = np.array(x)
@@ -63,7 +63,7 @@ def propagate(x, us, dts, dynamics, enforce_bounds, IsInCollision, system=None, 
     for i in range(len(us)):
         dt = dts[i]
         u = us[i]
-        num_steps = int(np.round(dt / step_sz))
+        num_steps = int(np.floor(dt / step_sz))
         last_step = dt - num_steps*step_sz
 
         for k in range(num_steps):
@@ -128,14 +128,31 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
     # traj_opt: a function given two endpoints x0, x1, compute the optimal trajectory
     if direction == 0:
         xs, us, dts = traj_opt(x0.x, x1.x, x_init, u_init, t_init)
-        if endpoint:
-            """
-            print('----------------forward----------------')
-            print('trajectory opt:')
-            print('start:')
-            print(x0.x)
-            print('end:')
-            print(x1.x)
+        #if endpoint:
+
+        print('----------------forward----------------')
+        print('trajectory opt:')
+        print('start:')
+        print(x0.x)
+        print('end:')
+        print(x1.x)
+        print('xs[0]:')
+        print(xs[0])
+        print('xs[-1]:')
+        print(xs[-1])
+        print('us:')
+        print(us)
+        print('dts:')
+        print(dts)
+
+        # ensure us and dts have length 1 less than xs
+        if len(us) == len(xs):
+            us = us[:-1]
+        if propagating:
+            xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
+            #if endpoint:
+            
+            print('propagation result:')
             print('xs[0]:')
             print(xs[0])
             print('xs[-1]:')
@@ -144,25 +161,8 @@ def pathSteerToBothDir(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds,
             print(us)
             print('dts:')
             print(dts)
-            """
-        # ensure us and dts have length 1 less than xs
-        if len(us) == len(xs):
-            us = us[:-1]
-        if propagating:
-            xs, us, dts, valid = propagate(x0.x, us, dts, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=IsInCollision, system=system, step_sz=step_sz)
-            if endpoint:
-                """
-                print('propagation result:')
-                print('xs[0]:')
-                print(xs[0])
-                print('xs[-1]:')
-                print(xs[-1])
-                print('us:')
-                print(us)
-                print('dts:')
-                print(dts)
-                """
-                pass
+            
+            #pass
         else:
             # check collision for the trajopt endpoint
             valid = True
