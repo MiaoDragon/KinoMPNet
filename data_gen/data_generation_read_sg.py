@@ -113,9 +113,9 @@ def main(args):
         obs_list = [[]]
         obc_list = [[]]
         for i in range(len(obs_list)):
-            file = open(args.path_folder+'obs_%d.pkl' % (i+args.s), 'wb')
+            file = open(args.path_folder+'obs_%d.pkl' % (i+args.s), 'rb')
             obs_list.append(pickle.load(file))
-            file = open(args.path_folder+'obc_%d.pkl' % (i+args.s), 'wb')
+            file = open(args.path_folder+'obc_%d.pkl' % (i+args.s), 'rb')
             obc_list.append(pickle.load(file))
     ####################################################################################
     def plan_one_path_bvp(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
