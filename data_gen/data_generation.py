@@ -167,9 +167,9 @@ def main(args):
         time0 = time.time()
         #print('obs: %d, path: %d' % (i, j))
         for iter in range(args.max_iter):
-            print('iteration: %d' % (iter))
+            #print('iteration: %d' % (iter))
             planner.step(env, min_time_steps, max_time_steps, integration_step)
-            print('after step')
+            #print('after step')
             #planner.step_with_sample(env, sample, min_time_steps, max_time_steps, integration_step)
             #solution = planner.get_solution()
             # don't break the searching to find better solutions
