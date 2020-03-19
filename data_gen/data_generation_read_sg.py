@@ -114,9 +114,9 @@ def main(args):
         obc_list = [[]]
         for i in range(len(obs_list)):
             file = open(args.path_folder+'obs_%d.pkl' % (i+args.s), 'wb')
-            pickle.dump(obs_list[i], file)
+            obs_list.append(pickle.load(file))
             file = open(args.path_folder+'obc_%d.pkl' % (i+args.s), 'wb')
-            pickle.dump(obc_list[i], file)
+            obc_list.append(pickle.load(file))
     ####################################################################################
     def plan_one_path_bvp(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
         planner = _sst_module.SSTWrapper(
