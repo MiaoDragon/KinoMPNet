@@ -209,6 +209,7 @@ def main(args):
                 #p = Process(target=plan_one_path_sst, args=(env, start, end, queue, path_file, control_file, cost_file, time_file))
                 #p.start()
                 #p.join()
+                print(env)
                 res = plan_one_path_sst(env, start, end, path_file, control_file, cost_file, time_file)
                 print('obtained result:')
                 print(res)
