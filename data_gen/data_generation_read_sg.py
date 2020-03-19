@@ -277,16 +277,23 @@ def main(args):
                     start, end = cartpole_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
                 elif args.env_name == 'acrobot_obs':
                     start, end = acrobot_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
-                elif args.env_name == 'acrobot':
-                    start, end = acrobot_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
+                #elif args.env_name == 'acrobot':
+                #    start, end = acrobot_sg_gen.start_goal_gen(low, high, width, obs_list[i], obs_recs)
                 dir = args.path_folder+str(i+args.s)+'/'
                 if not os.path.exists(dir):
                     os.makedirs(dir)
+
                 path_file = dir+args.path_file+'_%d'%(j+args.sp) + ".pkl"
                 control_file = dir+args.control_file+'_%d'%(j+args.sp) + ".pkl"
                 cost_file = dir+args.cost_file+'_%d'%(j+args.sp) + ".pkl"
                 time_file = dir+args.time_file+'_%d'%(j+args.sp) + ".pkl"
                 sg_file = dir+args.sg_file+'_%d'%(j+args.sp)+".pkl"
+                file = open(sg_file, 'rb')
+                p = pickle._Unpickler(file)
+                p.encoding = 'latin1'
+                data_sg = p.load()
+                start = data_sg[0]
+                end = data_sg[1]
                 p = Process(target=plan_one_path_sst, args=(env, start, end, queue, path_file, control_file, cost_file, time_file))
                 p.start()
                 p.join()
