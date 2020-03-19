@@ -99,7 +99,7 @@ def main(args):
         planner = _sst_module.SSTWrapper(
             state_bounds=env.get_state_bounds(),
             control_bounds=env.get_control_bounds(),
-            distance=env.distance_computer(),
+            distance=_sst_module.TwoLinkAcrobotDistance(),
             start_state=start,
             goal_state=end,
             goal_radius=goal_radius,
