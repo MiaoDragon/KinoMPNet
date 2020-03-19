@@ -155,7 +155,8 @@ def main(args):
         elif args.env_name == 'cartpole_obs':
             env = env_constr(obs_list[i], width, 'cartpole')
         elif args.env_name == 'acrobot_obs':
-            env = env_constr(obs_list[i], width, 'acrobot')
+            #env = env_constr(obs_list[i], width, 'acrobot')
+            env = _sst_module.RectangleObsSystem(obs_list[i], width, 'acrobot')
         # generate rec representation of obs
         obs_recs = []
         for k in range(len(obs_list[i])):
