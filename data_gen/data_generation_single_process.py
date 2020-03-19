@@ -95,7 +95,7 @@ def main(args):
             pickle.dump(obc_list[i], file)
 
     ####################################################################################
-    def plan_one_path_sst(env, start, end, out_queue, path_file, control_file, cost_file, time_file):
+    def plan_one_path_sst(env, start, end, path_file, control_file, cost_file, time_file):
         planner = _sst_module.SSTWrapper(
             state_bounds=env.get_state_bounds(),
             control_bounds=env.get_control_bounds(),
@@ -209,8 +209,7 @@ def main(args):
                 #p = Process(target=plan_one_path_sst, args=(env, start, end, queue, path_file, control_file, cost_file, time_file))
                 #p.start()
                 #p.join()
-                res = plan_one_path_sst(env, start, end, queue, path_file, control_file, cost_file, time_file)
-                res = queue.get()
+                res = plan_one_path_sst(env, start, end, path_file, control_file, cost_file, time_file)
                 print('obtained result:')
                 print(res)
                 if res:
