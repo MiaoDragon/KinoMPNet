@@ -96,14 +96,14 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                 start_node = Node(paths[i][j][0])
                 goal_node = Node(sgs[i][j][1])
                 #goal_node = Node(paths[i][j][-1])
-                print(goal_check(goal_node, Node(sgs[i][j][1])))
+                print(goal_check(goal_node, Node(sgs[i][j][1]), system))
                 #goal_node.S0 = np.diag([1.,1.,0,0])
                 #goal_node.rho0 = 1.
                 path = [start_node, goal_node]
                 #step_sz = DEFAULT_STEP
                 MAX_NEURAL_REPLAN = 21
-                path = plan(obs, obc[i], start_node, goal_node, state, informer, init_informer, system, dynamics, enforce_bounds, \
-                            IsInCollision, traj_opt, step_sz)
+                fp = plan(obs[i], obc[i], start_node, goal_node, state, informer, init_informer, system, dynamics, enforce_bounds, \
+                            IsInCollision, traj_opt, step_sz, num_steps)
             """
             if fp:
                 # only for successful paths
@@ -138,9 +138,9 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
             # write the path
             #print('planned path:')
             #print(path)
-            path = [p.numpy() for p in path]
-            path = np.array(path)
-            np.savetxt('path_%d.txt' % (j), path, fmt='%f')
+            #path = [p.numpy() for p in path]
+            #path = np.array(path)
+            #np.savetxt('path_%d.txt' % (j), path, fmt='%f')
             fes_path.append(fp)
             print('env %d accuracy up to now: %f' % (i, (float(np.sum(fes_path))/ np.sum(valid_path))))
         time_env.append(time_path)
@@ -149,7 +149,7 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
         fes_env.append(fes_path)
         valid_env.append(valid_path)
         print('accuracy up to now: %f' % (float(np.sum(fes_env)) / np.sum(valid_env)))
-    if filename is not None:
-        pickle.dump(time_env, open(filename, "wb" ))
-        #print(fp/tp)
+    #if filename is not None:
+    #    pickle.dump(time_env, open(filename, "wb" ))
+    #    #print(fp/tp)
     return np.array(fes_env), np.array(valid_env)

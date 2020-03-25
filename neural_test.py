@@ -25,6 +25,7 @@ import numpy as np
 import argparse
 import os
 import torch
+
 #from gem_eval_original_mpnet import eval_tasks
 from iterative_plan_and_retreat.gem_eval import eval_tasks
 from torch.autograd import Variable
@@ -36,8 +37,10 @@ from tools.utility import *
 from plan_utility import pendulum, acrobot_obs
 #from sparse_rrt.systems import standard_cpp_systems
 #from sparse_rrt import _sst_module
+
 from iterative_plan_and_retreat.data_structure import *
 from iterative_plan_and_retreat.plan_general import propagate
+
 #from plan_utility.data_structure import *
 #from plan_utility.plan_general_original_mpnet import propagate
 from tools import data_loader
@@ -87,14 +90,15 @@ def main(args):
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
     elif args.env_type == 'acrobot_obs':
         IsInCollision =acrobot_obs.IsInCollision
+        #IsInCollision = lambda x, obs: False
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
         system = _sst_module.PSOPTAcrobot()
-        #dynamics = acrobot_obs.dynamics
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        xdot = acrobot_obs.dynamics
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d
@@ -103,7 +107,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
@@ -190,8 +194,8 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         #num_steps = 21
-        num_steps = 11#args.num_steps*2
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        num_steps = 15#args.num_steps*2
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
         #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
         #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
@@ -209,8 +213,8 @@ def main(args):
                    cae, mlp)
 
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    #model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
+    #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
+    model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet0, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -233,8 +237,8 @@ def main(args):
 
 
     # load previously trained model if start epoch > 0
-    model_path='kmpnet_epoch_%d_direction_1_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    #model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
+    #model_path='kmpnet_epoch_%d_direction_1_step_%d.pkl' %(args.start_epoch, args.num_steps)
+    model_path='kmpnet_epoch_%d_direction_1.pkl' %(args.start_epoch)
     if args.start_epoch > 0:
         load_net_state(mpNet1, os.path.join(args.model_path, model_path))
         torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
@@ -287,8 +291,17 @@ def main(args):
                             delta_x[i] = delta_x[i] - 2*np.pi
                         if delta_x[i] <= 0.:
                             delta_x[i] = delta_x[i] + 2*np.pi
-            res = Node(next_state)
-            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps)
+                            
+            res = Node(x0.x + delta_x)
+            cov = np.diag([0.02,0.02,0.02,0.02])
+            #mean = next_state
+            #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+            mean = np.zeros(next_state.shape)
+            rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+            rand_x_init[0] = rand_x_init[0]*0.
+            rand_x_init[-1] = rand_x_init[-1]*0.
+
+            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
             ## TODO: : change this to general case
             u_init_i = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
             u_init = u_init_i
@@ -297,12 +310,23 @@ def main(args):
             #u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
             #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
             t_init = np.linspace(0, cost_i, num_steps)
+            """
+            print('init:')
+            print('x_init:')
+            print(x_init)
+            print('u_init:')
+            print(u_init)
+            print('t_init:')
+            print(t_init)
+            print('xw:')
+            print(next_state)
+            """
         else:
-            x = torch.cat([xG_x,x0_x], dim=0)
+            x = torch.cat([x0_x,xG_x], dim=0)
             mpNet = mpNet1
             next_state = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
             next_state = unnormalize_func(next_state).numpy()[0]
-            delta_x = x0.x - next_state
+            delta_x = next_state - x0.x
             # can be either clockwise or counterclockwise, take shorter one
             for i in range(len(delta_x)):
                 if circular[i]:
@@ -317,9 +341,10 @@ def main(args):
                         elif delta_x[i] <= 0.:
                             delta_x[i] = delta_x[i] + 2*np.pi
             #next_state = state[max_d_i] + delta_x
+            next_state = x0.x + delta_x
             res = Node(next_state)
             # initial: from max_d_i to max_d_i+1
-            x_init = np.linspace(next_state, next_state + delta_x, num_steps) + rand_x_init
+            x_init = np.linspace(next_state, x0.x, num_steps) + rand_x_init
             # action: copy over to number of steps
             u_init_i = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
             u_init = u_init_i
@@ -342,25 +367,34 @@ def main(args):
                         delta_x[i] = delta_x[i] - 2*np.pi
                     # randomly pick either direction
                     rand_d = np.random.randint(2)
-                    print('inside init_informer')
-                    print('delta_x[%d]: %f' % (i, delta_x[i]))
+                    #print('inside init_informer')
+                    #print('delta_x[%d]: %f' % (i, delta_x[i]))
                     if rand_d < 1 and np.abs(delta_x[i]) >= np.pi*0.9:
                         if delta_x[i] > 0.:
                             delta_x[i] = delta_x[i] - 2*np.pi
                         if delta_x[i] <= 0.:
                             delta_x[i] = delta_x[i] + 2*np.pi
             res = Node(next_state)
-            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps)
+            cov = np.diag([0.02,0.02,0.02,0.02])
+            #mean = next_state
+            #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
+            mean = np.zeros(next_state.shape)
+            rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
+            rand_x_init[0] = rand_x_init[0]*0.
+            rand_x_init[-1] = rand_x_init[-1]*0.
+
+            x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
             ## TODO: : change this to general case
             u_init_i = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
             u_init = u_init_i
             #u_init_i = control[max_d_i]
-            cost_i = 10*step_sz
-            #cost_i = (num_steps-1)*step_sz
+            #cost_i = 10*step_sz
+            cost_i = (num_steps-1)*step_sz
 
             #u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
             #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
             t_init = np.linspace(0, cost_i, num_steps)
+
         else:
             next_state = xG.x
             delta_x = x0.x - next_state
@@ -443,9 +477,9 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_8_lr0.010000_SGD_step_10/',help='path for saving trained models')
+    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
     parser.add_argument('--seen_N', type=int, default=1)
-    parser.add_argument('--seen_NP', type=int, default=10)
+    parser.add_argument('--seen_NP', type=int, default=100)
     parser.add_argument('--seen_s', type=int, default=0)
     parser.add_argument('--seen_sp', type=int, default=0)
     parser.add_argument('--unseen_N', type=int, default=0)
@@ -463,11 +497,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=1200)
-    parser.add_argument('--env_type', type=str, default='acrobot_obs_8', help='s2d for simple 2d, c2d for complex 2d')
+    parser.add_argument('--start_epoch', type=int, default=5000)
+    parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
-    parser.add_argument('--num_steps', type=int, default=10)
+    parser.add_argument('--num_steps', type=int, default=20)
 
     args = parser.parse_args()
     print(args)
