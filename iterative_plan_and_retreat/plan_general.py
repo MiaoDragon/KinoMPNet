@@ -219,237 +219,11 @@ def h_cost(x0, x1, system):
                 delta_x[i] = delta_x[i] - 2*np.pi
     return max(abs(delta_x[0]) / vmax, abs(delta_x[1])/vmax)
 
-def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enforce_bounds, IsInCollisionWithObs, traj_opt, step_sz=0.02, num_steps=21, MAX_LENGTH=1000):
-    """
-    For each node xt, we record how many explorations have been made from xt. We do planning according to the following rules:
-    1. if n_explored >= n_max_explore:
-        if not the root, backtrace to the previous node
-
-    hat(x)_t+1 = informer(xt, G)
-    x_t+1, tau = BVP(xt, hat(x)_t+1)
-    n_exlored(x_t) += 1
-    2. if explored(x_t+1) (w.r.t. some regions as defined in SST paper)
-        ignore x_t+1
-        # may also update the "score" using the already explored region
-    3. if too_far(x_t+1, hat(x)_t+1)
-        ignore x_t+1
-    4. if inCollision(x_t+1)
-        ignore x_t+1
-        # may also update the "score" of points
-
-    # otherwise it is safe
-    establish the connections between x_t and x_t+1,
-    move to x_t+1
-    """
-
-    # visualization
-    obs_width = 6.
-    new_obs_i = []
-    for k in range(len(obs)):
-        obs_pt = []
-        obs_pt.append(obs[k][0]-obs_width/2)
-        obs_pt.append(obs[k][1]-obs_width/2)
-        obs_pt.append(obs[k][0]-obs_width/2)
-        obs_pt.append(obs[k][1]+obs_width/2)
-        obs_pt.append(obs[k][0]+obs_width/2)
-        obs_pt.append(obs[k][1]+obs_width/2)
-        obs_pt.append(obs[k][0]+obs_width/2)
-        obs_pt.append(obs[k][1]-obs_width/2)
-        new_obs_i.append(obs_pt)
-
-    IsInCollision = lambda x: IsInCollisionWithObs(x, new_obs_i)
-    # visualization
-    
-    print('step_sz: %f' % (step_sz))
-    params = {}
-    params['obs_w'] = 6.
-    params['obs_h'] = 6.
-    params['integration_step'] = step_sz
-    vis = AcrobotVisualizer(Acrobot(), params)
-    vis.obs = obs
-    plt.ion()
-    fig = plt.figure()
-    ax = fig.add_subplot(121)
-    ax.set_autoscale_on(True)
-    hl, = ax.plot([], [], 'b')
-    #hl_real, = ax.plot([], [], 'r')
-    hl_for, = ax.plot([], [], 'g')
-    hl_back, = ax.plot([], [], 'r')
-    hl_for_mpnet, = ax.plot([], [], 'lightgreen')
-    hl_back_mpnet, = ax.plot([], [], 'salmon')
-
-    ax_ani = fig.add_subplot(122)
-    vis._init(ax_ani)
-    
-    print(obs)
-    def update_line(h, ax, new_data):
-        new_data = wrap_angle(new_data, system)
-        h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
-        #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
-        #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
-
-    def remove_last_k(h, ax, k):
-        h.set_data(h.get_xdata()[:-k], h.get_ydata()[:-k])
-
-    def draw_update_line(ax):
-        ax.relim()
-        ax.autoscale_view()
-        fig.canvas.draw()
-        fig.canvas.flush_events()
-        #plt.show()
-
-    def animation(states, actions):
-        vis._animate(states[-1], ax_ani)
-        draw_update_line(ax_ani)
-    dtheta = 0.1
-    feasible_points = []
-    infeasible_points = []
-    goal_region = []
-    imin = 0
-    imax = int(2*np.pi/dtheta)
-
-    
-    for i in range(imin, imax):
-        for j in range(imin, imax):
-            x = np.array([dtheta*i-np.pi, dtheta*j-np.pi, 0., 0.])
-            if IsInCollision(x):
-                infeasible_points.append(x)
-            else:
-                feasible_points.append(x)
-                if goal_check(Node(x), xG, system):
-                    goal_region.append(x)
-    feasible_points = np.array(feasible_points)
-    infeasible_points = np.array(infeasible_points)
-    goal_region = np.array(goal_region)
-    ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
-    ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
-    ax.scatter(goal_region[:,0], goal_region[:,1], c='green')
-    for i in range(len(data)):
-        update_line(hl, ax, data[i])
-    draw_update_line(ax)
-    update_line(hl_for, ax, x0.x)
-    draw_update_line(ax)
-    update_line(hl_back, ax, xG.x)
-    draw_update_line(ax)
-
-    
-
-
-    env = torch.FloatTensor(env)
-    env = to_var(env)
-    explored_nodes = [x0]
-    
-    xt = x0
-    max_explore = 3
-    xt.n_explored = 0
-    xt.cost = 0.
-    xw_scat = None
-    fes = False
-    frontier_nodes = []
-    entry = (-x0.cost+h_cost(x0,xG,system), x0)
-    heapq.heappush(frontier_nodes, entry)
-    
-    for itr in range(MAX_LENGTH):
-        if xw_scat is not None:
-            xw_scat.remove()
-            xw_scat = None
-        # pop nodes from frontier_nodes
-        if len(frontier_nodes) == 0:
-            entry = (-x0.cost+h_cost(x0,xG,system), x0)
-            heapq.heappush(frontier_nodes, entry)  # push it back
-        entry = heapq.heappop(frontier_nodes)
-        print('popping...')
-        print("entry cost:")
-        print(entry[0])
-        
-        xt = entry[1]
-        
-        if xt.n_explored >= max_explore and xt is not x0:
-            xt = xt.prev
-            #print('retreating...')
-            continue
-
-        # try connecting to goal every now and then
-        x_init, u_init, t_init = init_informer(env, xt, xG, direction=0)
-        x_G_, edge, valid = pathSteerTo(xt, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
-                                traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
-
-        xs_to_plot = np.array(edge.xs[::10])
-        for i in range(len(xs_to_plot)):
-            xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
-        ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='orange')
-        draw_update_line(ax)
-
-        if edge is not None and goal_check(x_G_, xG, system):
-            print('bingo!')
-            fes = True
-            break    
-            
-        for i in range(max_explore):
-            xw, x_init, u_init, t_init = informer(env, xt, xG, direction=0)
-
-            xw_scat = ax.scatter(xw.x[0], xw.x[1], c='lightgreen')
-            draw_update_line(ax)
-
-            x_t_1, edge, valid = pathSteerTo(xt, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
-                                    traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
-
-            # stop at the last node that is not in collision
-
-            xt.n_explored += 1
-            #print('n_explored: %d' % (xt.n_explored))
-            if edge is None:  # when the immediate next node is in collision
-                #print('edge is None')
-                continue
-            if explored(x_t_1, explored_nodes, system):
-                # based on some defined distance
-                #print('explored')
-                continue
-            # if too far...
-
-            #for i in range(len(edge.xs)):
-            #    update_line(hl_for, ax, edge.xs[i])
-            xs_to_plot = np.array(edge.xs[::5])
-            for i in range(len(xs_to_plot)):
-                xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
-            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='g')
-            draw_update_line(ax)
-            animation(edge.xs, edge.us)
-
-            # establish connections to x_t+1
-            xt.next = x_t_1
-            x_t_1.prev = xt
-            xt.edge = edge
-            xt.edge.next = x_t_1
-            x_t_1.n_explored = 0
-            x_t_1.cost = xt.cost + xt.edge.dt
-            explored_nodes.append(x_t_1)
-            #xt = x_t_1
-            
-            # push to frontier
-            entry = (-x_t_1.cost+h_cost(x_t_1,xG,system), x_t_1)
-            heapq.heappush(frontier_nodes, entry)
-
-            # check if the new node is near goal
-            if goal_check(x_t_1, xG, system):
-                print("success")
-                fes = True
-                break            
-        if fes:
-            break
-                
-        # check if the new node is near goal
-        if goal_check(xt, xG, system):
-            print("success")
-            fes = True
-            break
-    return fes
 
 
 
 
-
-
+# This version is using SST, and will add all waypoints to SST node
 def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enforce_bounds, IsInCollisionWithObs, traj_opt, step_sz=0.02, num_steps=21, MAX_LENGTH=1000):
     """
     For each node xt, we record how many explorations have been made from xt. We do planning according to the following rules:
@@ -485,9 +259,9 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
         sst_delta_near=1.5,
         sst_delta_drain=1.
     )
-    
-    
-    
+
+
+
     # visualization
     obs_width = 6.
     new_obs_i = []
@@ -526,7 +300,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
 
     ax_ani = fig.add_subplot(122)
     vis._init(ax_ani)
-    
+
     print(obs)
     def update_line(h, ax, new_data):
         new_data = wrap_angle(new_data, system)
@@ -554,7 +328,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
     imin = 0
     imax = int(2*np.pi/dtheta)
 
-    
+
     for i in range(imin, imax):
         for j in range(imin, imax):
             x = np.array([dtheta*i-np.pi, dtheta*j-np.pi, 0., 0.])
@@ -578,13 +352,13 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
     update_line(hl_back, ax, xG.x)
     draw_update_line(ax)
     """
-    
+
 
 
     env = torch.FloatTensor(env)
     env = to_var(env)
     #explored_nodes = [x0]
-    
+
     xt = x0
     max_explore = 1
     xt.n_explored = 0
@@ -595,7 +369,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
     tie_breaker = 0
     entry = (x0.cost+h_cost(x0,xG,system), tie_breaker, x0)
     heapq.heappush(frontier_nodes, entry)
-    
+
     for itr in range(MAX_LENGTH):
         if xw_scat is not None:
             xw_scat.remove()
@@ -609,9 +383,9 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
         print('popping...')
         print("entry cost:")
         print(entry[0])
-        
+
         xt = entry[2]
-        
+
         if xt.n_explored >= max_explore and xt is not x0:
             xt = xt.prev
             #print('retreating...')
@@ -632,11 +406,11 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
         if edge is not None and goal_check(x_G_, xG, system):
             print('bingo!')
             fes = True
-            break    
-            
+            break
+
         """
         xs, us, dts = planner.step_bvp(propagate_system, system, xt.x, x_init[-1], 400, num_steps, step_sz, x_init, u_init, t_init)
-        
+
         if len(us) != 0:
             #xs_to_plot = np.array(edge.xs[::10])
             #for i in range(len(xs_to_plot)):
@@ -668,14 +442,14 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             tie_breaker += 1
             entry = (goal.cost+h_cost(goal,xG,system), tie_breaker, goal)
             heapq.heappush(frontier_nodes, entry)
-            
+
             if goal_check(Node(x_t_1), xG, system):
                 print('bingo!')
                 fes = True
-                break    
+                break
         """
-            
-            
+
+
         for i in range(max_explore):
             xw, x_init, u_init, t_init = informer(env, xt, xG, direction=0)
             """
@@ -719,7 +493,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             draw_update_line(ax)
             animation(xs, us)
             """
-            
+
             #x_t_1.prev = xt
             goal.n_explored = 0
             goal.cost = xt.cost + xt.edge.dt
@@ -732,10 +506,251 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             if goal_check(goal, xG, system):
                 print("success")
                 fes = True
-                break            
+                break
         if fes:
             break
-                
+
+        # check if the new node is near goal
+        if goal_check(xt, xG, system):
+            print("success")
+            fes = True
+            break
+    return fes
+
+
+
+
+
+
+
+
+def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enforce_bounds, IsInCollisionWithObs, traj_opt, step_sz=0.02, num_steps=21, MAX_LENGTH=100):
+    """
+    For each node xt, we record how many explorations have been made from xt. We do planning according to the following rules:
+    1. if n_explored >= n_max_explore:
+        if not the root, backtrace to the previous node
+
+    hat(x)_t+1 = informer(xt, G)
+    x_t+1, tau = BVP(xt, hat(x)_t+1)
+    n_exlored(x_t) += 1
+    2. if explored(x_t+1) (w.r.t. some regions as defined in SST paper)
+        ignore x_t+1
+        # may also update the "score" using the already explored region
+    3. if too_far(x_t+1, hat(x)_t+1)
+        ignore x_t+1
+    4. if inCollision(x_t+1)
+        ignore x_t+1
+        # may also update the "score" of points
+
+    # otherwise it is safe
+    establish the connections between x_t and x_t+1,
+    move to x_t+1
+    """
+
+    # visualization
+    obs_width = 6.
+    new_obs_i = []
+    for k in range(len(obs)):
+        obs_pt = []
+        obs_pt.append(obs[k][0]-obs_width/2)
+        obs_pt.append(obs[k][1]-obs_width/2)
+        obs_pt.append(obs[k][0]-obs_width/2)
+        obs_pt.append(obs[k][1]+obs_width/2)
+        obs_pt.append(obs[k][0]+obs_width/2)
+        obs_pt.append(obs[k][1]+obs_width/2)
+        obs_pt.append(obs[k][0]+obs_width/2)
+        obs_pt.append(obs[k][1]-obs_width/2)
+        new_obs_i.append(obs_pt)
+
+    IsInCollision = lambda x: IsInCollisionWithObs(x, new_obs_i)
+    # visualization
+    print('step_sz: %f' % (step_sz))
+    params = {}
+    params['obs_w'] = 6.
+    params['obs_h'] = 6.
+    params['integration_step'] = step_sz
+    vis = AcrobotVisualizer(Acrobot(), params)
+    vis.obs = obs
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(121)
+    ax.set_autoscale_on(True)
+    hl, = ax.plot([], [], 'b')
+    #hl_real, = ax.plot([], [], 'r')
+    hl_for, = ax.plot([], [], 'g')
+    hl_back, = ax.plot([], [], 'r')
+    hl_for_mpnet, = ax.plot([], [], 'lightgreen')
+    hl_back_mpnet, = ax.plot([], [], 'salmon')
+
+    ax_ani = fig.add_subplot(122)
+    vis._init(ax_ani)
+
+    print(obs)
+    def update_line(h, ax, new_data):
+        new_data = wrap_angle(new_data, system)
+        h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
+        #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
+        #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
+
+    def remove_last_k(h, ax, k):
+        h.set_data(h.get_xdata()[:-k], h.get_ydata()[:-k])
+
+    def draw_update_line(ax):
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+        #plt.show()
+
+    def animation(states, actions):
+        vis._animate(states[-1], ax_ani)
+        draw_update_line(ax_ani)
+    dtheta = 0.1
+    feasible_points = []
+    infeasible_points = []
+    goal_region = []
+    imin = 0
+    imax = int(2*np.pi/dtheta)
+
+
+    for i in range(imin, imax):
+        for j in range(imin, imax):
+            x = np.array([dtheta*i-np.pi, dtheta*j-np.pi, 0., 0.])
+            if IsInCollision(x):
+                infeasible_points.append(x)
+            else:
+                feasible_points.append(x)
+                if goal_check(Node(x), xG, system):
+                    goal_region.append(x)
+    feasible_points = np.array(feasible_points)
+    infeasible_points = np.array(infeasible_points)
+    goal_region = np.array(goal_region)
+    ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
+    ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
+    ax.scatter(goal_region[:,0], goal_region[:,1], c='green')
+    for i in range(len(data)):
+        update_line(hl, ax, data[i])
+    draw_update_line(ax)
+    update_line(hl_for, ax, x0.x)
+    draw_update_line(ax)
+    update_line(hl_back, ax, xG.x)
+    draw_update_line(ax)
+
+
+
+
+    env = torch.FloatTensor(env)
+    env = to_var(env)
+    #explored_nodes = [x0]
+
+    xt = x0
+    max_explore = 10
+    xt.n_explored = 0
+    xt.cost = 0.
+    xw_scat = None
+    fes = False
+    frontier_nodes = []
+    entry = (-x0.cost+h_cost(x0,xG,system), x0)
+    heapq.heappush(frontier_nodes, entry)
+
+    node = x0
+    for itr in range(MAX_LENGTH):
+        if xw_scat is not None:
+            xw_scat.remove()
+            xw_scat = None
+        # pop nodes from frontier_nodes
+        if len(frontier_nodes) == 0:
+            entry = (-x0.cost+h_cost(x0,xG,system), x0)
+            heapq.heappush(frontier_nodes, entry)  # push it back
+        entry = heapq.heappop(frontier_nodes)
+        print('popping...')
+        print("entry cost:")
+        print(entry[0])
+
+        xt = entry[1]
+
+        if xt.n_explored >= max_explore and xt is not x0:
+            xt = xt.prev
+            #print('retreating...')
+            continue
+
+        # try connecting to goal every now and then
+        x_init, u_init, t_init = init_informer(env, xt, xG, direction=0)
+        x_G_, edge, valid = pathSteerTo(xt, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
+
+        xs_to_plot = np.array(edge.xs[::10])
+        for i in range(len(xs_to_plot)):
+            xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+        ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='orange')
+        draw_update_line(ax)
+
+        if edge is not None and goal_check(x_G_, xG, system):
+            print('bingo!')
+            fes = True
+            break
+
+
+        #### renew heapq for non-retreating case, Turn-off this if want search-tree version
+        frontier_nodes = []
+        for i in range(max_explore):
+            xw, x_init, u_init, t_init = informer(env, xt, xG, direction=0)
+
+            xw_scat = ax.scatter(xw.x[0], xw.x[1], c='lightgreen')
+            draw_update_line(ax)
+
+            x_t_1, edge, valid = pathSteerTo(xt, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                    traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
+
+            # stop at the last node that is not in collision
+
+            xt.n_explored += 1
+            #print('n_explored: %d' % (xt.n_explored))
+            if edge is None:  # when the immediate next node is in collision
+                #print('edge is None')
+                continue
+
+            """
+            # Turnoff explored checking
+            if explored(x_t_1, explored_nodes, system):
+                # based on some defined distance
+                #print('explored')
+                continue
+            """
+            # if too far...
+
+            #for i in range(len(edge.xs)):
+            #    update_line(hl_for, ax, edge.xs[i])
+            xs_to_plot = np.array(edge.xs[::5])
+            for i in range(len(xs_to_plot)):
+                xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='g')
+            draw_update_line(ax)
+            animation(edge.xs, edge.us)
+
+            # establish connections to x_t+1
+            xt.next = x_t_1
+            x_t_1.prev = xt
+            xt.edge = edge
+            xt.edge.next = x_t_1
+            x_t_1.n_explored = 0
+            x_t_1.cost = xt.cost + xt.edge.dt
+
+            #explored_nodes.append(x_t_1)
+            #xt = x_t_1
+
+            # push to frontier
+            entry = (-x_t_1.cost+h_cost(x_t_1,xG,system), x_t_1)
+            heapq.heappush(frontier_nodes, entry)
+
+            # check if the new node is near goal
+            if goal_check(x_t_1, xG, system):
+                print("success")
+                fes = True
+                break
+        if fes:
+            break
+
         # check if the new node is near goal
         if goal_check(xt, xG, system):
             print("success")

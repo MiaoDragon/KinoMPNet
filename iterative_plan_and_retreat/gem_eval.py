@@ -129,12 +129,12 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                 animator = AcrobotVisualizer(Acrobot(), params)
                 animation_acrobot(fig, ax, animator, xs, obs_i)
                 plt.waitforbuttonpress()
-
+                """
                 time1 = time.time() - time0
                 time1 -= time_norm
                 time_path.append(time1)
                 print('test time: %f' % (time1))
-            """
+
             # write the path
             #print('planned path:')
             #print(path)
