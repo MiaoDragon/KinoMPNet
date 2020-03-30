@@ -296,3 +296,125 @@ def voxelize2d(points, voxel_size=(24, 24), padding_size=(32, 32), resolution=0.
     voxels[x_idx, y_idx] = OCCUPIED
     return voxels
     #return voxels, inside_box_points
+
+
+
+
+
+def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, system=None, step_sz=0.02, num_steps=20):
+    # obtain the generated paths, and transform into
+    # (obc, dataset, targets, env_indices)
+    # return list NOT NUMPY ARRAY
+    ## TODO: add different folders for obstacle information and path
+    # transform paths into dataset and targets
+    # (xt, xT), x_{t+1}
+    # direction: 0 -- forward;  1 -- backward
+
+    # load obs and obc (obc: obstacle point cloud)
+    if obs_f is None:
+        obs = None
+        obc = None
+        obs_list = None
+        obc_list = None
+    else:
+        obs_list = []
+        obc_list = []
+        for i in range(N):
+            file = open(data_folder+'obs_%d.pkl' % (i), 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            obs = p.load()
+            #obs = pickle.load(file)
+            file = open(data_folder+'obc_%d.pkl' % (i), 'rb')
+            #obc = pickle.load(file)
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            obc = p.load()
+            # concatenate on the first direction (each obs has a different index)
+            obc = obc.reshape(-1, 2)
+            obs_list.append(obs)
+            obc_list.append(obc)
+        obc_list = np.array(obc_list)
+        obc_list = pcd_to_voxel2d(obc_list, voxel_size=[32,32]).reshape(-1,1,32,32)
+
+    cost_dataset = []
+    cost_targets = []
+    env_indices = []
+    u_init_dataset = []  # (start, goal) -> control
+    t_init_dataset = []  # (start, goal) -> dt
+    u_init_targets = []
+    t_init_targets = []
+
+    for i in range(N):
+        print('loading... env: %d' % (i))
+        for j in range(NP):
+            dir = data_folder+str(i)+'/'
+            path_file = dir+'path_%d' %(j) + ".pkl"
+            control_file = dir+'control_%d' %(j) + ".pkl"
+            cost_file = dir+'cost_%d' %(j) + ".pkl"
+            time_file = dir+'time_%d' %(j) + ".pkl"
+            sg_file = dir+'start_goal_%d' % (j) + '.pkl'
+            file = open(sg_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            data_sg = p.load()
+            file = open(path_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            data_path = p.load()
+            file = open(control_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            data_control = p.load()
+            file = open(cost_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            data_cost = p.load()
+
+
+            if dynamics is not None:
+                # use dense input
+                data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps)
+            print('cost:')
+            print(data_cost)
+            p = data_path
+            #print('before flip:')
+            #print(p)
+            if direction == 1:
+                # backward
+                p = np.flip(p, axis=0)
+            #print('after flip:')
+            #print(p)
+            for k in range(len(p)-1):
+                for l in range(k+1, len(p)):
+                    cost_dataset.append(np.concatenate([p[k], p[l]]))
+                    print('start idx: %d, end idx: %d': % (k, l))
+                    print(data_cost[k:l-k+1].sum())
+                    cost_targets.append(data_cost[k:l-k+1].sum())
+                    env_indices.append(i)
+                u_init_dataset.append(np.concatenate([p[k], p[k+1]]))
+                u_init_targets.append(data_control[k])
+                t_init_dataset.append(np.concatenate([p[k], p[k+1]]))
+                t_init_targets.append(data_cost[k])
+        #path_env.append(paths)
+        #path_length_env.append(path_lengths)
+        #control_env.append(controls)
+        #cost_env.append(costs)
+        #sg_env.append(sgs)
+    ## TODO: print out intermediate results to visualize
+    cost_dataset = np.array(cost_dataset)
+    cost_targets = np.array(cost_targets)
+    env_indices = np.array(env_indices)
+    u_init_dataset = np.array(u_init_dataset)
+    u_init_targets = np.array(u_init_targets)
+    t_init_dataset = np.array(t_init_dataset)
+    t_init_targets = np.array(t_init_targets)
+    if obs_list is not None:
+        obs_list = np.array(obs_list)
+        obc_list = np.array(obc_list)
+    return obc_list, cost_dataset, cost_targets, env_indices, \
+           u_init_dataset, u_init_targets, t_init_dataset, t_init_targets
+
+
+#def load_test_dataset(N, NP, folder):
+#    # obtain
