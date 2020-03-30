@@ -478,10 +478,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
     parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
-    parser.add_argument('--seen_N', type=int, default=1)
-    parser.add_argument('--seen_NP', type=int, default=100)
+    parser.add_argument('--seen_N', type=int, default=10)
+    parser.add_argument('--seen_NP', type=int, default=200)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=0)
+    parser.add_argument('--seen_sp', type=int, default=800)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)

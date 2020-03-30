@@ -62,10 +62,10 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                     #state_i.append(len(detail_paths)-1)
                     max_steps = int(costs[i][j][k]/step_sz)
                     accum_cost = 0.
-                    print('p_start:')
-                    print(p_start)
-                    print('data:')
-                    print(paths[i][j][k])
+                    #print('p_start:')
+                    #print(p_start)
+                    #print('data:')
+                    #print(paths[i][j][k])
                     # modify it because of small difference between data and actual propagation
                     p_start = paths[i][j][k]
                     state[-1] = paths[i][j][k]
@@ -78,15 +78,15 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                         accum_cost += step_sz
                         if (step % 1 == 0) or (step == max_steps):
                             state.append(p_start)
-                            print('control')
-                            print(controls[i][j])
+                            #print('control')
+                            #print(controls[i][j])
                             control.append(controls[i][j][k])
                             cost.append(accum_cost)
                             accum_cost = 0.
-                print('p_start:')
-                print(p_start)
-                print('data:')
-                print(paths[i][j][-1])
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][-1])
                 state[-1] = paths[i][j][-1]
 
 
@@ -104,6 +104,10 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                 MAX_NEURAL_REPLAN = 21
                 fp = plan(obs[i], obc[i], start_node, goal_node, state, informer, init_informer, system, dynamics, enforce_bounds, \
                             IsInCollision, traj_opt, step_sz, num_steps)
+                time1 = time.time() - time0
+                time1 -= time_norm
+                time_path.append(time1)
+                print('test time: %f' % (time1))
             """
             if fp:
                 # only for successful paths
@@ -130,10 +134,6 @@ def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, norma
                 animation_acrobot(fig, ax, animator, xs, obs_i)
                 plt.waitforbuttonpress()
                 """
-                time1 = time.time() - time0
-                time1 -= time_norm
-                time_path.append(time1)
-                print('test time: %f' % (time1))
 
             # write the path
             #print('planned path:')
