@@ -375,8 +375,9 @@ def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamic
             if dynamics is not None:
                 # use dense input
                 data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps)
-            print('cost:')
-            print(data_cost)
+            #print('cost:')
+            #print(data_cost)
+            data_cost = np.array(data_cost)
             p = data_path
             #print('before flip:')
             #print(p)
@@ -388,9 +389,9 @@ def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamic
             for k in range(len(p)-1):
                 for l in range(k+1, len(p)):
                     cost_dataset.append(np.concatenate([p[k], p[l]]))
-                    print('start idx: %d, end idx: %d': % (k, l))
-                    print(data_cost[k:l-k+1].sum())
-                    cost_targets.append(data_cost[k:l-k+1].sum())
+                    #print('start idx: %d, end idx: %d' % (k, l))
+                    #print(data_cost[k:l].sum())
+                    cost_targets.append(data_cost[k:l].sum())
                     env_indices.append(i)
                 u_init_dataset.append(np.concatenate([p[k], p[k+1]]))
                 u_init_targets.append(data_control[k])
@@ -403,7 +404,7 @@ def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamic
         #sg_env.append(sgs)
     ## TODO: print out intermediate results to visualize
     cost_dataset = np.array(cost_dataset)
-    cost_targets = np.array(cost_targets)
+    cost_targets = np.array(cost_targets).reshape(-1,1)
     env_indices = np.array(env_indices)
     u_init_dataset = np.array(u_init_dataset)
     u_init_targets = np.array(u_init_targets)

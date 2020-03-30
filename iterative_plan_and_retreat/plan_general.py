@@ -196,7 +196,7 @@ def pathSteerTo(x0, x1, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCo
         edge.next = goal
         start.edge = edge
         start.next = goal
-        goal.prev = start
+        #goal.prev = start
     return x1, edge, valid
 
 
@@ -661,6 +661,8 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
     tie_breaker = 0
     entry = (-x0.cost+h_cost(x0,xG,system), tie_breaker, x0)
     heapq.heappush(frontier_nodes, entry)
+    
+    path = [x0]  # record the path from start to goal
 
     node = x0
     for itr in range(MAX_LENGTH):
@@ -672,6 +674,15 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             tie_breaker = 0
             entry = (-x0.cost+h_cost(x0,xG,system), tie_breaker, x0)
             heapq.heappush(frontier_nodes, entry)  # push it back
+            # free the memory of path
+            for i in range(1,len(path)):
+                del path[i].edge
+                del path[i]
+            path[0].next = None
+            del path[0].edge
+            path[0].edge = None
+            path = [x0]
+            
         entry = heapq.heappop(frontier_nodes)
         #print('popping...')
         #print("entry cost:")
@@ -679,10 +690,6 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
 
         xt = entry[2]
 
-        if xt.n_explored >= max_explore and xt is not x0:
-            xt = xt.prev
-            #print('retreating...')
-            continue
 
         # try connecting to goal every now and then
         x_init, u_init, t_init = init_informer(env, xt, xG, direction=0)
@@ -743,7 +750,6 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             """
             # establish connections to x_t+1
             xt.next = x_t_1
-            x_t_1.prev = xt
             xt.edge = edge
             xt.edge.next = x_t_1
             x_t_1.n_explored = 0
