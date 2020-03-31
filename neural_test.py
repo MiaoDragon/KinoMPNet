@@ -488,7 +488,7 @@ if __name__ == '__main__':
     parser.add_argument('--unseen_sp', type=int, default=0)
     parser.add_argument('--grad_step', type=int, default=1, help='number of gradient steps in continual learning')
     # Model parameters
-    parser.add_argument('--total_input_size', type=int, default=4, help='dimension of total input')
+    parser.add_argument('--total_input_size', type=int, default=8, help='dimension of total input')
     parser.add_argument('--AE_input_size', nargs='+', type=int, default=32, help='dimension of input to AE')
     parser.add_argument('--mlp_input_size', type=int , default=136, help='dimension of the input vector')
     parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
