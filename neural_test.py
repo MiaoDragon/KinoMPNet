@@ -121,6 +121,7 @@ def main(args):
         system = _sst_module.PSOPTAcrobot()
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        xdot = acrobot_obs.dynamics
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d_2
@@ -129,7 +130,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
@@ -142,6 +143,7 @@ def main(args):
         system = _sst_module.PSOPTAcrobot()
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        xdot = acrobot_obs.dynamics
         jax_dynamics = acrobot_obs.jax_dynamics
         enforce_bounds = acrobot_obs.enforce_bounds
         cae = CAE_acrobot_voxel_2d_3
@@ -150,7 +152,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
@@ -160,6 +162,7 @@ def main(args):
         unnormalize = acrobot_obs.unnormalize
         obs_file = None
         obc_file = None
+        xdot = acrobot_obs.dynamics
         system = _sst_module.PSOPTAcrobot()
         cpp_propagator = _sst_module.SystemPropagator()
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
@@ -171,7 +174,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
@@ -194,7 +197,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         #num_steps = 21
-        num_steps = 15#args.num_steps*2
+        num_steps = 21#args.num_steps*2
         traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
         #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
