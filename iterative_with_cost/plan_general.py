@@ -529,7 +529,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
 
 
 
-def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynamics, enforce_bounds, IsInCollisionWithObs, traj_opt, step_sz=0.02, num_steps=21, MAX_LENGTH=50):
+def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynamics, enforce_bounds, IsInCollisionWithObs, traj_opt, step_sz=0.02, num_steps=21, MAX_LENGTH=50):
     """
     For each node xt, we record how many explorations have been made from xt. We do planning according to the following rules:
     1. if n_explored >= n_max_explore:
@@ -569,7 +569,7 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
 
     IsInCollision = lambda x: IsInCollisionWithObs(x, new_obs_i)
     # visualization
-    
+
     print('step_sz: %f' % (step_sz))
     params = {}
     params['obs_w'] = 6.
@@ -590,7 +590,7 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
 
     ax_ani = fig.add_subplot(122)
     vis._init(ax_ani)
-
+    
     print(obs)
     def update_line(h, ax, new_data):
         print(h.get_xdata())
@@ -599,7 +599,7 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
         h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
         #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
         #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
-
+    
     def remove_last_k(h, ax, k):
         h.set_data(h.get_xdata()[:-k], h.get_ydata()[:-k])
 
@@ -613,6 +613,7 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
     def animation(states, actions):
         vis._animate(states[-1], ax_ani)
         draw_update_line(ax_ani)
+
     dtheta = 0.1
     feasible_points = []
     infeasible_points = []
@@ -646,13 +647,12 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
 
 
 
-
     env = torch.FloatTensor(env)
     env = to_var(env)
     #explored_nodes = [x0]
 
     xt = x0
-    max_explore = 3
+    max_explore = 20
     xt.n_explored = 0
     xt.cost = 0.
     xw_scat = None
@@ -661,9 +661,11 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
 
     node = x0
     for itr in range(MAX_LENGTH):
+
         if xw_scat is not None:
             xw_scat.remove()
             xw_scat = None
+
         if xt is x0:
             # free the memory of path
             for i in range(1,len(path)):
@@ -698,34 +700,10 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
         for i in range(max_explore):
             # generate the new states using only mpnet and costnet
             xw, x_init, u_init, t_init = informer(env, xt, xG, direction=0)
-
-
-            xt_x = torch.from_numpy(xt.x).type(torch.FloatTensor)
-            xw_x = torch.from_numpy(xw.x).type(torch.FloatTensor)
-            xt_x = normalize_func(xt_x)
-            xw_x = normalize_func(xw_x)
-            if torch.cuda.is_available():
-                xt_x = xt_x.cuda()
-                xw_x = xw_x.cuda()
-            x = torch.cat([xt_x,xw_x], dim=0)
-            if torch.cuda.is_available():
-                x = x.cuda()
-            cost_to_xw = costNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
-            cost_to_xw = cost_to_xw.numpy()[0]
-
-
-            xw_x = torch.from_numpy(xw.x).type(torch.FloatTensor)
-            xG_x = torch.from_numpy(xG.x).type(torch.FloatTensor)
-            xw_x = normalize_func(xw_x)
-            xG_x = normalize_func(xG_x)
-            if torch.cuda.is_available():
-                xw_x = xw_x.cuda()
-                xG_x = xG_x.cuda()
-            x = torch.cat([xw_x,xG_x], dim=0)
-            if torch.cuda.is_available():
-                x = x.cuda()
-            cost_to_goal = costNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
-            cost_to_goal = cost_to_goal.numpy()[0]
+            cost_to_xw = critics(env, xt, xw)
+            cost_to_goal = critics(env, xw, xG)
+            #print('cost_to_xw: %f' % (cost_to_xw))
+            #print('cost_to_goal: %f' % (cost_to_goal))
             tie_breaker += 1
             entry = (-xt.cost-cost_to_xw-cost_to_goal, tie_breaker, xw)
             heapq.heappush(frontier_nodes, entry)
@@ -734,6 +712,7 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
         entry = heapq.heappop(frontier_nodes)
         xw = entry[2]
         x_init, u_init, t_init = init_informer(env, xt, xw, direction=0)
+        t_init = np.linspace(0, critics(env, xt, xw), num_steps)
 
         xw_scat = ax.scatter(xw.x[0], xw.x[1], c='lightgreen')
         draw_update_line(ax)
@@ -746,13 +725,7 @@ def plan(obs, env, x0, xG, data, costNet, informer, init_informer, system, dynam
             xt = x0
             continue
 
-        """
-        # Turnoff explored checking
-        if explored(x_t_1, explored_nodes, system):
-            # based on some defined distance
-            #print('explored')
-            continue
-        """
+
         # if too far...
 
         #for i in range(len(edge.xs)):

@@ -10,7 +10,7 @@ import pickle
 from torch.autograd import Variable
 import math
 import time
-from iterative_plan_and_retreat.plan_general import *
+from iterative_with_cost.plan_general import *
 
 import jax
 from tvlqr.python_lyapunov import *
@@ -18,7 +18,7 @@ from visual.acrobot_vis import *
 #from visual.vis_tools import *
 import matplotlib.pyplot as plt
 
-def eval_tasks(costNet, mpNet1, mpNet2, test_data, folder, filename, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps):
+def eval_tasks(mpNet1, mpNet2, test_data, folder, filename, IsInCollision, normalize_func, unnormalize_func, critics, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps):
     obc, obs, paths, sgs, path_lengths, controls, costs = test_data
     obc = obc.astype(np.float32)
     obc = torch.from_numpy(obc)
@@ -102,7 +102,7 @@ def eval_tasks(costNet, mpNet1, mpNet2, test_data, folder, filename, IsInCollisi
                 path = [start_node, goal_node]
                 #step_sz = DEFAULT_STEP
                 MAX_NEURAL_REPLAN = 21
-                fp = plan(obs[i], obc[i], start_node, goal_node, state, costNet, informer, init_informer, system, dynamics, enforce_bounds, \
+                fp = plan(obs[i], obc[i], start_node, goal_node, state, critics, informer, init_informer, system, dynamics, enforce_bounds, \
                             IsInCollision, traj_opt, step_sz, num_steps)
                 time1 = time.time() - time0
                 time1 -= time_norm
