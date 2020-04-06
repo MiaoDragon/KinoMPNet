@@ -569,7 +569,7 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
 
     IsInCollision = lambda x: IsInCollisionWithObs(x, new_obs_i)
     # visualization
-
+    """
     print('step_sz: %f' % (step_sz))
     params = {}
     params['obs_w'] = 6.
@@ -644,7 +644,7 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
     draw_update_line(ax)
     update_line(hl_back, ax, xG.x)
     draw_update_line(ax)
-
+    """
 
 
     env = torch.FloatTensor(env)
@@ -652,7 +652,7 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
     #explored_nodes = [x0]
 
     xt = x0
-    max_explore = 20
+    max_explore = 10
     xt.n_explored = 0
     xt.cost = 0.
     xw_scat = None
@@ -661,11 +661,11 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
 
     node = x0
     for itr in range(MAX_LENGTH):
-
+        """
         if xw_scat is not None:
             xw_scat.remove()
             xw_scat = None
-
+        """
         if xt is x0:
             # free the memory of path
             for i in range(1,len(path)):
@@ -680,14 +680,14 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
         x_init, u_init, t_init = init_informer(env, xt, xG, direction=0)
         x_G_, edge, valid = pathSteerTo(xt, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                 traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
-
+        """
         if edge is not None:
             xs_to_plot = np.array(edge.xs[::10])
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
             ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='orange')
             draw_update_line(ax)
-
+        """
         if edge is not None and goal_check(x_G_, xG, system):
             print('bingo!')
             fes = True
@@ -700,23 +700,33 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
         for i in range(max_explore):
             # generate the new states using only mpnet and costnet
             xw, x_init, u_init, t_init = informer(env, xt, xG, direction=0)
+            if IsInCollision(xw.x):
+                continue
             cost_to_xw = critics(env, xt, xw)
             cost_to_goal = critics(env, xw, xG)
             #print('cost_to_xw: %f' % (cost_to_xw))
             #print('cost_to_goal: %f' % (cost_to_goal))
             tie_breaker += 1
-            entry = (-xt.cost-cost_to_xw-cost_to_goal, tie_breaker, xw)
+            entry = (xt.cost+cost_to_xw, tie_breaker, xw)
             heapq.heappush(frontier_nodes, entry)
-
-
+            _, edge, valid = pathSteerTo(xt, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+                                    traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
+            if not valid:
+                print('bvp cost: inf')
+            else:
+                print("bvp cost: %f" % (xt.cost+edge.dt))
+            print('neural cost: %f' % (xt.cost+cost_to_xw))
+        #print(frontier_nodes)
         entry = heapq.heappop(frontier_nodes)
+        #print('poped cost:')
+        #print(entry[0])
         xw = entry[2]
         x_init, u_init, t_init = init_informer(env, xt, xw, direction=0)
         t_init = np.linspace(0, critics(env, xt, xw), num_steps)
-
+        """
         xw_scat = ax.scatter(xw.x[0], xw.x[1], c='lightgreen')
         draw_update_line(ax)
-
+        """
         x_t_1, edge, valid = pathSteerTo(xt, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
                                 traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
         #print('n_explored: %d' % (xt.n_explored))
@@ -730,14 +740,14 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
 
         #for i in range(len(edge.xs)):
         #    update_line(hl_for, ax, edge.xs[i])
-
+        """
         xs_to_plot = np.array(edge.xs[::5])
         for i in range(len(xs_to_plot)):
             xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
         ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='g')
         draw_update_line(ax)
         animation(edge.xs, edge.us)
-
+        """
         # establish connections to x_t+1
         xt.next = x_t_1
         xt.edge = edge

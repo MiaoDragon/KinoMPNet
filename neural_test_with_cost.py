@@ -318,7 +318,7 @@ def main(args):
     mlp = mlp_acrobot.MLP6
     costNet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, 1,
                    cae, mlp)
-    model_path='cost_kmpnet_epoch_400_direction_0_step_20.pkl'
+    model_path='cost_kmpnet_epoch_300_direction_0_step_20.pkl'
     model_folder = '/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/cost_acrobot_obs_8_lr0.010000_SGD_step_20/'
     if args.start_epoch > 0:
         load_net_state(costNet, os.path.join(model_folder, model_path))
@@ -339,11 +339,27 @@ def main(args):
             costNet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
     if args.start_epoch > 0:
         load_opt_state(costNet, os.path.join(model_folder, model_path))
-
+    costNet.eval()
 
 
     # define informer
     circular = system.is_circular_topology()
+    
+    def critics(env, x0, xG):
+        x0_x = torch.from_numpy(x0.x).type(torch.FloatTensor)
+        xG_x = torch.from_numpy(xG.x).type(torch.FloatTensor)
+        x0_x = normalize_func(x0_x)
+        xG_x = normalize_func(xG_x)
+        if torch.cuda.is_available():
+            x0_x = x0_x.cuda()
+            xG_x = xG_x.cuda()
+        x = torch.cat([x0_x,xG_x], dim=0)
+        if torch.cuda.is_available():
+            x = x.cuda()
+        cost = costNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
+        cost = cost.numpy()[0][0]
+        return cost
+    
     def informer(env, x0, xG, direction):
         x0_x = torch.from_numpy(x0.x).type(torch.FloatTensor)
         xG_x = torch.from_numpy(xG.x).type(torch.FloatTensor)
@@ -534,14 +550,14 @@ def main(args):
         # seen
         if args.seen_N > 0:
             time_file = os.path.join(args.model_path,'time_seen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(costNet, mpNet0, mpNet1, seen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, seen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, critics, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             seen_test_suc_rate += fes_path.sum() / valid_path.sum()
         # unseen
         if args.unseen_N > 0:
             time_file = os.path.join(args.model_path,'time_unseen_epoch_%d_mlp.p' % (args.start_epoch))
-            fes_path_, valid_path_ = eval_tasks(costNet, mpNet0, mpNet1, unseen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
+            fes_path_, valid_path_ = eval_tasks(mpNet0, mpNet1, unseen_test_data, args.model_path, time_file, IsInCollision, normalize_func, unnormalize_func, critics, informer, init_informer, system, dynamics, xdot, jax_dynamics, enforce_bounds, traj_opt, step_sz, num_steps)
             valid_path = valid_path_.flatten()
             fes_path = fes_path_.flatten()   # notice different environments are involved
             unseen_test_suc_rate += fes_path.sum() / valid_path.sum()
