@@ -19,7 +19,7 @@ from torch.autograd import Variable
 import torch
 import torch.nn as nn
 from sparse_rrt import _sst_module
-
+import os
 
 class Encoder_acrobot(nn.Module):
     # ref: https://github.com/lxxue/voxnet-pytorch/blob/master/models/voxnet.py
@@ -48,7 +48,8 @@ class Encoder_acrobot(nn.Module):
     @torch.jit.script_method
     def forward(self, x):
         x = self.encoder(x)
-        x = x.view(x.size(0), -1)
+        #x = x.view(x.size(0), -1)
+        x = torch.flatten(x, 1)
         x = self.head(x)
         return x
 
@@ -81,29 +82,12 @@ class Encoder_acrobot_Annotated(torch.jit.ScriptModule):
     @torch.jit.script_method
     def forward(self, x):
         x = self.encoder(x)
-        x = x.view(x.size(0), -1)
+        #x = x.view(x.size(0), -1)
+        x = torch.flatten(x, 1)
         x = self.head(x)
         return x
 
-
-class MLP(nn.Module):
-    def __init__(self, input_size, output_size):
-        super(MLP, self).__init__()
-        self.fc = nn.Sequential(
-                    nn.Linear(input_size, 2048), nn.PReLU(), nn.Dropout(),
-                    nn.Linear(2048, 1024), nn.PReLU(), nn.Dropout(),
-                    nn.Linear(1024, 896), nn.PReLU(), nn.Dropout(),
-                    nn.Linear(896, 512), nn.PReLU(), nn.Dropout(),
-                    nn.Linear(512, 256), nn.PReLU(), nn.Dropout(),
-                    nn.Linear(256, 128), nn.PReLU(), nn.Dropout(),
-                    nn.Linear(128, 32), nn.PReLU(),
-                    nn.Linear(32, output_size))
-
-    def forward(self, x):
-        out = self.fc(x)
-        return out
-
-class mlp_acrobot(nn.Module):
+class MLP_acrobot(nn.Module):
     def __init__(self, input_size, output_size):
         super(MLP_acrobot, self).__init__()
         self.fc1 = nn.Sequential(nn.Linear(input_size, 2048), nn.PReLU())
@@ -114,7 +98,6 @@ class mlp_acrobot(nn.Module):
         self.fc6 = nn.Sequential(nn.Linear(256, 128), nn.PReLU())
         self.fc7 = nn.Sequential(nn.Linear(128, 32), nn.PReLU())
         self.fc8 = nn.Linear(32, output_size)
-
     def forward(self, x):
         x = self.fc1(x)
         x = self.fc2(x)
@@ -128,7 +111,7 @@ class mlp_acrobot(nn.Module):
 
 
 class MLP_acrobot_Annotated(torch.jit.ScriptModule):
-    __constants__ = ['fc1','fc2','fc3','fc4','fc5','fc6','device']
+    __constants__ = ['fc1','fc2','fc3','fc4','fc5','fc6','fc7', 'device']
     def __init__(self, input_size, output_size):
         super(MLP_acrobot_Annotated, self).__init__()
         self.fc1 = nn.Sequential(nn.Linear(input_size, 2048), nn.PReLU())
@@ -139,7 +122,7 @@ class MLP_acrobot_Annotated(torch.jit.ScriptModule):
         self.fc6 = nn.Sequential(nn.Linear(256, 128), nn.PReLU())
         self.fc7 = nn.Sequential(nn.Linear(128, 32), nn.PReLU())
         self.fc8 = nn.Linear(32, output_size)
-
+        
         self.device = torch.device('cuda')
     @torch.jit.script_method
     def forward(self, x):
@@ -218,8 +201,6 @@ def copyMLP(MLP_to_copy, mlp_weights):
 def main(args):
     # Set this value to export models for continual learning or batch training
 
-    load_dataset = data_loader_home.load_dataset
-
     system = _sst_module.PSOPTAcrobot()
     #dynamics = acrobot_obs.dynamics
     dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
@@ -232,10 +213,10 @@ def main(args):
     CAE = CAE_acrobot_voxel_2d
     # make the big model
     mpNet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
-                   cae, mlp)
+                   CAE, mlp)
     # The model that performed well originally, load into the big end2end model
     model_dir = args.model_dir
-    model_dir = model_dir+"acrobot_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
+    model_dir = model_dir+"acrobot_obs_lr%f_%s/" % (args.learning_rate, args.opt)
     model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
     load_net_state(mpNet, os.path.join(model_dir, model_path))
 
@@ -255,7 +236,7 @@ def main(args):
     # do everything for the MLP on the GPU
     device = torch.device('cuda:%d'%(args.device))
 
-    encoder = Encoder_acrobot_Annotated()
+    encoder = Encoder_acrobot_Annotated(args.AE_input_size, args.mlp_input_size-args.total_input_size)
     encoder.cuda()
     #encoder.cuda()
     # Create the annotated model
@@ -332,8 +313,8 @@ parser.add_argument('--num_steps', type=int, default=20)
 # Model parameters
 parser.add_argument('--total_input_size', type=int, default=8, help='dimension of total input')
 parser.add_argument('--AE_input_size', type=int, default=32, help='dimension of input to AE')
-parser.add_argument('--mlp_input_size', type=int , default=136, help='dimension of the input vector')
-parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
+parser.add_argument('--mlp_input_size', type=int, default=136, help='dimension of the input vector')
+parser.add_argument('--output_size', type=int, default=4, help='dimension of the input vector')
 
 parser.add_argument('--learning_rate', type=float, default=0.01)
 parser.add_argument('--device', type=int, default=0, help='cuda device')
