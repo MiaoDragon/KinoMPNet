@@ -262,8 +262,8 @@ def main(args):
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    mlp_path = 'acrobot_mlp_annotated_test_gpu.pt'
-    encoder_path = 'acrobot_encoder_annotated_test_cpu.pt'
+    mlp_path = os.path.join(os.getcwd(),'acrobot_mlp_annotated_test_gpu.pt')
+    encoder_path = os.path.join(os.getcwd(),'acrobot_encoder_annotated_test_cpu.pt')
 
     #####################################################
     def plan_one_path(obs, obc, start_state, goal_state, max_iteration, out_queue):
