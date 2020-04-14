@@ -204,7 +204,7 @@ def main(args):
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
-
+        obs_width = 6.0
     elif args.env_type == 'acrobot_obs_6':
         IsInCollision =acrobot_obs.IsInCollision
         normalize = acrobot_obs.normalize
@@ -227,7 +227,7 @@ def main(args):
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
-
+        obs_width = 6.0
 
     elif args.env_type == 'acrobot_obs_8':
         IsInCollision =acrobot_obs.IsInCollision
@@ -256,10 +256,31 @@ def main(args):
         #    xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=lambda x: False, system=system, step_sz=step_sz)
         #    return xs, us, dts
         #traj_opt = cem_trajopt
+        obs_width = 6.0
         goal_S0 = np.diag([1.,1.,0,0])
         goal_rho0 = 1.0
 
 
+
+    if args.env_type == 'pendulum':
+        step_sz = 0.002
+        num_steps = 20
+
+    elif args.env_type == 'cartpole_obs':
+        #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+        step_sz = 0.002
+        num_steps = 20
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
+        #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
+        obs_width = 6.0
+        step_sz = 0.02
+        num_steps = 21
+        goal_radius=2.0
+        random_seed=0
+        delta_near=1.0
+        delta_drain=0.5
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
