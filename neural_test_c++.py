@@ -16,6 +16,8 @@ import sys
 sys.path.append('deps/sparse_rrt')
 sys.path.append('.')
 from sparse_rrt import _sst_module
+from sparse_rrt.systems import standard_cpp_systems
+
 import model.AE.identity as cae_identity
 from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
 from model import mlp, mlp_acrobot
