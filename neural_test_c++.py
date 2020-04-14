@@ -362,16 +362,17 @@ def main(args):
         obs_i = obs[i]
         for k in range(len(obs_i)):
             obs_pt = []
-            obs_pt.append(obs[k][0]-obs_width/2)
-            obs_pt.append(obs[k][1]-obs_width/2)
-            obs_pt.append(obs[k][0]-obs_width/2)
-            obs_pt.append(obs[k][1]+obs_width/2)
-            obs_pt.append(obs[k][0]+obs_width/2)
-            obs_pt.append(obs[k][1]+obs_width/2)
-            obs_pt.append(obs[k][0]+obs_width/2)
-            obs_pt.append(obs[k][1]-obs_width/2)
+            obs_pt.append(obs_i[k][0]-obs_width/2)
+            obs_pt.append(obs_i[k][1]-obs_width/2)
+            obs_pt.append(obs_i[k][0]-obs_width/2)
+            obs_pt.append(obs_i[k][1]+obs_width/2)
+            obs_pt.append(obs_i[k][0]+obs_width/2)
+            obs_pt.append(obs_i[k][1]+obs_width/2)
+            obs_pt.append(obs_i[k][0]+obs_width/2)
+            obs_pt.append(obs_i[k][1]-obs_width/2)
             new_obs_i.append(obs_pt)
         obs_i = new_obs_i
+        print(obs_i)
         for j in range(len(paths[i])):
             start_state = sgs[i][j][0]
             goal_state = sgs[i][j][1]
