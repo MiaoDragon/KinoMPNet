@@ -326,6 +326,7 @@ def main(args):
                                 max_iteration, goal_radius, propagate_system.distance_computer(), \
                                 delta_near, delta_drain)
         plan_time = time.time() - time0
+        print('plan time: %fs' % (plan_time))
         if len(res_x) == 0:
             print('failed.')
             out_queue.put(0)
