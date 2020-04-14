@@ -375,7 +375,7 @@ def main(args):
         for j in range(len(paths[i])):
             start_state = sgs[i][j][0]
             goal_state = sgs[i][j][1]
-            p = Process(target=plan_one_path, args=(obs, obc, start_state, goal_state, 500, queue))
+            p = Process(target=plan_one_path, args=(obs_i, obc[i], start_state, goal_state, 500, queue))
             p.start()
             p.join()
             res = queue.get()
