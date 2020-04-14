@@ -319,7 +319,7 @@ def main(args):
             delta_near=1.0
             delta_drain=0.5
 
-        planner = _sst_module.DeepSMPWrapper(mlp_path, encoder_path, propagate_system, psopt_system)
+        planner = _sst_module.DeepSMPWrapper(mlp_path, encoder_path, max_iteration, num_steps, step_sz, propagate_system, psopt_system)
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
         res_x, res_u, res_t = planner.plan("sst", obs, start_state, goal_state, \
