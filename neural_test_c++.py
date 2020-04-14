@@ -37,6 +37,7 @@ from tools.utility import *
 from plan_utility import pendulum, acrobot_obs
 #from sparse_rrt.systems import standard_cpp_systems
 #from sparse_rrt import _sst_module
+from multiprocessing import Process, Queue
 
 from iterative_plan_and_retreat.data_structure import *
 from iterative_plan_and_retreat.plan_general import propagate
