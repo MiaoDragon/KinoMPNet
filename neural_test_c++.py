@@ -322,6 +322,8 @@ def main(args):
         planner = _sst_module.DeepSMPWrapper(mlp_path, encoder_path, max_iteration, num_steps, step_sz, propagate_system, psopt_system)
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
+        print('obs:')
+        print(obs)
         res_x, res_u, res_t = planner.plan("sst", obs, start_state, goal_state, \
                                 max_iteration, goal_radius, propagate_system.distance_computer(), \
                                 delta_near, delta_drain)
@@ -373,7 +375,7 @@ def main(args):
             obs_pt.append(obs_i[k][1]-obs_width/2)
             new_obs_i.append(obs_pt)
         obs_i = new_obs_i
-        print(obs_i)
+        #print(obs_i)
         for j in range(len(paths[i])):
             start_state = sgs[i][j][0]
             goal_state = sgs[i][j][1]
