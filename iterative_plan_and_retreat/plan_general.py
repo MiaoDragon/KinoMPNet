@@ -818,8 +818,8 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
         goal_state=xG.x,
         goal_radius=2.,
         random_seed=0,
-        sst_delta_near=1.5,
-        sst_delta_drain=1.
+        sst_delta_near=0.2,
+        sst_delta_drain=0.1
     )
 
 
@@ -921,12 +921,15 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
     #explored_nodes = [x0]
 
     xt = x0
+    xt.cost = 0.
     fes = False
 
     for itr in range(MAX_LENGTH):
         # pop nodes from frontier_nodes
         if xt is None:
             xt = x0
+        print('start state:')
+        print(xt.x)
         # try connecting to goal every now and then
         x_init, u_init, t_init = init_informer(env, xt, xG, direction=0)
         x_G_, edge, valid = pathSteerTo(xt, xG, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
@@ -937,17 +940,20 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             xs_to_plot[i] = wrap_angle(xs_to_plot[i], system)
         ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='orange')
         draw_update_line(ax)
-
-        if edge is not None and goal_check(x_G_, xG, system):
-            print('bingo!')
-            fes = True
-            break
+        
         if edge is not None:
+            # check goal for each node
+            for i in range(len(edge.xs)):
+                if goal_check(Node(wrap_angle(edge.xs[i], system)), xG, system):
+                    print('bingo')
+                    return 1                             
+            
             xt.edge = None
             xt.next = None
 
 
-        xs, us, dts = planner.step_bvp(propagate_system, system, xt.x, x_init[-1], 400, num_steps, step_sz, x_init, u_init, t_init)
+        
+        xs, us, dts = planner.step_bvp(propagate_system, system, xt.x, x_init[-1], 200, num_steps, step_sz, x_init, u_init, t_init)
 
         if len(us) != 0:
             #xs_to_plot = np.array(edge.xs[::10])
@@ -974,8 +980,10 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
             start.edge = edge
             start.next = goal
             goal.prev = start
-            goal.n_explored = 0
-            goal.cost = xt.cost + xt.edge.dt
+            #goal.n_explored = 0
+            #goal.cost = xt.cost + xt.edge.dt
+
+            """
             # push to frontier
             tie_breaker += 1
             entry = (goal.cost+h_cost(goal,xG,system), tie_breaker, goal)
@@ -986,19 +994,19 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
                 fes = True
                 break
 
-
-
+            """
 
         xw, x_init, u_init, t_init = informer(env, xt, xG, direction=0)
 
         xw_scat = ax.scatter(xw.x[0], xw.x[1], c='lightgreen')
         draw_update_line(ax)
 
-        xs, us, dts = planner.step_bvp(propagate_system, system, xt.x, xw.x, 400, num_steps, step_sz, x_init, u_init, t_init)
+        xs, us, dts = planner.step_bvp(propagate_system, system, xt.x, xw.x, 200, num_steps, step_sz, x_init, u_init, t_init)
         #print('xs:')
         #print(xs)
         # stop at the last node that is not in collision
         if len(us) == 0:
+            print('step_bvp failed')
             # the same node, it hasn't changed
             xt = None
             continue
