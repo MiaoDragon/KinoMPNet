@@ -107,7 +107,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0

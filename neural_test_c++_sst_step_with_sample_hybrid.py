@@ -93,6 +93,28 @@ def IsInCollision(x, obc, obc_width=6.):
                 return True
     return False
 
+def enforce_bounds(state):
+    STATE_THETA_1, STATE_THETA_2, STATE_V_1, STATE_V_2 = 0, 1, 2, 3
+    MIN_V_1, MAX_V_1 = -6., 6.
+    MIN_V_2, MAX_V_2 = -6., 6.
+    MIN_TORQUE, MAX_TORQUE = -4., 4.
+
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    state = np.array(state)
+    if state[0] < -np.pi:
+        state[0] += 2*np.pi
+    elif state[0] > np.pi:
+        state[0] -= 2 * np.pi
+    if state[1] < -np.pi:
+        state[1] += 2*np.pi
+    elif state[1] > np.pi:
+        state[1] -= 2 * np.pi
+
+    state[2:] = np.clip(
+        state[2:],
+        [MIN_V_1, MIN_V_2],
+        [MAX_V_1, MAX_V_2])
+    return state
 
 
 def main(args):
@@ -122,7 +144,7 @@ def main(args):
         obc_file = None
         dynamics = cartpole.dynamics
         jax_dynamics = cartpole.jax_dynamics
-        enforce_bounds = cartpole.enforce_bounds
+        #enforce_bounds = cartpole.enforce_bounds
         cae = CAE_acrobot_voxel_2d
         mlp = mlp_acrobot.MLP
         obs_f = True
@@ -269,7 +291,7 @@ def main(args):
     print('mlp_path:')
     print(mlp_path)
     #####################################################
-    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, max_iteration, out_queue):
+    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue):
         if args.env_type == 'pendulum':
             system = standard_cpp_systems.PSOPTPendulum()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
@@ -295,32 +317,21 @@ def main(args):
             #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
             step_sz = 0.02
             num_steps = 21
-            goal_radius=10.0
+            goal_radius=2.0
             random_seed=0
             delta_near=1.0
             delta_drain=0.5
         #print('creating planner...')
-        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 10, num_steps, step_sz, propagate_system)
+        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 200, num_steps, step_sz, propagate_system)
+        #cost_threshold = cost_i * 1.1
+        cost_threshold = 100000000.
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
-        #print('obc:')
-        #print(obc.shape)
-        #print(delta_near)
-        #print(delta_drain)
-        #print('start_state:')
-        #print(start_state)
-        #print('goal_state:')
-        #print(goal_state)
-        res_x, res_u, res_t = planner.plan("sst", args.plan_type, propagate_system, psopt_system, obc.flatten(), start_state, goal_inform_state, goal_inform_state, \
+        res_x, res_u, res_t = planner.plan_tree_SMP_hybrid("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_inform_state, goal_inform_state, \
                                 goal_radius, max_iteration, distance_computer, \
-                                delta_near, delta_drain)
-
-        #res_x, res_u, res_t = planner.plan("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_state, goal_inform_state, \
-        #                        goal_radius, max_iteration, propagate_system.distance_computer(), \
-        #                        delta_near, delta_drain)
+                                delta_near, delta_drain, cost_threshold)
         plan_time = time.time() - time0
-        
-        
+
         """
         # visualization
         plt.ion()
@@ -336,7 +347,7 @@ def main(args):
         hl_for_mpnet, = ax.plot([], [], 'lightgreen')
         hl_back_mpnet, = ax.plot([], [], 'salmon')
 
-        print(obs)
+        #print(obs)
         def update_line(h, ax, new_data):
             new_data = wrap_angle(new_data, propagate_system)
             h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
@@ -385,35 +396,117 @@ def main(args):
         print(infeasible_points)
         ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
         ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
-
-        if len(res_x) != 0:
-            xs_to_plot = np.array(res_x)
+        #for i in range(len(data)):
+        #    update_line(hl, ax, data[i])
+        draw_update_line(ax)
+        #state_t = start_state
+                
+        if len(res_u):
+            # propagate data
+            p_start = res_x[0]
+            detail_paths = [p_start]
+            detail_controls = []
+            detail_costs = []
+            state = [p_start]
+            control = []
+            cost = []
+            for k in range(len(res_u)):
+                #state_i.append(len(detail_paths)-1)
+                max_steps = int(res_t[k]/step_sz)
+                accum_cost = 0.
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][k])
+                # modify it because of small difference between data and actual propagation
+                p_start = res_x[k]
+                state[-1] = res_x[k]
+                for step in range(1,max_steps+1):
+                    p_start = dynamics(p_start, res_u[k], step_sz)
+                    p_start = enforce_bounds(p_start)
+                    detail_paths.append(p_start)
+                    accum_cost += step_sz
+                    if (step % 1 == 0) or (step == max_steps):
+                        state.append(p_start)
+                        #print('control')
+                        #print(controls[i][j])
+                        cost.append(accum_cost)
+                        accum_cost = 0.
+            #print('p_start:')
+            #print(p_start)
+            #print('data:')
+            #print(paths[i][j][-1])
+            state[-1] = res_x[-1]
+            
+            
+            
+            xs_to_plot = np.array(state)
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], propagate_system)
-            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='orange')
-            print('solution: x')
-            print(res_x)
-            print('solution: u')
-            print(res_u)
-            print('solution: t')
-            print(res_t)
+                if IsInCollision(xs_to_plot[i], obs_i):
+                    print('in collision')
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
             # draw start and goal
-            ax.scatter(start_state[0], goal_state[0], marker='X')
+            #ax.scatter(start_state[0], goal_state[0], marker='X')
             draw_update_line(ax)
             plt.waitforbuttonpress()
-
-        
+        """
         
         #im = planner.visualize_nodes(propagate_system)
         #sec = input('Let us wait for user input')
         #show_image_opencv(im, "planning_tree", wait=True)
-        """
+        
+        # validate if the path contains collision
+        if len(res_u):
+            # propagate data
+            p_start = res_x[0]
+            detail_paths = [p_start]
+            detail_controls = []
+            detail_costs = []
+            state = [p_start]
+            control = []
+            cost = []
+            for k in range(len(res_u)):
+                #state_i.append(len(detail_paths)-1)
+                max_steps = int(res_t[k]/step_sz)
+                accum_cost = 0.
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][k])
+                # modify it because of small difference between data and actual propagation
+                p_start = res_x[k]
+                state[-1] = res_x[k]
+                for step in range(1,max_steps+1):
+                    p_start = dynamics(p_start, res_u[k], step_sz)
+                    p_start = enforce_bounds(p_start)
+                    detail_paths.append(p_start)
+                    accum_cost += step_sz
+                    if (step % 1 == 0) or (step == max_steps):
+                        state.append(p_start)
+                        #print('control')
+                        #print(controls[i][j])
+                        cost.append(accum_cost)
+                        accum_cost = 0.
+                        # check collision for the new state
+                        assert not IsInCollision(p_start, obs_i)
+                        
+            #print('p_start:')
+            #print(p_start)
+            #print('data:')
+            #print(paths[i][j][-1])
+            state[-1] = res_x[-1]
+        # validation end
+        
         print('plan time: %fs' % (plan_time))
         if len(res_x) == 0:
             print('failed.')
             out_queue.put(-1)
         else:
             print('path succeeded.')
+            print('cost: %f' % (np.sum(res_t)))
+            print('cost_threshold: %f' % (cost_threshold))
+            print('data cost: %f' % (cost_i))
             out_queue.put(plan_time)
     ####################################################################################
 
@@ -466,10 +559,11 @@ def main(args):
             start_state = sgs[i][j][0]
             goal_inform_state = paths[i][j][-1]
             goal_state = sgs[i][j][1]
+            cost_i = costs[i][j].sum()
+            #cost_i = 100000000.
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, 1000, queue))
-            #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, 500, queue)
+            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue))
+            #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
             p.start()
             p.join()
             res = queue.get()
