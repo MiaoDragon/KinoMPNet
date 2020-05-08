@@ -320,7 +320,7 @@ def main(args):
             goal_radius=2
             random_seed=0
             delta_near=1.0
-            delta_drain=0.2
+            delta_drain=0.5
         #print('creating planner...')
         planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 20, num_steps, step_sz, propagate_system)
         # generate a path by using SST to plan for some maximal iterations

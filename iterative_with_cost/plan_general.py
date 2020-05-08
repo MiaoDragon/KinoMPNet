@@ -15,7 +15,7 @@ from torch.autograd import Variable
 import time
 import heapq
 from sparse_rrt import _sst_module
-
+import random
 
 def to_var(x, volatile=False):
     if torch.cuda.is_available():
@@ -529,7 +529,7 @@ def plan(obs, env, x0, xG, data, informer, init_informer, system, dynamics, enfo
 
 
 
-def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynamics, enforce_bounds, IsInCollisionWithObs, traj_opt, step_sz=0.02, num_steps=21, MAX_LENGTH=50):
+def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynamics, enforce_bounds, IsInCollisionWithObs, traj_opt, step_sz=0.02, num_steps=21, MAX_LENGTH=500):
     """
     For each node xt, we record how many explorations have been made from xt. We do planning according to the following rules:
     1. if n_explored >= n_max_explore:
@@ -620,7 +620,7 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
     goal_region = []
     imin = 0
     imax = int(2*np.pi/dtheta)
-
+    
 
     for i in range(imin, imax):
         for j in range(imin, imax):
@@ -652,7 +652,7 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
     #explored_nodes = [x0]
 
     xt = x0
-    max_explore = 10
+    max_explore = 100
     xt.n_explored = 0
     xt.cost = 0.
     xw_scat = None
@@ -704,22 +704,30 @@ def plan(obs, env, x0, xG, data, critics, informer, init_informer, system, dynam
                 continue
             cost_to_xw = critics(env, xt, xw)
             cost_to_goal = critics(env, xw, xG)
+            cost_xt_to_goal = critics(env, xt, xG)
             #print('cost_to_xw: %f' % (cost_to_xw))
-            #print('cost_to_goal: %f' % (cost_to_goal))
+            #print('cost_to_goal: %f' % (cost_xt_to_goal))
             tie_breaker += 1
-            entry = (xt.cost+cost_to_xw, tie_breaker, xw)
+            #entry = (xt.cost+cost_to_xw+cost_to_goal, tie_breaker, xw)
+            entry = (xt.cost+cost_xt_to_goal, tie_breaker, xw)
             heapq.heappush(frontier_nodes, entry)
-            _, edge, valid = pathSteerTo(xt, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
-                                    traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
-            if not valid:
-                print('bvp cost: inf')
-            else:
-                print("bvp cost: %f" % (xt.cost+edge.dt))
-            print('neural cost: %f' % (xt.cost+cost_to_xw))
+            #_, edge, valid = pathSteerTo(xt, xw, x_init, u_init, t_init, dynamics, enforce_bounds, IsInCollision, \
+            #                        traj_opt, step_sz=step_sz, num_steps=num_steps, system=system, direction=0, propagating=True)
+            #if not valid:
+            #    print('bvp cost: inf')
+            #else:
+            #    print("bvp cost: %f" % (xt.cost+edge.dt))
+            #print('neural cost: %f' % (xt.cost+cost_to_xw))
         #print(frontier_nodes)
         entry = heapq.heappop(frontier_nodes)
         #print('poped cost:')
         #print(entry[0])
+        
+        # select 20% top nodes and sample
+        entires = heapq.nsmallest(int(0.15*max_explore), frontier_nodes)
+        # randomly sample one
+        #print('sampled: ', random.sample(entires,1))
+        entry = random.sample(entires, 1)[0]
         xw = entry[2]
         x_init, u_init, t_init = init_informer(env, xt, xw, direction=0)
         t_init = np.linspace(0, critics(env, xt, xw), num_steps)

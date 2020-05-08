@@ -25,10 +25,10 @@ import sparse_rrt.planners as vis_planners
 from sparse_rrt.systems import standard_cpp_systems
 from sparse_rrt.visualization import show_image_opencv
 #import model.AE.identity as cae_identity
-from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
-from model import mlp, mlp_acrobot
-from model.mlp import MLP
-from model.mpnet import KMPNet
+#from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
+#from model import mlp, mlp_acrobot
+#from model.mlp import MLP
+#from model.mpnet import KMPNet
 import numpy as np
 import argparse
 import os
@@ -36,13 +36,13 @@ import os
 
 #from gem_eval_original_mpnet import eval_tasks
 #from iterative_plan_and_retreat.gem_eval import eval_tasks
-from torch.autograd import Variable
+#from torch.autograd import Variable
 import copy
 import os
 import gc
 import random
-from tools.utility import *
-from plan_utility import pendulum, acrobot_obs
+#from tools.utility import *
+#from plan_utility import pendulum, acrobot_obs
 #from sparse_rrt.systems import standard_cpp_systems
 #from sparse_rrt import _sst_module
 from multiprocessing import Process, Queue
@@ -118,8 +118,6 @@ def enforce_bounds(state):
 
 
 def main(args):
-    
-    
     # set seed
     print(args.model_path)
     torch_seed = np.random.randint(low=0, high=1000)
@@ -128,26 +126,31 @@ def main(args):
     #torch.manual_seed(torch_seed)
     np.random.seed(np_seed)
     random.seed(py_seed)
-    
-    
-    # load MPNet
-    print(args.model_path)
-    torch_seed = np.random.randint(low=0, high=1000)
-    np_seed = np.random.randint(low=0, high=1000)
-    py_seed = np.random.randint(low=0, high=1000)
-    torch.manual_seed(torch_seed)
-    np.random.seed(np_seed)
-    random.seed(py_seed)
-    # Build the models
-    if torch.cuda.is_available():
-        torch.cuda.set_device(args.device)
-        
     # Build the models
     #if torch.cuda.is_available():
     #    torch.cuda.set_device(args.device)
 
     # setup evaluation function and load function
-    if args.env_type == 'acrobot_obs':
+    if args.env_type == 'pendulum':
+        obs_file = None
+        obc_file = None
+        obs_f = False
+        #system = standard_cpp_systems.PSOPTPendulum()
+        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
+    elif args.env_type == 'cartpole_obs':
+        normalize = cartpole.normalize
+        unnormalize = cartpole.unnormalize
+        obs_file = None
+        obc_file = None
+        dynamics = cartpole.dynamics
+        jax_dynamics = cartpole.jax_dynamics
+        #enforce_bounds = cartpole.enforce_bounds
+        cae = CAE_acrobot_voxel_2d
+        mlp = mlp_acrobot.MLP
+        obs_f = True
+        #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
+        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+    elif args.env_type == 'acrobot_obs':
         obs_file = None
         obc_file = None
         system = _sst_module.PSOPTAcrobot()
@@ -163,117 +166,115 @@ def main(args):
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
 
-        
-        
-        #IsInCollision = lambda x, obs: False
-        normalize = acrobot_obs.normalize
-        unnormalize = acrobot_obs.unnormalize
+    elif args.env_type == 'acrobot_obs_2':
         obs_file = None
         obc_file = None
         system = _sst_module.PSOPTAcrobot()
-        xdot = acrobot_obs.dynamics
-        jax_dynamics = acrobot_obs.jax_dynamics
-        cae = CAE_acrobot_voxel_2d
-        mlp = mlp_acrobot.MLP
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         obs_f = True
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 50, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
 
-    mpNet0 = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
-                   cae, mlp)
-    mpNet1 = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
-                   cae, mlp)
-
-    # load previously trained model if start epoch > 0
-    #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    model_path='kmpnet_epoch_%d_direction_0.pkl' %(args.start_epoch)
-    if args.start_epoch > 0:
-        load_net_state(mpNet0, os.path.join(args.model_path, model_path))
-        torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
-        # set seed after loading
-        torch.manual_seed(torch_seed)
-        np.random.seed(np_seed)
-        random.seed(py_seed)
-    if torch.cuda.is_available():
-        mpNet0.cuda()
-        mpNet0.mlp.cuda()
-        mpNet0.encoder.cuda()
-        if args.opt == 'Adagrad':
-            mpNet0.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
-        elif args.opt == 'Adam':
-            mpNet0.set_opt(torch.optim.Adam, lr=args.learning_rate)
-        elif args.opt == 'SGD':
-            mpNet0.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
-    if args.start_epoch > 0:
-        load_opt_state(mpNet0, os.path.join(args.model_path, model_path))
+    elif args.env_type == 'acrobot_obs_3':
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        obs_f = True
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        num_steps = 21
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
 
 
-    # define informer
-    circular = system.is_circular_topology()
-    def informer(env, x0, xG, direction=0):
-        x0_x = torch.from_numpy(x0.x).type(torch.FloatTensor)
-        xG_x = torch.from_numpy(xG.x).type(torch.FloatTensor)
-        x0_x = normalize_func(x0_x)
-        xG_x = normalize_func(xG_x)
-        if torch.cuda.is_available():
-            x0_x = x0_x.cuda()
-            xG_x = xG_x.cuda()
+    elif args.env_type == 'acrobot_obs_5':
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        obs_f = True
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        num_steps = 21
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type == 'acrobot_obs_6':
+        obs_file = None
+        obc_file = None
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        obs_f = True
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        num_steps = 21
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+        obs_width = 6.0
+    elif args.env_type == 'acrobot_obs_6':
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        obs_f = True
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        num_steps = 21
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+        obs_width = 6.0
 
-        x = torch.cat([x0_x,xG_x], dim=0)
-        mpNet = mpNet0
-        if torch.cuda.is_available():
-            x = x.cuda()
-        next_state = mpNet(x.unsqueeze(0), env.unsqueeze(0)).cpu().data
-        next_state = unnormalize_func(next_state).numpy()[0]
-        delta_x = next_state - x0.x
-        # can be either clockwise or counterclockwise, take shorter one
-        for i in range(len(delta_x)):
-            if circular[i]:
-                delta_x[i] = delta_x[i] - np.floor(delta_x[i] / (2*np.pi))*(2*np.pi)
-                if delta_x[i] > np.pi:
-                    delta_x[i] = delta_x[i] - 2*np.pi
-                # randomly pick either direction
-                rand_d = np.random.randint(2)
-                if rand_d < 1 and np.abs(delta_x[i]) >= np.pi*0.5:
-                    if delta_x[i] > 0.:
-                        delta_x[i] = delta_x[i] - 2*np.pi
-                    if delta_x[i] <= 0.:
-                        delta_x[i] = delta_x[i] + 2*np.pi
+    elif args.env_type == 'acrobot_obs_8':
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        obs_f = True
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        #num_steps = 21
+        num_steps = 21#args.num_steps*2
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
+        #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
+        #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        #    xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=lambda x: False, system=system, step_sz=step_sz)
+        #    return xs, us, dts
+        #traj_opt = cem_trajopt
+        obs_width = 6.0
+        goal_S0 = np.diag([1.,1.,0,0])
+        goal_rho0 = 1.0
 
-        res = x0.x + delta_x
-        cov = np.diag([0.02,0.02,0.02,0.02])
-        #mean = next_state
-        #next_state = np.random.multivariate_normal(mean=next_state,cov=cov)
-        mean = np.zeros(next_state.shape)
-        rand_x_init = np.random.multivariate_normal(mean=mean, cov=cov, size=num_steps)
-        rand_x_init[0] = rand_x_init[0]*0.
-        rand_x_init[-1] = rand_x_init[-1]*0.
 
-        x_init = np.linspace(x0.x, x0.x+delta_x, num_steps) + rand_x_init
-        ## TODO: : change this to general case
-        u_init_i = np.random.uniform(low=[-4.], high=[4], size=(num_steps,1))
-        u_init = u_init_i
-        #u_init_i = control[max_d_i]
-        cost_i = (num_steps-1)*step_sz  #TOEDIT
-        #u_init = np.repeat(u_init_i, num_steps, axis=0).reshape(-1,len(u_init_i))
-        #u_init = u_init + np.random.normal(scale=1., size=u_init.shape)
-        t_init = np.linspace(0, cost_i, num_steps)
 
-        return res, x_init, u_init, t_init
+    if args.env_type == 'pendulum':
+        step_sz = 0.002
+        num_steps = 20
 
-        
-        
-        
-        
-        
-        
-
-    if args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
+    elif args.env_type == 'cartpole_obs':
+        #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+        step_sz = 0.002
+        num_steps = 20
+        goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+    elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         obs_width = 6.0
         step_sz = 0.02
@@ -321,18 +322,7 @@ def main(args):
             delta_near=1.0
             delta_drain=0.5
         #print('creating planner...')
-            
-        planner = _sst_module.SSTWrapper(
-                    state_bounds=propagate_system.get_state_bounds(),
-                    control_bounds=propagate_system.get_control_bounds(),
-                    distance=distance_computer,
-                    start_state=start_state,
-                    goal_state=goal_inform_state,
-                    goal_radius=goal_radius,
-                    random_seed=0,
-                    sst_delta_near=delta_near,
-                    sst_delta_drain=delta_drain
-                )        
+        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 200, num_steps, step_sz, propagate_system)
         #cost_threshold = cost_i * 1.1
         cost_threshold = 100000000.
         
@@ -408,23 +398,20 @@ def main(args):
         # generate a path by using SST to plan for some maximal iterations
 
         state_t = start_state
-        pick_goal_threshold = 0.1
+        pick_goal_threshold = 0.25
         for i in range(max_iteration):
             time0 = time.time()
             # determine if picking goal based on iteration number
             goal_prob = random.random()
             #flag=1: using MPNet
             #flag=0: not using MPNet
-            if goal_prob <= pick_goal_threshold and i >= max_iteration * 0.4:
+            if goal_prob <= pick_goal_threshold:
                 flag = 0
-                next_state = goal_inform_state
-                mpnet_res = next_state
             else:
                 flag = 1
-                mpnet_res, _, _, _ = informer(env, x0, xG, direction=0)
-                next_state = mpnet_res
-
-            planner.step_with_sample(propagate_system, next_state, 5, 100, 0.02)
+            bvp_x, bvp_u, bvp_t, mpnet_res = planner.plan_tree_SMP_step("sst", propagate_system, psopt_system, obc.flatten(), state_t, goal_inform_state, goal_inform_state, \
+                                flag, goal_radius, max_iteration, distance_computer, \
+                                delta_near, delta_drain, cost_threshold)
 
             if len(bvp_u) != 0:# and bvp_t[0] > 0.01:  # turn bvp_t off if want to use step_bvp
                 xw_scat = ax.scatter(mpnet_res[0], mpnet_res[1], c='lightgreen')
@@ -455,6 +442,7 @@ def main(args):
                 xs_to_plot = np.array(state)
                 for j in range(len(xs_to_plot)):
                     xs_to_plot[j] = wrap_angle(xs_to_plot[j], propagate_system)
+                xs_to_plot = xs_to_plot[::5]
                 ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
                 #ax.scatter(bvp_x[:,0], bvp_x[:,1], c='green')
                 print('solution: x')
@@ -474,7 +462,7 @@ def main(args):
                 # only change state_t if in MPNet inform mode                
                 if len(bvp_u) != 0:
                     # try using steered result as next start
-                    state_t = bvp_x[-1]
+                    state_t = mpnet_res
                 else:
                     state_t = start_state # failed BVP, back to origin
 
@@ -542,10 +530,55 @@ def main(args):
             goal_inform_state = paths[i][j][-1]
             goal_state = sgs[i][j][1]
             cost_i = costs[i][j].sum()
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue))
-            #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
-            p.start()
-            p.join()
+            #cost_i = 100000000.
+            
+            # propagate data
+            p_start = paths[i][j][0]
+            detail_paths = [p_start]
+            detail_controls = []
+            detail_costs = []
+            state = [p_start]
+            control = []
+            cost = []
+            for k in range(len(controls[i][j])):
+                #state_i.append(len(detail_paths)-1)
+                max_steps = int(costs[i][j][k]/step_sz)
+                accum_cost = 0.
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][k])
+                # modify it because of small difference between data and actual propagation
+                p_start = paths[i][j][k]
+                state[-1] = paths[i][j][k]
+                for step in range(1,max_steps+1):
+                    p_start = dynamics(p_start, controls[i][j][k], step_sz)
+                    p_start = enforce_bounds(p_start)
+                    detail_paths.append(p_start)
+                    detail_controls.append(controls[i][j])
+                    detail_costs.append(step_sz)
+                    accum_cost += step_sz
+                    if (step % 1 == 0) or (step == max_steps):
+                        state.append(p_start)
+                        #print('control')
+                        #print(controls[i][j])
+                        control.append(controls[i][j][k])
+                        cost.append(accum_cost)
+                        accum_cost = 0.
+            #print('p_start:')
+            #print(p_start)
+            #print('data:')
+            #print(paths[i][j][-1])
+            state[-1] = paths[i][j][-1]
+            data = state
+            # end of propagation
+            
+            
+            print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
+            #p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, data, queue))
+            plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, data, queue)
+            #p.start()
+            #p.join()
             res = queue.get()
             if res == -1:
                 plan_res_env.append(0)
@@ -590,7 +623,7 @@ if __name__ == '__main__':
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
     parser.add_argument('--num_steps', type=int, default=20)
-    parser.add_argument('--plan_type', type=str, default='line')
+    parser.add_argument('--plan_type', type=str, default='tree')
 
     args = parser.parse_args()
     print(args)

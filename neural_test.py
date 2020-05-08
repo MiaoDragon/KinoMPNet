@@ -107,7 +107,7 @@ def main(args):
         bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 50, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
@@ -532,7 +532,7 @@ if __name__ == '__main__':
     # for training
     parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
     parser.add_argument('--seen_N', type=int, default=10)
-    parser.add_argument('--seen_NP', type=int, default=200)
+    parser.add_argument('--seen_NP', type=int, default=100)
     parser.add_argument('--seen_s', type=int, default=0)
     parser.add_argument('--seen_sp', type=int, default=800)
     parser.add_argument('--unseen_N', type=int, default=0)

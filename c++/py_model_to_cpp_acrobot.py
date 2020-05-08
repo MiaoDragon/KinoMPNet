@@ -13,12 +13,12 @@ from model import mlp_acrobot
 from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
 from tools import data_loader
 from tools.utility import *
-from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs
+#from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs
 import numpy as np
 from torch.autograd import Variable
 import torch
 import torch.nn as nn
-from sparse_rrt import _sst_module
+#from sparse_rrt import _sst_module
 import os
 
 class Encoder_acrobot(nn.Module):
@@ -159,7 +159,7 @@ class MLP_acrobot_Annotated(torch.jit.ScriptModule):
 
         out8 = self.fc8(out7)
 
-        return out7
+        return out8
 
 def copyMLP(MLP_to_copy, mlp_weights):
     # this function is where weights are manually copied from the originally trained
@@ -201,10 +201,10 @@ def copyMLP(MLP_to_copy, mlp_weights):
 def main(args):
     # Set this value to export models for continual learning or batch training
 
-    system = _sst_module.PSOPTAcrobot()
+    #system = _sst_module.PSOPTAcrobot()
     #dynamics = acrobot_obs.dynamics
-    dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-    enforce_bounds = acrobot_obs.enforce_bounds
+    #dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+    #enforce_bounds = acrobot_obs.enforce_bounds
     step_sz = 0.02
     num_steps = 20
 
@@ -265,37 +265,39 @@ def main(args):
 
     MLP.save("acrobot_mlp_annotated_test_gpu.pt")
 
-    """
+
     # Everything from here below just tests both models to see if the outputs match
-    obs, waypoint_dataset, waypoint_targets, env_indices, \
-    _, _, _, _ = data_loader.load_train_dataset(N=1, NP=1,
-                                                data_folder=args.data_path, obs_f=True,
-                                                direction=1,
-                                                dynamics=dynamics, enforce_bounds=enforce_bounds,
-                                                system=system, step_sz=step_sz, num_steps=args.num_steps)
+    #obs, waypoint_dataset, waypoint_targets, env_indices, \
+    #_, _, _, _ = data_loader.load_train_dataset(N=1, NP=1,
+    #                                            data_folder=args.data_path, obs_f=True,
+    #                                            direction=1,
+    #                                            dynamics=dynamics, enforce_bounds=enforce_bounds,
+    #                                            system=system, step_sz=step_sz, num_steps=args.num_steps)
 
 
     # write test case
-    obs_test = np.array([0.1,1.2,3.0,2.5,1.4,5.2,3.4,-1.])
+    #obs_test = np.array([0.1,1.2,3.0,2.5,1.4,5.2,3.4,-1.])
     #obs_test = obs_test.reshape((1,2,2,2))
-    np.savetxt('obs_voxel_test.txt', obs_test, delimiter='\n', fmt='%f')
+    #np.savetxt('obs_voxel_test.txt', obs_test, delimiter='\n', fmt='%f')
 
     # write obstacle to flattened vector representation, then later be loaded in the C++
-    obs_out = obs.flatten()
-    np.savetxt('obs_voxel.txt', obs_out, delimiter='\n', fmt='%f')
-
+    #obs_out = obs.flatten()
+    #np.savetxt('obs_voxel.txt', obs_out, delimiter='\n', fmt='%f')
+    
+    obs = np.random.rand(1,1,32,32)
 
     obs = torch.from_numpy(obs).type(torch.FloatTensor)
-    obs = Variable(obs)
+    obs = Variable(obs).cuda()
     # h = mpNet.encoder(obs)
     h = encoder(obs)
     path_data = np.array([-0.08007369,  0.32780212, -0.01338363,  0.00726194, 0.00430644, -0.00323558,
-                       0.18593094,  0.13094018, 0.18499476, 0.3250918, 0.52175426, 0.07388325, -0.49999127, 0.52322733])
+                       0.18593094,  0.13094018])
     path_data = np.array([path_data])
     path_data = torch.from_numpy(path_data).type(torch.FloatTensor)
 
     test_input = torch.cat((path_data, h.data.cpu()), dim=1).cuda()  # for MPNet1.0
     test_input = Variable(test_input)
+    print(test_input.size())
     for i in range(5):
         test_output = mpNet.mlp(test_input)
         test_output_save = MLP(test_input)
@@ -303,7 +305,7 @@ def main(args):
         print(test_output.data)
         print(test_output_save.data)
 
-    """
+
 parser = argparse.ArgumentParser()
 # for training
 parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
