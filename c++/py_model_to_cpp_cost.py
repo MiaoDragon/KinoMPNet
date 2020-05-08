@@ -1,28 +1,18 @@
-"""
-This implements the Kinodynamic Planning using MPNet, by using MPNet
-to generate random samples, that will guide the SST algorithm.
-"""
-import sys
-sys.path.append('deps/sparse_rrt')
-sys.path.append('.')
 import torch
-import model.AE.identity as cae_identity
-from model.mlp import MLP
-from model import mlp_acrobot
-from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
-from model.mpnet import KMPNet
-from tools import data_loader
-from tools.utility import *
-from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs
-import argparse
 import numpy as np
-import random
-import os
-from sparse_rrt import _sst_module
+import argparse
+from networks.mpnet import MPNet, MPNetExported
+from dataset.dataset import get_loader
 
-from tensorboardX import SummaryWriter
 
-def main(args):
+# click can achieve similar functionality as argparse
+#@click.command()
+#@click.option('--system', default='sst_envs')
+#@click.option('--model', default='acrobot_obs')
+#@click.option('--setup', default='default_norm')
+#@click.option('--ep', default=5000)
+def main(system, model, setup, ep):
+    # load MPNet
     #global hl
     if torch.cuda.is_available():
         torch.cuda.set_device(args.device)
@@ -199,140 +189,101 @@ def main(args):
     targets = np.array(targets)
     env_indices = np.array(env_indices)
 
-    # use 5% as validation dataset
-    val_len = int(len(dataset) * 0.05)
-    val_dataset = dataset[-val_len:]
-    val_targets = targets[-val_len:]
-    val_env_indices = env_indices[-val_len:]
+    # set to training model to enable dropout
+    mpnet.train()
 
-    dataset = dataset[:-val_len]
-    targets = targets[:-val_len]
-    env_indices = env_indices[:-val_len]
+    """
+    # sample code for generating C++ model
+    env_vox = torch.from_numpy(np.load('{}/{}_env_vox.npy'.format(system, model))).float()
+    train_loader, test_loader = get_loader(system, model, batch_size=1, setup=setup)
 
-    # Train the Models
-    print('training...')
-    writer_fname = 'cost_cont_%s_%f_%s_direction_%d_step_%d' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps)
-    writer = SummaryWriter('./runs/'+writer_fname)
-    record_i = 0
-    val_record_i = 0
-    loss_avg_i = 0
-    val_loss_avg_i = 0
-    loss_avg = 0.
-    val_loss_avg = 0.
-    loss_steps = 100  # record every 100 loss
-    for epoch in range(args.start_epoch+1,args.num_epochs+1):
-        print('epoch' + str(epoch))
-        val_i = 0
-        for i in range(0,len(dataset),args.batch_size):
-            print('epoch: %d, training... path: %d' % (epoch, i+1))
-            dataset_i = dataset[i:i+args.batch_size]
-            targets_i = targets[i:i+args.batch_size]
-            env_indices_i = env_indices[i:i+args.batch_size]
-            # record
-            bi = dataset_i.astype(np.float32)
-            print('bi shape:')
-            print(bi.shape)
-            bt = targets_i
-            bi = torch.FloatTensor(bi)
-            bt = torch.FloatTensor(bt)
-            bi = normalize(bi, args.world_size)
-            mpnet.zero_grad()
-            bi=to_var(bi)
-            bt=to_var(bt)
-            if obs is None:
-                bobs = None
-            else:
-                bobs = obs[env_indices_i].astype(np.float32)
-                bobs = torch.FloatTensor(bobs)
-                bobs = to_var(bobs)
-            print('before training losses:')
-            print(mpnet.loss(mpnet(bi, bobs), bt))
-            mpnet.step(bi, bobs, bt)
-            print('after training losses:')
-            print(mpnet.loss(mpnet(bi, bobs), bt))
-            loss = mpnet.loss(mpnet(bi, bobs), bt)
-            #update_line(hl, ax, [i//args.batch_size, loss.data.numpy()])
-            loss_avg += loss.cpu().data
-            loss_avg_i += 1
-            if loss_avg_i >= loss_steps:
-                loss_avg = loss_avg / loss_avg_i
-                writer.add_scalar('train_loss', loss_avg, record_i)
-                record_i += 1
-                loss_avg = 0.
-                loss_avg_i = 0
+    env_input = env_vox[train_loader.dataset[0:1][0][0:1, 0].long()].cuda()
+    state_input = train_loader.dataset[0:1][0][0:1, 1:].cuda()
 
-            # validation
-            # calculate the corresponding batch in val_dataset
-            dataset_i = val_dataset[val_i:val_i+args.batch_size]
-            targets_i = val_targets[val_i:val_i+args.batch_size]
-            env_indices_i = val_env_indices[val_i:val_i+args.batch_size]
-            val_i = val_i + args.batch_size
-            if val_i > val_len:
-                val_i = 0
-            # record
-            bi = dataset_i.astype(np.float32)
-            print('bi shape:')
-            print(bi.shape)
-            bt = targets_i
-            bi = torch.FloatTensor(bi)
-            bt = torch.FloatTensor(bt)
-            bi = normalize(bi, args.world_size)
-            bi=to_var(bi)
-            bt=to_var(bt)
-            if obs is None:
-                bobs = None
-            else:
-                bobs = obs[env_indices_i].astype(np.float32)
-                bobs = torch.FloatTensor(bobs)
-                bobs = to_var(bobs)
-            loss = mpnet.loss(mpnet(bi, bobs), bt)
-            print('validation loss: %f' % (loss.cpu().data))
+    output = mpnet(state_input, env_input)
+    print(output)
+    traced_script_module = torch.jit.trace(mpnet, (state_input, env_input))
 
-            val_loss_avg += loss.cpu().data
-            val_loss_avg_i += 1
-            if val_loss_avg_i >= loss_steps:
-                val_loss_avg = val_loss_avg / val_loss_avg_i
-                writer.add_scalar('val_loss', val_loss_avg, val_record_i)
-                val_record_i += 1
-                val_loss_avg = 0.
-                val_loss_avg_i = 0
-        # Save the models
-        if epoch > 0 and epoch % 50 == 0:
-            model_path='cost_kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(epoch, args.direction, args.num_steps)
-            #save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(args.model_path,model_path))
-            save_state(mpnet, torch_seed, np_seed, py_seed, os.path.join(model_dir,model_path))
-    writer.export_scalars_to_json("./all_scalars.json")
-    writer.close()
-parser = argparse.ArgumentParser()
-# for training
-parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
-parser.add_argument('--model_dir', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/',help='path for saving trained models')
-parser.add_argument('--no_env', type=int, default=100,help='directory for obstacle images')
-parser.add_argument('--no_motion_paths', type=int,default=4000,help='number of optimal paths in each environment')
-parser.add_argument('--no_val_paths', type=int,default=50,help='number of optimal paths in each environment')
-parser.add_argument('--num_steps', type=int, default=20)
+    serilized_module = torch.jit.script(mpnet)
+    serilized_output = serilized_module(state_input, env_input)
+    print(serilized_output)
+    traced_script_module.save("cpp/output/mpnet5000.pt")
+    """
 
-# Model parameters
-parser.add_argument('--total_input_size', type=int, default=2800+4, help='dimension of total input')
-parser.add_argument('--AE_input_size', type=int, default=2800, help='dimension of input to AE')
-parser.add_argument('--mlp_input_size', type=int , default=28+4, help='dimension of the input vector')
-parser.add_argument('--output_size', type=int , default=2, help='dimension of the input vector')
+    MLP = mpnet.mlp
+    encoder = mpnet.encoder
+    # record
+    bi = dataset.astype(np.float32)
+    print('bi shape:')
+    print(bi.shape)
+    bt = targets
+    bi = torch.FloatTensor(bi)
+    bt = torch.FloatTensor(bt)
+    bi = normalize(bi, args.world_size)
+    bi=to_var(bi)
+    bt=to_var(bt)
+    if obs is None:
+        bobs = None
+    else:
+        bobs = obs[env_indices].astype(np.float32)
+        bobs = torch.FloatTensor(bobs)
+        bobs = to_var(bobs)
 
-parser.add_argument('--learning_rate', type=float, default=0.01)
-parser.add_argument('--seen', type=int, default=0, help='seen or unseen? 0 for seen, 1 for unseen')
-parser.add_argument('--device', type=int, default=0, help='cuda device')
+    loss = mpnet.loss(mpnet(bi, bobs), bt)
 
-parser.add_argument('--num_epochs', type=int, default=500)
-parser.add_argument('--batch_size', type=int, default=100, help='rehersal on how many data (not path)')
-parser.add_argument('--path_folder', type=str, default='../data/simple/')
-parser.add_argument('--path_file', type=str, default='train')
+    """
+    traced_script_module = torch.jit.trace(mpnet, (state_input, env_input))
 
-parser.add_argument('--start_epoch', type=int, default=0)
-parser.add_argument('--env_type', type=str, default='cartpole', help='environment')
-parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')
-parser.add_argument('--opt', type=str, default='Adagrad')
-parser.add_argument('--direction', type=int, default=0, help='0: forward, 1: backward')
-#parser.add_argument('--opt', type=str, default='Adagrad')
-args = parser.parse_args()
-print(args)
-main(args)
+    serilized_module = torch.jit.script(mpnet)
+    serilized_output = serilized_module(state_input, env_input)
+    print(serilized_output)
+    traced_script_module.save("cpp/output/mpnet5000.pt")
+    """
+    traced_encoder = torch.jit.trace(encoder, (bobs))
+    encoder_output = encoder(bobs)
+    mlp_input = torch.cat((encoder_output, bi), 1)
+    traced_MLP = torch.jit.trace(MLP, (mlp_input))
+    traced_encoder.save("costnet_%s_encoder_epoch_%d.pt" % (args.env_type, args.start_epoch))
+    traced_MLP.save("costnet_%s_MLP_epoch_%d.pt" % (args.env_type, args.start_epoch))
+
+    # test the traced model
+    serilized_encoder = torch.jit.script(encoder)
+    serilized_MLP = torch.jit.script(MLP)
+    serilized_encoder_output = serilized_encoder(bobs)
+    serilized_MLP_input = torch.cat((serilized_encoder_output, bi), 1)
+    serilized_MLP_output = serilized_MLP(serilized_MLP_input)
+    print('encoder output: ', serilized_encoder_output)
+    print('MLP output: ', serilized_MLP_output)
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    # for training
+    parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
+    parser.add_argument('--model_dir', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/',help='path for saving trained models')
+    parser.add_argument('--num_steps', type=int, default=20)
+
+    # Model parameters
+    parser.add_argument('--total_input_size', type=int, default=8, help='dimension of total input')
+    parser.add_argument('--AE_input_size', type=int, default=32, help='dimension of input to AE')
+    parser.add_argument('--mlp_input_size', type=int, default=136, help='dimension of the input vector')
+    parser.add_argument('--output_size', type=int, default=4, help='dimension of the input vector')
+
+    parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--device', type=int, default=0, help='cuda device')
+    parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
+    parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
+    parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
+
+    parser.add_argument('--batch_size', type=int, default=100, help='rehersal on how many data (not path)')
+    parser.add_argument('--path_folder', type=str, default='../data/simple/')
+    parser.add_argument('--path_file', type=str, default='train')
+
+    parser.add_argument('--start_epoch', type=int, default=5000)
+    parser.add_argument('--opt', type=str, default='SGD')
+    parser.add_argument('--direction', type=int, default=0, help='0: forward, 1: backward')
+
+
+    args = parser.parse_args()
+    print(args)
+    main(args)
