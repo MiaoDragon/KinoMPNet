@@ -2,8 +2,8 @@
 This transform python cost network to C++
 """
 import sys
-sys.path.append('deps/sparse_rrt')
-sys.path.append('.')
+sys.path.append('../deps/sparse_rrt')
+sys.path.append('..')
 import torch
 import model.AE.identity as cae_identity
 from model.mlp import MLP
