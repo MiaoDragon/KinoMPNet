@@ -1,8 +1,25 @@
+"""
+This transform python cost network to C++
+"""
+import sys
+sys.path.append('deps/sparse_rrt')
+sys.path.append('.')
 import torch
-import numpy as np
+import model.AE.identity as cae_identity
+from model.mlp import MLP
+from model import mlp_acrobot
+from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
+from model.mpnet import KMPNet
+from tools import data_loader
+from tools.utility import *
+from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs
 import argparse
-from networks.mpnet import MPNet, MPNetExported
-from dataset.dataset import get_loader
+import numpy as np
+import random
+import os
+from sparse_rrt import _sst_module
+
+from tensorboardX import SummaryWriter
 
 
 # click can achieve similar functionality as argparse
@@ -11,7 +28,7 @@ from dataset.dataset import get_loader
 #@click.option('--model', default='acrobot_obs')
 #@click.option('--setup', default='default_norm')
 #@click.option('--ep', default=5000)
-def main(system, model, setup, ep):
+def main(args):
     # load MPNet
     #global hl
     if torch.cuda.is_available():
@@ -56,72 +73,6 @@ def main(system, model, setup, ep):
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
-    elif args.env_type == 'acrobot_obs_2':
-        normalize = acrobot_obs.normalize
-        unnormalize = acrobot_obs.unnormalize
-        system = _sst_module.PSOPTAcrobot()
-        mlp = mlp_acrobot.MLP2
-        cae = CAE_acrobot_voxel_2d_2
-        #dynamics = acrobot_obs.dynamics
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = acrobot_obs.enforce_bounds
-        step_sz = 0.02
-        num_steps = 20
-    elif args.env_type == 'acrobot_obs_3':
-        normalize = acrobot_obs.normalize
-        unnormalize = acrobot_obs.unnormalize
-        system = _sst_module.PSOPTAcrobot()
-        mlp = mlp_acrobot.MLP3
-        cae = CAE_acrobot_voxel_2d_2
-        #dynamics = acrobot_obs.dynamics
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = acrobot_obs.enforce_bounds
-        step_sz = 0.02
-        num_steps = 20
-    elif args.env_type == 'acrobot_obs_4':
-        normalize = acrobot_obs.normalize
-        unnormalize = acrobot_obs.unnormalize
-        system = _sst_module.PSOPTAcrobot()
-        mlp = mlp_acrobot.MLP3
-        cae = CAE_acrobot_voxel_2d_3
-        #dynamics = acrobot_obs.dynamics
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = acrobot_obs.enforce_bounds
-        step_sz = 0.02
-        num_steps = 20
-    elif args.env_type == 'acrobot_obs_5':
-        normalize = acrobot_obs.normalize
-        unnormalize = acrobot_obs.unnormalize
-        system = _sst_module.PSOPTAcrobot()
-        mlp = mlp_acrobot.MLP
-        cae = CAE_acrobot_voxel_2d_3
-        #dynamics = acrobot_obs.dynamics
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = acrobot_obs.enforce_bounds
-        step_sz = 0.02
-        num_steps = 20
-    elif args.env_type == 'acrobot_obs_6':
-        normalize = acrobot_obs.normalize
-        unnormalize = acrobot_obs.unnormalize
-        system = _sst_module.PSOPTAcrobot()
-        mlp = mlp_acrobot.MLP4
-        cae = CAE_acrobot_voxel_2d_3
-        #dynamics = acrobot_obs.dynamics
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = acrobot_obs.enforce_bounds
-        step_sz = 0.02
-        num_steps = 20
-    elif args.env_type == 'acrobot_obs_7':
-        normalize = acrobot_obs.normalize
-        unnormalize = acrobot_obs.unnormalize
-        system = _sst_module.PSOPTAcrobot()
-        mlp = mlp_acrobot.MLP5
-        cae = CAE_acrobot_voxel_2d_3
-        #dynamics = acrobot_obs.dynamics
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = acrobot_obs.enforce_bounds
-        step_sz = 0.02
-        num_steps = 20
     elif args.env_type == 'acrobot_obs_8':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
@@ -133,7 +84,6 @@ def main(system, model, setup, ep):
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
-
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
     # load net
@@ -192,24 +142,6 @@ def main(system, model, setup, ep):
     # set to training model to enable dropout
     mpnet.train()
 
-    """
-    # sample code for generating C++ model
-    env_vox = torch.from_numpy(np.load('{}/{}_env_vox.npy'.format(system, model))).float()
-    train_loader, test_loader = get_loader(system, model, batch_size=1, setup=setup)
-
-    env_input = env_vox[train_loader.dataset[0:1][0][0:1, 0].long()].cuda()
-    state_input = train_loader.dataset[0:1][0][0:1, 1:].cuda()
-
-    output = mpnet(state_input, env_input)
-    print(output)
-    traced_script_module = torch.jit.trace(mpnet, (state_input, env_input))
-
-    serilized_module = torch.jit.script(mpnet)
-    serilized_output = serilized_module(state_input, env_input)
-    print(serilized_output)
-    traced_script_module.save("cpp/output/mpnet5000.pt")
-    """
-
     MLP = mpnet.mlp
     encoder = mpnet.encoder
     # record
@@ -231,20 +163,12 @@ def main(system, model, setup, ep):
 
     loss = mpnet.loss(mpnet(bi, bobs), bt)
 
-    """
-    traced_script_module = torch.jit.trace(mpnet, (state_input, env_input))
-
-    serilized_module = torch.jit.script(mpnet)
-    serilized_output = serilized_module(state_input, env_input)
-    print(serilized_output)
-    traced_script_module.save("cpp/output/mpnet5000.pt")
-    """
     traced_encoder = torch.jit.trace(encoder, (bobs))
     encoder_output = encoder(bobs)
     mlp_input = torch.cat((encoder_output, bi), 1)
     traced_MLP = torch.jit.trace(MLP, (mlp_input))
-    traced_encoder.save("costnet_%s_encoder_epoch_%d.pt" % (args.env_type, args.start_epoch))
-    traced_MLP.save("costnet_%s_MLP_epoch_%d.pt" % (args.env_type, args.start_epoch))
+    traced_encoder.save("costnet_%s_encoder_epoch_%d_step_%d.pt" % (args.env_type, args.start_epoch, args.num_steps))
+    traced_MLP.save("costnet_%s_MLP_epoch_%d_step_%d.pt" % (args.env_type, args.start_epoch, args.num_steps))
 
     # test the traced model
     serilized_encoder = torch.jit.script(encoder)
@@ -261,28 +185,28 @@ if __name__ == '__main__':
     # for training
     parser.add_argument('--model_path', type=str, default='./results/',help='path for saving trained models')
     parser.add_argument('--model_dir', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/',help='path for saving trained models')
+    parser.add_argument('--no_env', type=int, default=100,help='directory for obstacle images')
+    parser.add_argument('--no_motion_paths', type=int,default=4000,help='number of optimal paths in each environment')
     parser.add_argument('--num_steps', type=int, default=20)
 
     # Model parameters
-    parser.add_argument('--total_input_size', type=int, default=8, help='dimension of total input')
-    parser.add_argument('--AE_input_size', type=int, default=32, help='dimension of input to AE')
-    parser.add_argument('--mlp_input_size', type=int, default=136, help='dimension of the input vector')
-    parser.add_argument('--output_size', type=int, default=4, help='dimension of the input vector')
+    parser.add_argument('--total_input_size', type=int, default=2800+4, help='dimension of total input')
+    parser.add_argument('--AE_input_size', type=int, default=2800, help='dimension of input to AE')
+    parser.add_argument('--mlp_input_size', type=int , default=28+4, help='dimension of the input vector')
+    parser.add_argument('--output_size', type=int , default=2, help='dimension of the input vector')
 
     parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--seen', type=int, default=0, help='seen or unseen? 0 for seen, 1 for unseen')
     parser.add_argument('--device', type=int, default=0, help='cuda device')
-    parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
-    parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
-    parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
 
-    parser.add_argument('--batch_size', type=int, default=100, help='rehersal on how many data (not path)')
     parser.add_argument('--path_folder', type=str, default='../data/simple/')
     parser.add_argument('--path_file', type=str, default='train')
 
-    parser.add_argument('--start_epoch', type=int, default=5000)
-    parser.add_argument('--opt', type=str, default='SGD')
+    parser.add_argument('--start_epoch', type=int, default=0)
+    parser.add_argument('--env_type', type=str, default='cartpole', help='environment')
+    parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')
+    parser.add_argument('--opt', type=str, default='Adagrad')
     parser.add_argument('--direction', type=int, default=0, help='0: forward, 1: backward')
-
 
     args = parser.parse_args()
     print(args)
