@@ -50,8 +50,20 @@ def main(args):
     elif args.env_type == 'cartpole_obs':
         normalize = cart_pole_obs.normalize
         unnormalize = cart_pole_obs.unnormalize
-        system = _sst_module.CartPole()
-        dynamics = cartpole.dynamics
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cartpole.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+    elif args.env_type == 'cartpole_obs_2':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP6
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = cartpole.enforce_bounds
         step_sz = 0.002
         num_steps = 20
