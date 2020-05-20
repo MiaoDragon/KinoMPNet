@@ -131,26 +131,19 @@ def main(args):
     #    torch.cuda.set_device(args.device)
 
     # setup evaluation function and load function
-    if args.env_type == 'pendulum':
+    if args.env_type == 'acrobot_obs':
         obs_file = None
         obc_file = None
-        obs_f = False
-        #system = standard_cpp_systems.PSOPTPendulum()
-        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-    elif args.env_type == 'cartpole_obs':
-        normalize = cartpole.normalize
-        unnormalize = cartpole.unnormalize
-        obs_file = None
-        obc_file = None
-        dynamics = cartpole.dynamics
-        jax_dynamics = cartpole.jax_dynamics
-        #enforce_bounds = cartpole.enforce_bounds
-        cae = CAE_acrobot_voxel_2d
-        mlp = mlp_acrobot.MLP
+        #cpp_propagator = _sst_module.SystemPropagator()
+        #dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+
         obs_f = True
-        #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-    elif args.env_type == 'acrobot_obs':
+        step_sz = 0.02
+        num_steps = 21
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
         obs_file = None
         obc_file = None
         system = _sst_module.PSOPTAcrobot()
@@ -166,102 +159,7 @@ def main(args):
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
 
-    elif args.env_type == 'acrobot_obs_2':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-    elif args.env_type == 'acrobot_obs_3':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-
-    elif args.env_type == 'acrobot_obs_5':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-
-    elif args.env_type == 'acrobot_obs_8':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        #num_steps = 21
-        num_steps = 21#args.num_steps*2
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
-        #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
-        #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #    xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=lambda x: False, system=system, step_sz=step_sz)
-        #    return xs, us, dts
-        #traj_opt = cem_trajopt
-        obs_width = 6.0
-        goal_S0 = np.diag([1.,1.,0,0])
-        goal_rho0 = 1.0
-
+        
 
 
     if args.env_type == 'pendulum':
@@ -279,39 +177,24 @@ def main(args):
         obs_width = 6.0
         step_sz = 0.02
         num_steps = 21
-        goal_radius=2.0
+        goal_radius=10.0
         random_seed=0
-        delta_near=0.1
-        delta_drain=0.05
+        delta_near=1.0
+        delta_drain=0.5
+
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
     mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_epoch_5000.pt')
     encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_epoch_5000.pt')
-    cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_MLP_epoch_800_step_10.pt')
-    cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_encoder_epoch_800_step_10.pt')
-
+    cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_MLP_epoch_1200_step_10.pt')
+    cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_encoder_epoch_1200_step_10.pt')
+    
     print('mlp_path:')
     print(mlp_path)
     #####################################################
-    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, data, out_queue):
-        if args.env_type == 'pendulum':
-            system = standard_cpp_systems.PSOPTPendulum()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-            step_sz = 0.002
-            num_steps = 20
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 200, num_steps, 1, 20, step_sz)
-
-        elif args.env_type == 'cartpole_obs':
-            #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
-            system = _sst_module.CartPole()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.002
-            num_steps = 20
-            traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*50, x_init, u_init, t_init)
-            goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
-        elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
+    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue):
+        if args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
             obs_width = 6.0
             psopt_system = _sst_module.PSOPTAcrobot()
@@ -324,12 +207,28 @@ def main(args):
             random_seed=0
             delta_near=1.0
             delta_drain=0.5
+            device = 3
+            pick_goal_init_threshold = 0.1
+            goal_linear_inc_start_rate = 0.4
+            pick_goal_end_threshold = 0.95
+            num_sample = 20
+            bvp_min_time_steps = 5
+            bvp_max_time_steps = 100
         #print('creating planner...')
         planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path, \
-                                              200, num_steps, step_sz, propagate_system, 3)
+                                              200, num_steps, step_sz, propagate_system, device)
         #cost_threshold = cost_i * 1.1
         cost_threshold = 100000000.
-        
+        # generate a path by using SST to plan for some maximal iterations
+        time0 = time.time()
+        res_x, res_u, res_t = planner.plan_tree_SMP_cost("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_inform_state, goal_inform_state, \
+                                goal_radius, max_iteration, distance_computer, \
+                                delta_near, delta_drain, cost_threshold, \
+                                pick_goal_init_threshold, goal_linear_inc_start_rate, pick_goal_end_threshold,
+                                num_sample, bvp_min_time_steps, bvp_max_time_steps)
+        plan_time = time.time() - time0
+
+        """
         # visualization
         plt.ion()
         fig = plt.figure()
@@ -393,94 +292,112 @@ def main(args):
         print(infeasible_points)
         ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
         ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
-        for i in range(len(data)):
-            update_line(hl, ax, data[i])
-        draw_update_line(ax)        
-        # visualization end
-        
-        
-        # generate a path by using SST to plan for some maximal iterations
-
-        state_t = start_state
-        pick_goal_threshold = 1.0
-        for i in range(max_iteration):
-            time0 = time.time()
-            # determine if picking goal based on iteration number
-            goal_prob = random.random()
-            #flag=1: using MPNet
-            #flag=0: not using MPNet
-            if goal_prob <= pick_goal_threshold:
-                flag = 0
-            else:
-                flag = 1
-            bvp_x, bvp_u, bvp_t, mpnet_res = planner.plan_tree_SMP_step("sst", propagate_system, psopt_system, obc.flatten(), state_t, goal_inform_state, goal_inform_state, \
-                                flag, goal_radius, max_iteration, distance_computer, \
-                                delta_near, delta_drain, cost_threshold)
-
-            if len(bvp_u) != 0:# and bvp_t[0] > 0.01:  # turn bvp_t off if want to use step_bvp
-                xw_scat = ax.scatter(mpnet_res[0], mpnet_res[1], c='lightgreen')
-                draw_update_line(ax)
-                          
-                # propagate data
-                p_start = bvp_x[0]
-                detail_paths = [p_start]
-                detail_controls = []
-                detail_costs = []
-                state = [p_start]
-                control = []
-                cost = []
-                for k in range(len(bvp_u)):
-                    #state_i.append(len(detail_paths)-1)
-                    max_steps = int(bvp_t[k]/step_sz)
-                    accum_cost = 0.
-                    for step in range(1,max_steps+1):
-                        p_start = dynamics(p_start, bvp_u[k], step_sz)
-                        p_start = enforce_bounds(p_start)
-                        detail_paths.append(p_start)
-                        accum_cost += step_sz
-                        if (step % 1 == 0) or (step == max_steps):
-                            state.append(p_start)
-                            cost.append(accum_cost)
-                            accum_cost = 0.
-
-                xs_to_plot = np.array(state)
-                for j in range(len(xs_to_plot)):
-                    xs_to_plot[j] = wrap_angle(xs_to_plot[j], propagate_system)
-                xs_to_plot = xs_to_plot[::5]
-                ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
-                #ax.scatter(bvp_x[:,0], bvp_x[:,1], c='green')
-                print('solution: x')
-                print(bvp_x)
-                print('solution: u')
-                print(bvp_u)
-                print('solution: t')
-                print(bvp_t)
-                # draw start and goal
-                #ax.scatter(start_state[0], goal_state[0], marker='X')
-                draw_update_line(ax)
-                #state_t = state[-1]
+        #for i in range(len(data)):
+        #    update_line(hl, ax, data[i])
+        draw_update_line(ax)
+        #state_t = start_state
                 
-            print('state_t:')
-            print(state_t)
-            print('mpnet_res')
-            print(mpnet_res)
-            # based on flag, determine how to change state_t
-            if flag:
-                # only change state_t if in MPNet inform mode                
-                if len(bvp_u) != 0:
-                    # try using steered result as next start
-                    state_t = mpnet_res
-                    print('after copying to state_t:')
-                    print('state_t')
-                    print(state_t)
-                else:
-                    print('failure')
-                    state_t = start_state # failed BVP, back to origin
-
-        plan_time = time.time() - time0
+        if len(res_u):
+            # propagate data
+            p_start = res_x[0]
+            detail_paths = [p_start]
+            detail_controls = []
+            detail_costs = []
+            state = [p_start]
+            control = []
+            cost = []
+            for k in range(len(res_u)):
+                #state_i.append(len(detail_paths)-1)
+                max_steps = int(res_t[k]/step_sz)
+                accum_cost = 0.
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][k])
+                # modify it because of small difference between data and actual propagation
+                p_start = res_x[k]
+                state[-1] = res_x[k]
+                for step in range(1,max_steps+1):
+                    p_start = dynamics(p_start, res_u[k], step_sz)
+                    p_start = enforce_bounds(p_start)
+                    detail_paths.append(p_start)
+                    accum_cost += step_sz
+                    if (step % 1 == 0) or (step == max_steps):
+                        state.append(p_start)
+                        #print('control')
+                        #print(controls[i][j])
+                        cost.append(accum_cost)
+                        accum_cost = 0.
+            #print('p_start:')
+            #print(p_start)
+            #print('data:')
+            #print(paths[i][j][-1])
+            state[-1] = res_x[-1]
+            
+            
+            
+            xs_to_plot = np.array(state)
+            for i in range(len(xs_to_plot)):
+                xs_to_plot[i] = wrap_angle(xs_to_plot[i], propagate_system)
+                if IsInCollision(xs_to_plot[i], obs_i):
+                    print('in collision')
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
+            # draw start and goal
+            #ax.scatter(start_state[0], goal_state[0], marker='X')
+            draw_update_line(ax)
+            plt.waitforbuttonpress()
+        """
+        
+        #im = planner.visualize_nodes(propagate_system)
+        #sec = input('Let us wait for user input')
+        #show_image_opencv(im, "planning_tree", wait=True)
+        
+        # validate if the path contains collision
+        """
+        if len(res_u):
+            # propagate data
+            p_start = res_x[0]
+            detail_paths = [p_start]
+            detail_controls = []
+            detail_costs = []
+            state = [p_start]
+            control = []
+            cost = []
+            for k in range(len(res_u)):
+                #state_i.append(len(detail_paths)-1)
+                max_steps = int(res_t[k]/step_sz)
+                accum_cost = 0.
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][k])
+                # modify it because of small difference between data and actual propagation
+                p_start = res_x[k]
+                state[-1] = res_x[k]
+                for step in range(1,max_steps+1):
+                    p_start = dynamics(p_start, res_u[k], step_sz)
+                    p_start = enforce_bounds(p_start)
+                    detail_paths.append(p_start)
+                    accum_cost += step_sz
+                    if (step % 1 == 0) or (step == max_steps):
+                        state.append(p_start)
+                        #print('control')
+                        #print(controls[i][j])
+                        cost.append(accum_cost)
+                        accum_cost = 0.
+                        # check collision for the new state
+                        assert not IsInCollision(p_start, obs_i)
+                        
+            #print('p_start:')
+            #print(p_start)
+            #print('data:')
+            #print(paths[i][j][-1])
+            state[-1] = res_x[-1]
+        # validation end
+        """
         
         print('plan time: %fs' % (plan_time))
-        if len(res_u) == 0:
+        if len(res_x) == 0:
             print('failed.')
             out_queue.put(-1)
         else:
@@ -542,54 +459,11 @@ def main(args):
             goal_state = sgs[i][j][1]
             cost_i = costs[i][j].sum()
             #cost_i = 100000000.
-            
-            # propagate data
-            p_start = paths[i][j][0]
-            detail_paths = [p_start]
-            detail_controls = []
-            detail_costs = []
-            state = [p_start]
-            control = []
-            cost = []
-            for k in range(len(controls[i][j])):
-                #state_i.append(len(detail_paths)-1)
-                max_steps = int(costs[i][j][k]/step_sz)
-                accum_cost = 0.
-                #print('p_start:')
-                #print(p_start)
-                #print('data:')
-                #print(paths[i][j][k])
-                # modify it because of small difference between data and actual propagation
-                p_start = paths[i][j][k]
-                state[-1] = paths[i][j][k]
-                for step in range(1,max_steps+1):
-                    p_start = dynamics(p_start, controls[i][j][k], step_sz)
-                    p_start = enforce_bounds(p_start)
-                    detail_paths.append(p_start)
-                    detail_controls.append(controls[i][j])
-                    detail_costs.append(step_sz)
-                    accum_cost += step_sz
-                    if (step % 1 == 0) or (step == max_steps):
-                        state.append(p_start)
-                        #print('control')
-                        #print(controls[i][j])
-                        control.append(controls[i][j][k])
-                        cost.append(accum_cost)
-                        accum_cost = 0.
-            #print('p_start:')
-            #print(p_start)
-            #print('data:')
-            #print(paths[i][j][-1])
-            state[-1] = paths[i][j][-1]
-            data = state
-            # end of propagation
-            
-            
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-            #p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, data, queue))
-            plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, data, queue)
-            #p.start()
-            #p.join()
+            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue))
+            #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
+            p.start()
+            p.join()
             res = queue.get()
             if res == -1:
                 plan_res_env.append(0)

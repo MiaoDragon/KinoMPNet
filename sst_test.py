@@ -291,7 +291,7 @@ def main(args):
     print('mlp_path:')
     print(mlp_path)
     #####################################################
-    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue):
+    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue_t, out_queue_cost):
         if args.env_type == 'pendulum':
             system = standard_cpp_systems.PSOPTPendulum()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
@@ -321,6 +321,7 @@ def main(args):
             random_seed=0
             delta_near=1.0
             delta_drain=0.5
+            cost_threshold = 1.2
             
         planner = _sst_module.SSTWrapper(
                     state_bounds=propagate_system.get_state_bounds(),
@@ -353,7 +354,8 @@ def main(args):
                 t_sst = np.sum(ts)
                 #print(t_sst)
                 #print(cost_i)
-                if t_sst <= cost_i * 1.1:
+                if t_sst <= cost_i * cost_threshold:
+                    print('solved in %d iterations' % (i))
                     break
         plan_time = time.time() - time0
         solution = planner.get_solution()
@@ -524,10 +526,12 @@ def main(args):
         print('plan time: %fs' % (plan_time))
         if solution is None:
             print('failed.')
-            out_queue.put(-1)
+            out_queue_t.put(-1)
+            out_queue_cost.put(-1)
         else:
             print('path succeeded.')
-            out_queue.put(plan_time)
+            out_queue_t.put(plan_time)
+            out_queue_cost.put(cost_i)
     ####################################################################################
 
 
@@ -543,25 +547,40 @@ def main(args):
     # test
     # testing
 
-    queue = Queue(1)
+    queue_t = Queue(1)
+    queue_cost = Queue(1)
     print('testing...')
     seen_test_suc_rate = 0.
     unseen_test_suc_rate = 0.
 
     obc, obs, paths, sgs, path_lengths, controls, costs = seen_test_data
     obc = obc.astype(np.float32)
-    #obc = torch.from_numpy(obc)
-    #if torch.cuda.is_available():
-    #    obc = obc.cuda()
-    
-    plan_res = []
+    # for all planning, use a flattened vector to store
     plan_times = []
     plan_res_all = []
+    plan_costs = []
+    data_costs = []
+
+    # store in a 2d vector, for env and path
+    plan_res_env = []
+    plan_time_env = []
+    plan_cost_env = []
+    data_cost_env = []
+    
+    
+    # directory to save the results
+    res_path = args.res_path
+    res_path = res_path+args.env_type+"_sst/"
+    if not os.path.exists(res_path):
+        os.makedirs(res_path)
+    
     for i in range(len(paths)):
         new_obs_i = []
         obs_i = obs[i]
-        plan_res_env = []
-        plan_time_env = []
+        plan_res_path = []
+        plan_time_path = []
+        plan_cost_path = []
+        data_cost_path = []
         for k in range(len(obs_i)):
             obs_pt = []
             obs_pt.append(obs_i[k][0]-obs_width/2)
@@ -580,33 +599,89 @@ def main(args):
             goal_inform_state = paths[i][j][-1]
             goal_state = sgs[i][j][1]
             cost_i = costs[i][j].sum()
+            #cost_i = 100000000.
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue))
+            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue_t, queue_cost))
             #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
             p.start()
             p.join()
-            res = queue.get()
-            if res == -1:
-                plan_res_env.append(0)
+            plan_t = queue_t.get()
+            plan_cost = queue_cost.get()
+            if plan_t == -1:
+                # failed, do not record in the flattened list
                 plan_res_all.append(0)
+                # record in the 2d list
+                plan_res_path.append(0)
+                plan_time_path.append(plan_t)
+                plan_cost_path.append(plan_cost)
+                data_cost_path.append(-1.0)
             else:
-                plan_res_env.append(1)
-                plan_times.append(res)
+                # record in the flattened list
                 plan_res_all.append(1)
+                plan_times.append(plan_t)
+                plan_costs.append(plan_cost)
+                data_costs.append(cost_i)
+                # record in the 2d list
+                plan_res_path.append(1)
+                plan_time_path.append(plan_t)
+                plan_cost_path.append(plan_cost)
+                data_cost_path.append(cost_i)
             print('average accuracy up to now: %f' % (np.array(plan_res_all).flatten().mean()))
             print('plan average time: %f' % (np.array(plan_times).mean()))
             print('plan time std: %f' % (np.array(plan_times).std()))
-        plan_res.append(plan_res_env)
-    print('plan accuracy: %f' % (np.array(plan_res).flatten().mean()))
+            print('plan average cost: %f' % (np.array(plan_costs).mean()))
+            print('plan cost std: %f' % (np.array(plan_costs).std()))
+            print('data average cost: %f' % (np.array(data_costs).mean()))
+            print('data cost std: %f' % (np.array(data_costs).std()))
+
+        # store in the 2d list
+        plan_res_env.append(plan_res_path)
+        plan_time_env.append(plan_time_path)
+        plan_cost_env.append(plan_cost_path)
+        data_cost_env.append(data_cost_path)
+
+        # for every environment planned, save
+        # save the 2d list
+        # save as numpy array
+        np.save(res_path+"plan_res.npy", np.array(plan_res_env))
+        np.save(res_path+"plan_time.npy", np.array(plan_time_env))
+        np.save(res_path+"plan_cost.npy", np.array(plan_cost_env))
+        np.save(res_path+"data_cost.npy", np.array(data_cost_env))
+
+        
+        
+    print('plan accuracy: %f' % (np.array(plan_res_all).flatten().mean()))
     print('plan average time: %f' % (np.array(plan_times).mean()))
     print('plan time std: %f' % (np.array(plan_times).std()))
+    print('plan average cost: %f' % (np.array(plan_costs).mean()))
+    print('plan cost std: %f' % (np.array(plan_costs).std()))
+    print('data average cost: %f' % (np.array(data_costs).mean()))
+    print('data cost std: %f' % (np.array(data_costs).std()))
+    
+    # save the 2d list
+    # save as numpy array
+    plan_res_env = np.array(plan_res_env)
+    plan_time_env = np.array(plan_time_env)
+    plan_cost_env = np.array(plan_cost_env)
+    data_cost_env = np.array(data_cost_env)
+
+    np.save(res_path+"plan_res.npy", plan_res_env)
+    np.save(res_path+"plan_time.npy", plan_time_env)
+    np.save(res_path+"plan_cost.npy", plan_cost_env)
+    np.save(res_path+"data_cost.npy", data_cost_env)
+
+    
+    
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
     parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
+    parser.add_argument('--res_path', type=str, default='./plan_results/',help='path for saving trained models')
+
     parser.add_argument('--seen_N', type=int, default=10)
-    parser.add_argument('--seen_NP', type=int, default=100)
+    parser.add_argument('--seen_NP', type=int, default=200)
     parser.add_argument('--seen_s', type=int, default=0)
     parser.add_argument('--seen_sp', type=int, default=800)
     parser.add_argument('--unseen_N', type=int, default=0)

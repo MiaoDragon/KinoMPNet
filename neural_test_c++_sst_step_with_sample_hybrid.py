@@ -131,139 +131,19 @@ def main(args):
     #    torch.cuda.set_device(args.device)
 
     # setup evaluation function and load function
-    if args.env_type == 'pendulum':
+    if args.env_type == 'acrobot_obs':
         obs_file = None
         obc_file = None
-        obs_f = False
-        #system = standard_cpp_systems.PSOPTPendulum()
-        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-    elif args.env_type == 'cartpole_obs':
-        normalize = cartpole.normalize
-        unnormalize = cartpole.unnormalize
-        obs_file = None
-        obc_file = None
-        dynamics = cartpole.dynamics
-        jax_dynamics = cartpole.jax_dynamics
-        #enforce_bounds = cartpole.enforce_bounds
-        cae = CAE_acrobot_voxel_2d
-        mlp = mlp_acrobot.MLP
+        #cpp_propagator = _sst_module.SystemPropagator()
+        #dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+
         obs_f = True
-        #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-    elif args.env_type == 'acrobot_obs':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
         step_sz = 0.02
         num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
         goal_S0 = np.diag([1.,1.,0,0])
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
-
-    elif args.env_type == 'acrobot_obs_2':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-    elif args.env_type == 'acrobot_obs_3':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-
-    elif args.env_type == 'acrobot_obs_5':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-
-    elif args.env_type == 'acrobot_obs_8':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        #num_steps = 21
-        num_steps = 21#args.num_steps*2
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
-        #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
-        #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #    xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=lambda x: False, system=system, step_sz=step_sz)
-        #    return xs, us, dts
-        #traj_opt = cem_trajopt
-        obs_width = 6.0
-        goal_S0 = np.diag([1.,1.,0,0])
-        goal_rho0 = 1.0
-
-
-
     if args.env_type == 'pendulum':
         step_sz = 0.002
         num_steps = 20
@@ -279,36 +159,23 @@ def main(args):
         obs_width = 6.0
         step_sz = 0.02
         num_steps = 21
-        goal_radius=2.0
+        goal_radius=10.0
         random_seed=0
-        delta_near=0.1
-        delta_drain=0.05
+        delta_near=1.0
+        delta_drain=0.5
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_mlp_annotated_test_gpu.pt')
-    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_encoder_annotated_test_cpu.pt')
+    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_epoch_5000.pt')
+    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_epoch_5000.pt')
+    cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_MLP_epoch_800_step_10.pt')
+    cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_encoder_epoch_800_step_10.pt')
+
     print('mlp_path:')
     print(mlp_path)
     #####################################################
-    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue):
-        if args.env_type == 'pendulum':
-            system = standard_cpp_systems.PSOPTPendulum()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
-            step_sz = 0.002
-            num_steps = 20
-            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 200, num_steps, 1, 20, step_sz)
-
-        elif args.env_type == 'cartpole_obs':
-            #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
-            system = _sst_module.CartPole()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-            step_sz = 0.002
-            num_steps = 20
-            traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*50, x_init, u_init, t_init)
-            goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
-        elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
+    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue_t, out_queue_cost):
+        if args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
             obs_width = 6.0
             psopt_system = _sst_module.PSOPTAcrobot()
@@ -321,15 +188,31 @@ def main(args):
             random_seed=0
             delta_near=1.0
             delta_drain=0.5
+            device=3
+            num_sample = 10
+            min_time_steps = 5
+            max_time_steps = 100
+            mpnet_goal_threshold = 2.0
+            mpnet_length_threshold = 30
+            random_sample_freq = 0.1
+            pick_goal_init_threshold = 0.1
+            pick_goal_end_threshold = 0.8
+            pick_goal_start_percent = 0.4
         #print('creating planner...')
-        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 200, num_steps, step_sz, propagate_system)
-        #cost_threshold = cost_i * 1.1
-        cost_threshold = 100000000.
+        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path, 200, num_steps, step_sz, propagate_system, device)
+        cost_threshold = cost_i * args.cost_threshold
+        #cost_threshold = 100000000.
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
+        print('before plan_tree_SMP...')
         res_x, res_u, res_t = planner.plan_tree_SMP_hybrid("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_inform_state, goal_inform_state, \
                                 goal_radius, max_iteration, distance_computer, \
-                                delta_near, delta_drain, cost_threshold)
+                                delta_near, delta_drain, cost_threshold, \
+                                num_sample, min_time_steps, max_time_steps, \
+                                mpnet_goal_threshold, mpnet_length_threshold, random_sample_freq, \
+                                pick_goal_init_threshold, pick_goal_end_threshold, pick_goal_start_percent)
+        print('after plan_tree_SMP.')
+
         plan_time = time.time() - time0
 
         """
@@ -457,6 +340,7 @@ def main(args):
         #show_image_opencv(im, "planning_tree", wait=True)
         
         # validate if the path contains collision
+        """
         if len(res_u):
             # propagate data
             p_start = res_x[0]
@@ -497,17 +381,20 @@ def main(args):
             #print(paths[i][j][-1])
             state[-1] = res_x[-1]
         # validation end
+        """
         
         print('plan time: %fs' % (plan_time))
         if len(res_x) == 0:
             print('failed.')
-            out_queue.put(-1)
+            out_queue_t.put(-1)
+            out_queue_cost.put(-1.0)
         else:
             print('path succeeded.')
             print('cost: %f' % (np.sum(res_t)))
             print('cost_threshold: %f' % (cost_threshold))
             print('data cost: %f' % (cost_i))
-            out_queue.put(plan_time)
+            out_queue_t.put(plan_time)
+            out_queue_cost.put(np.sum(res_t))
     ####################################################################################
 
 
@@ -523,25 +410,40 @@ def main(args):
     # test
     # testing
 
-    queue = Queue(1)
+    queue_t = Queue(1)
+    queue_cost = Queue(1)
     print('testing...')
     seen_test_suc_rate = 0.
     unseen_test_suc_rate = 0.
 
     obc, obs, paths, sgs, path_lengths, controls, costs = seen_test_data
     obc = obc.astype(np.float32)
-    #obc = torch.from_numpy(obc)
-    #if torch.cuda.is_available():
-    #    obc = obc.cuda()
-    
-    plan_res = []
+    # for all planning, use a flattened vector to store
     plan_times = []
     plan_res_all = []
+    plan_costs = []
+    data_costs = []
+
+    # store in a 2d vector, for env and path
+    plan_res_env = []
+    plan_time_env = []
+    plan_cost_env = []
+    data_cost_env = []
+    
+    
+    # directory to save the results
+    res_path = args.res_path
+    res_path = res_path+args.env_type+"_lr%f_%s_step_%d_hybrid/" % (args.learning_rate, args.opt, args.num_steps)
+    if not os.path.exists(res_path):
+        os.makedirs(res_path)
+    
     for i in range(len(paths)):
         new_obs_i = []
         obs_i = obs[i]
-        plan_res_env = []
-        plan_time_env = []
+        plan_res_path = []
+        plan_time_path = []
+        plan_cost_path = []
+        data_cost_path = []
         for k in range(len(obs_i)):
             obs_pt = []
             obs_pt.append(obs_i[k][0]-obs_width/2)
@@ -562,32 +464,84 @@ def main(args):
             cost_i = costs[i][j].sum()
             #cost_i = 100000000.
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue))
+            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue_t, queue_cost))
             #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
             p.start()
             p.join()
-            res = queue.get()
-            if res == -1:
-                plan_res_env.append(0)
+            plan_t = queue_t.get()
+            plan_cost = queue_cost.get()
+            if plan_t == -1:
+                # failed, do not record in the flattened list
                 plan_res_all.append(0)
+                # record in the 2d list
+                plan_res_path.append(0)
+                plan_time_path.append(plan_t)
+                plan_cost_path.append(plan_cost)
+                data_cost_path.append(-1.0)
             else:
-                plan_res_env.append(1)
-                plan_times.append(res)
+                # record in the flattened list
                 plan_res_all.append(1)
+                plan_times.append(plan_t)
+                plan_costs.append(plan_cost)
+                data_costs.append(cost_i)
+                # record in the 2d list
+                plan_res_path.append(1)
+                plan_time_path.append(plan_t)
+                plan_cost_path.append(plan_cost)
+                data_cost_path.append(cost_i)
             print('average accuracy up to now: %f' % (np.array(plan_res_all).flatten().mean()))
             print('plan average time: %f' % (np.array(plan_times).mean()))
             print('plan time std: %f' % (np.array(plan_times).std()))
-        plan_res.append(plan_res_env)
-    print('plan accuracy: %f' % (np.array(plan_res).flatten().mean()))
+            print('plan average cost: %f' % (np.array(plan_costs).mean()))
+            print('plan cost std: %f' % (np.array(plan_costs).std()))
+            print('data average cost: %f' % (np.array(data_costs).mean()))
+            print('data cost std: %f' % (np.array(data_costs).std()))
+
+        # store in the 2d list
+        plan_res_env.append(plan_res_path)
+        plan_time_env.append(plan_time_path)
+        plan_cost_env.append(plan_cost_path)
+        data_cost_env.append(data_cost_path)
+
+        # for every environment planned, save
+        # save the 2d list
+        # save as numpy array
+        np.save(res_path+"plan_res.npy", np.array(plan_res_env))
+        np.save(res_path+"plan_time.npy", np.array(plan_time_env))
+        np.save(res_path+"plan_cost.npy", np.array(plan_cost_env))
+        np.save(res_path+"data_cost.npy", np.array(data_cost_env))
+
+        
+        
+    print('plan accuracy: %f' % (np.array(plan_res_all).flatten().mean()))
     print('plan average time: %f' % (np.array(plan_times).mean()))
     print('plan time std: %f' % (np.array(plan_times).std()))
+    print('plan average cost: %f' % (np.array(plan_costs).mean()))
+    print('plan cost std: %f' % (np.array(plan_costs).std()))
+    print('data average cost: %f' % (np.array(data_costs).mean()))
+    print('data cost std: %f' % (np.array(data_costs).std()))
+    
+    # save the 2d list
+    # save as numpy array
+    plan_res_env = np.array(plan_res_env)
+    plan_time_env = np.array(plan_time_env)
+    plan_cost_env = np.array(plan_cost_env)
+    data_cost_env = np.array(data_cost_env)
 
+    np.save(res_path+"plan_res.npy", plan_res_env)
+    np.save(res_path+"plan_time.npy", plan_time_env)
+    np.save(res_path+"plan_cost.npy", plan_cost_env)
+    np.save(res_path+"data_cost.npy", data_cost_env)
+
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
     parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
+    parser.add_argument('--res_path', type=str, default='./plan_results/',help='path for saving trained models')
+    
     parser.add_argument('--seen_N', type=int, default=10)
-    parser.add_argument('--seen_NP', type=int, default=100)
+    parser.add_argument('--seen_NP', type=int, default=200)
     parser.add_argument('--seen_s', type=int, default=0)
     parser.add_argument('--seen_sp', type=int, default=800)
     parser.add_argument('--unseen_N', type=int, default=0)
@@ -608,9 +562,10 @@ if __name__ == '__main__':
     parser.add_argument('--start_epoch', type=int, default=5000)
     parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
-    parser.add_argument('--opt', type=str, default='Adagrad')
+    parser.add_argument('--opt', type=str, default='SGD')
     parser.add_argument('--num_steps', type=int, default=20)
     parser.add_argument('--plan_type', type=str, default='tree')
+    parser.add_argument('--cost_threshold', type=float, default=1.2)
 
     args = parser.parse_args()
     print(args)

@@ -78,28 +78,16 @@ def main(args):
         mlp = mlp_acrobot.MLP
         cae = CAE_acrobot_voxel_2d
 
-    elif args.env_type == 'acrobot_obs_8':
-        if args.debug:
-            normalize = acrobot_obs.normalize
-            unnormalize = acrobot_obs.unnormalize
-            system = _sst_module.PSOPTAcrobot()
-            #dynamics = acrobot_obs.dynamics
-            dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-            enforce_bounds = acrobot_obs.enforce_bounds
-            step_sz = 0.02
-            num_steps = 20
-        mlp = mlp_acrobot.MLP6
-        cae = CAE_acrobot_voxel_2d_3
 
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
                    cae, mlp)
     # load net
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
-    model_dir = model_dir+'cost_'+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
+    model_dir = model_dir+args.env_type+"_lr%f_%s/" % (args.learning_rate, args.opt)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-    model_path='cost_kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
+    model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
         #load_net_state(mpnet, os.path.join(args.model_path, model_path))
@@ -173,8 +161,8 @@ def main(args):
         bi = to_var(bi)
         bt = to_var(bt)
     # set to training model to enable dropout
-    #mpnet.train()
-    mpnet.eval()
+    mpnet.train()
+    #mpnet.eval()
 
     MLP = mpnet.mlp
     encoder = mpnet.encoder
@@ -182,8 +170,8 @@ def main(args):
     encoder_output = encoder(bobs)
     mlp_input = torch.cat((encoder_output, bi), 1)
     traced_MLP = torch.jit.trace(MLP, (mlp_input))
-    traced_encoder.save("costnet_%s_encoder_epoch_%d_step_%d.pt" % (args.env_type, args.start_epoch, args.num_steps))
-    traced_MLP.save("costnet_%s_MLP_epoch_%d_step_%d.pt" % (args.env_type, args.start_epoch, args.num_steps))
+    traced_encoder.save("%s_encoder_epoch_%d.pt" % (args.env_type, args.start_epoch))
+    traced_MLP.save("%s_MLP_epoch_%d.pt" % (args.env_type, args.start_epoch))
 
     # test the traced model
     serilized_encoder = torch.jit.script(encoder)

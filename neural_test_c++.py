@@ -266,6 +266,9 @@ def main(args):
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
     mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_mlp_annotated_test_gpu.pt')
     encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_encoder_annotated_test_cpu.pt')
+    cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_MLP_epoch_300_step_20.pt')
+    cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_encoder_epoch_300_step_20.pt')
+
     print('mlp_path:')
     print(mlp_path)
     #####################################################
@@ -298,9 +301,10 @@ def main(args):
             goal_radius=10.0
             random_seed=0
             delta_near=1.0
-            delta_drain=0.5
+            delta_drain=0.4
         #print('creating planner...')
-        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 10, num_steps, step_sz, propagate_system)
+        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path,
+                                              args.bvp_iter, num_steps, step_sz, propagate_system)
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
         #print('obc:')
@@ -313,7 +317,7 @@ def main(args):
         #print(goal_state)
         res_x, res_u, res_t = planner.plan("sst", args.plan_type, propagate_system, psopt_system, obc.flatten(), start_state, goal_inform_state, goal_inform_state, \
                                 goal_radius, max_iteration, distance_computer, \
-                                delta_near, delta_drain)
+                                args.delta_near, args.delta_drain)
 
         #res_x, res_u, res_t = planner.plan("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_state, goal_inform_state, \
         #                        goal_radius, max_iteration, propagate_system.distance_computer(), \
@@ -514,9 +518,13 @@ if __name__ == '__main__':
     parser.add_argument('--start_epoch', type=int, default=5000)
     parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
-    parser.add_argument('--opt', type=str, default='Adagrad')
+    parser.add_argument('--opt', type=str, default='SGD')
     parser.add_argument('--num_steps', type=int, default=20)
     parser.add_argument('--plan_type', type=str, default='tree')
+    parser.add_argument('--bvp_iter', type=int, default=10)
+    parser.add_argument('--delta_near', type=float, default=1.0)
+    parser.add_argument('--delta_drain', type=float, default=0.3)
+    
 
     args = parser.parse_args()
     print(args)

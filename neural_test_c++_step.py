@@ -165,103 +165,6 @@ def main(args):
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
 
-    elif args.env_type == 'acrobot_obs_2':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-    elif args.env_type == 'acrobot_obs_3':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-
-    elif args.env_type == 'acrobot_obs_5':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-
-    elif args.env_type == 'acrobot_obs_8':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        #num_steps = 21
-        num_steps = 21#args.num_steps*2
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
-        #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
-        #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #    xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=lambda x: False, system=system, step_sz=step_sz)
-        #    return xs, us, dts
-        #traj_opt = cem_trajopt
-        obs_width = 6.0
-        goal_S0 = np.diag([1.,1.,0,0])
-        goal_rho0 = 1.0
-
-
 
     if args.env_type == 'pendulum':
         step_sz = 0.002
@@ -287,6 +190,9 @@ def main(args):
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
     mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_mlp_annotated_test_gpu.pt')
     encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_encoder_annotated_test_cpu.pt')
+    cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_MLP_epoch_300_step_20.pt')
+    cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_encoder_epoch_300_step_20.pt')
+
     print('mlp_path:')
     print(mlp_path)
     #####################################################
@@ -322,7 +228,9 @@ def main(args):
             delta_near=1.0
             delta_drain=0.5
         #print('creating planner...')
-        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 20, num_steps, step_sz, propagate_system)
+        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 
+                                              cost_mlp_path, cost_encoder_path, 
+                                              20, num_steps, step_sz, propagate_system)
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
         #print('obc:')
@@ -400,18 +308,32 @@ def main(args):
             update_line(hl, ax, data[i])
         draw_update_line(ax)
         state_t = start_state
+        
+        pick_goal_threshold = 0.10
+        goal_linear_inc_start_iter = int(0.6*max_iteration)
+        goal_linear_inc_end_iter = max_iteration
+        goal_linear_inc_end_threshold = 0.95
+        goal_linear_inc = (goal_linear_inc_end_threshold - pick_goal_threshold) / (goal_linear_inc_end_iter - goal_linear_inc_start_iter)
+        
         for i in range(max_iteration):
             print('iteration: %d' % (i))
             print('state_t:')
             print(state_t)
+            # calculate if using goal or not
+            use_goal_prob = random.random()
+            if i > goal_linear_inc_start_iter:
+                pick_goal_threshold += goal_linear_inc
+            if use_goal_prob <= pick_goal_threshold:
+                flag = 0
+            else:
+                flag = 1
+            
             bvp_x, bvp_u, bvp_t, mpnet_res = planner.plan_step("sst", propagate_system, psopt_system, obc.flatten(), state_t, goal_inform_state, goal_inform_state, \
-                                    goal_radius, max_iteration, distance_computer, \
+                                    flag, goal_radius, max_iteration, distance_computer, \
                                     delta_near, delta_drain)
             plan_time = time.time() - time0
 
             if len(bvp_u) != 0:# and bvp_t[0] > 0.01:  # turn bvp_t off if want to use step_bvp
-                xw_scat = ax.scatter(mpnet_res[0], mpnet_res[1], c='lightgreen')
-                draw_update_line(ax)
                 
                 
                 # propagate data
@@ -449,6 +371,8 @@ def main(args):
                 print(bvp_t)
                 # draw start and goal
                 #ax.scatter(start_state[0], goal_state[0], marker='X')
+                draw_update_line(ax)
+                xw_scat = ax.scatter(mpnet_res[0], mpnet_res[1], c='brown')
                 draw_update_line(ax)
                 #state_t = state[-1]
                 # try using mpnet_res as new start
