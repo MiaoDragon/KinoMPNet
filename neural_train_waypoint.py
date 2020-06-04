@@ -8,8 +8,8 @@ sys.path.append('.')
 import torch
 import model.AE.identity as cae_identity
 from model.mlp import MLP
-from model import mlp_acrobot
-from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
+from model import mlp_acrobot, mlp_cartpole
+from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3, CAE_cartpole_voxel_2d
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
@@ -54,7 +54,7 @@ def main(args):
         mlp = mlp_cartpole.MLP
         cae = CAE_cartpole_voxel_2d
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = cartpole.enforce_bounds
+        enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 20
     elif args.env_type == 'cartpole_obs_2':
@@ -64,7 +64,7 @@ def main(args):
         mlp = mlp_cartpole.MLP6
         cae = CAE_cartpole_voxel_2d
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        enforce_bounds = cartpole.enforce_bounds
+        enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 20
     elif args.env_type == 'acrobot_obs':

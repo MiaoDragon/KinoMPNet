@@ -48,6 +48,20 @@ import numpy as np
 #from tvlqr.python_lyapunov import sample_tv_verify
 from plan_utility.data_structure import *
 from plan_utility.line_line_cc import line_line_cc
+import torch
+import model.AE.identity as cae_identity
+from model.mlp import MLP
+from model import mlp_acrobot, mlp_cartpole
+from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3, CAE_cartpole_voxel_2d
+from model.mpnet import KMPNet
+from tools import data_loader
+from tools.utility import *
+from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs
+import argparse
+import numpy as np
+import random
+import os
+from sparse_rrt import _sst_module
 
 
 
@@ -161,6 +175,17 @@ def main(args):
         #system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
         dynamics = lambda x, u, t: cpp_propagator.propagate(psopt_system, x, u, t)
 
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 100
+        
+        
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
     elif args.env_type == 'acrobot_obs':
@@ -173,6 +198,51 @@ def main(args):
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'acrobot')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
 
+        
+    mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
+                   cae, mlp)
+    # load net
+    # load previously trained model if start epoch > 0
+    model_dir = args.model_dir
+    model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
+    if not os.path.exists(model_dir):
+        os.makedirs(model_dir)
+    model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
+    torch_seed, np_seed, py_seed = 0, 0, 0
+    if args.start_epoch > 0:
+        #load_net_state(mpnet, os.path.join(args.model_path, model_path))
+        load_net_state(mpnet, os.path.join(model_dir, model_path))
+        #torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
+        torch_seed, np_seed, py_seed = load_seed(os.path.join(model_dir, model_path))
+        # set seed after loading
+        torch.manual_seed(torch_seed)
+        np.random.seed(np_seed)
+        random.seed(py_seed)
+
+    if torch.cuda.is_available():
+        mpnet.cuda()
+        mpnet.mlp.cuda()
+        mpnet.encoder.cuda()
+        if args.opt == 'Adagrad':
+            mpnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+        elif args.opt == 'Adam':
+            mpnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
+        elif args.opt == 'SGD':
+            mpnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
+        elif args.opt == 'ASGD':
+            mpnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
+    if args.start_epoch > 0:
+        #load_opt_state(mpnet, os.path.join(args.model_path, model_path))
+        load_opt_state(mpnet, os.path.join(model_dir, model_path))
+
+        
+        
+        
+        
+        
+        
+        
+        
     # load data
     print('loading...')
     if args.seen_N > 0:
@@ -191,12 +261,31 @@ def main(args):
     
     # find path
     
+    plt.ion()
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.set_autoscale_on(True)
+    hl, = ax.plot([], [], 'b')
+    
+    #hl_real, = ax.plot([], [], 'r')
+    def update_line(h, ax, new_data):
+        h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
+        #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
+        #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
+
+
+    def draw_update_line(ax):
+        ax.relim()
+        ax.autoscale_view()
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+ 
 
     # randomly pick up a point in the data, and find similar data in the dataset
     # plot the next point
     obc, obs, paths, sgs, path_lengths, controls, costs = seen_test_data
-    for envi in range(10):
-        for pathi in range(20):
+    for envi in range(2):
+        for pathi in range(10):
             obs_i = obs[envi]
             new_obs_i = []
             obs_i = obs[envi]
@@ -204,8 +293,6 @@ def main(args):
             plan_time_path = []
             plan_cost_path = []
             data_cost_path = []
-                        
-            
             for k in range(len(obs_i)):
                 obs_pt = []
                 obs_pt.append(obs_i[k][0]-obs_width/2)
@@ -304,16 +391,13 @@ def main(args):
                 #state_i.append(len(detail_paths)-1)
                 max_steps = int(ts[k]/step_sz)
                 accum_cost = 0.
-                print('p_start:')
-                print(p_start)
-                print('data:')
-                print(paths[envi][pathi][k])
-                
-                
-                # comment this out to test corrected data versus previous data
-                #p_start = xs[k]
-                #state[-1] = xs[k]
-                
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][k])
+                # modify it because of small difference between data and actual propagation
+                p_start = xs[k]
+                state[-1] = xs[k]
                 for step in range(1,max_steps+1):
                     p_start = dynamics(p_start, us[k], step_sz)
                     p_start = enforce_bounds(p_start)
@@ -325,13 +409,11 @@ def main(args):
                         #print(controls[i][j])
                         cost.append(accum_cost)
                         accum_cost = 0.
-                        assert not IsInCollision(p_start, obs_i)
-
-            print('p_start:')
-            print(p_start)
-            print('data:')
-            print(paths[envi][pathi][-1])
-            #state[-1] = xs[-1]
+            #print('p_start:')
+            #print(p_start)
+            #print('data:')
+            #print(paths[i][j][-1])
+            state[-1] = xs[-1]
 
 
 
@@ -344,33 +426,74 @@ def main(args):
             draw_update_line(ax)
             plt.waitforbuttonpress()
 
+            
+            
+            # visualize mPNet path
+            mpnet_paths = []
+            state = xs[0]
+            for k in range(50):
+                mpnet_paths.append(state)
+                bi = np.concatenate([state, xs[-1]])
+                bi = np.array([bi])
+                bi = torch.from_numpy(bi).type(torch.FloatTensor)
+                print(bi)
+                bi = normalize(bi, args.world_size)
+                bi=to_var(bi)
+                if obc is None:
+                    bobs = None
+                else:
+                    bobs = np.array([obc[envi]]).astype(np.float32)
+                    print(bobs.shape)
+                    bobs = torch.FloatTensor(bobs)
+                    bobs = to_var(bobs)
+                bt = mpnet(bi, bobs).cpu()
+                bt = unnormalize(bt, args.world_size)
+                bt = bt.detach().numpy()
+                print(bt.shape)
+                state = bt[0]
+
+            xs_to_plot = np.array(mpnet_paths)
+            for i in range(len(xs_to_plot)):
+                xs_to_plot[i] = wrap_angle(xs_to_plot[i], psopt_system)
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,2], c='lightgreen')
+            # draw start and goal
+            #ax.scatter(start_state[0], goal_state[0], marker='X')
+            draw_update_line(ax)
+            plt.waitforbuttonpress()
+
+            
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--seen_N', type=int, default=10)
-    parser.add_argument('--seen_NP', type=int, default=20)
+    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/',help='path for saving trained models')
+    parser.add_argument('--model_dir', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/',help='path for saving trained models')
+    parser.add_argument('--num_steps', type=int, default=100)
+    parser.add_argument('--direction', type=int, default=0)
+
+    parser.add_argument('--seen_N', type=int, default=1)
+    parser.add_argument('--seen_NP', type=int, default=700)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=850)
+    parser.add_argument('--seen_sp', type=int, default=0)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)
     parser.add_argument('--unseen_sp', type=int, default=0)
     parser.add_argument('--grad_step', type=int, default=1, help='number of gradient steps in continual learning')
     # Model parameters
-    parser.add_argument('--total_input_size', type=int, default=4, help='dimension of total input')
+    parser.add_argument('--total_input_size', type=int, default=8, help='dimension of total input')
     parser.add_argument('--AE_input_size', nargs='+', type=int, default=32, help='dimension of input to AE')
     parser.add_argument('--mlp_input_size', type=int , default=136, help='dimension of the input vector')
     parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
-    parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--device', type=int, default=0, help='cuda device')
     parser.add_argument('--data_folder', type=str, default='./data/cartpole_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=99)
+    parser.add_argument('--start_epoch', type=int, default=500)
     parser.add_argument('--env_type', type=str, default='cartpole_obs', help='s2d for simple 2d, c2d for complex 2d')
-    parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
-    parser.add_argument('--opt', type=str, default='Adagrad')
+    parser.add_argument('--world_size', nargs='+', type=float, default=[30.0, 40.0, 3.141592653589793, 2.0], help='boundary of world')
+    parser.add_argument('--opt', type=str, default='SGD')
 
     args = parser.parse_args()
     print(args)

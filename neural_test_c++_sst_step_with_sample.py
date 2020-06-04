@@ -119,7 +119,6 @@ def enforce_bounds(state):
 
 def main(args):
     # set seed
-    print(args.model_path)
     torch_seed = np.random.randint(low=0, high=1000)
     np_seed = np.random.randint(low=0, high=1000)
     py_seed = np.random.randint(low=0, high=1000)
@@ -151,9 +150,18 @@ def main(args):
     elif args.env_type == 'cartpole_obs':
         #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
         step_sz = 0.002
-        num_steps = 20
-        goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
+        num_steps = 21
+        goal_radius=1.5
+        random_seed=0
+        delta_near=2.0
+        delta_drain=1.2
+        cost_threshold = 1.2
+        min_time_steps = 10
+        max_time_steps = 200
+        integration_step = 0.002
+        obs_width = 4.0
+        obs_f = True
+
     elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         obs_width = 6.0
@@ -166,8 +174,13 @@ def main(args):
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_epoch_5000.pt')
-    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_epoch_5000.pt')
+    mlp_path = os.path.join(os.getcwd()+'/c++/','%s_MLP_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
+    encoder_path = os.path.join(os.getcwd()+'/c++/','%s_encoder_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
+    #mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_epoch_5000.pt')
+    #encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_epoch_5000.pt')
+
+    #cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_%s_MLP_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
+    #cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_%s_encoder_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
     cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_MLP_epoch_800_step_10.pt')
     cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_encoder_epoch_800_step_10.pt')
 
@@ -197,7 +210,29 @@ def main(args):
             pick_goal_init_threshold = 0.1
             pick_goal_end_threshold = 0.8
             pick_goal_start_percent = 0.4
-
+        elif args.env_type == 'cartpole_obs':
+            obs_width = 4.0
+            psopt_system = _sst_module.PSOPTCartPole()
+            propagate_system = standard_cpp_systems.RectangleObs(obs, obs_width, 'cartpole')
+            distance_computer = propagate_system.distance_computer()
+            #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
+            step_sz = 0.002
+            num_steps = 101
+            goal_radius=1.5
+            random_seed=0
+            delta_near=2.0
+            delta_drain=1.2
+            #delta_near=1.0
+            #delta_drain=0.5
+            device=3
+            num_sample = 10
+            min_time_steps = 10
+            max_time_steps = 200
+            mpnet_goal_threshold = 2.0
+            mpnet_length_threshold = 90
+            pick_goal_init_threshold = 0.1
+            pick_goal_end_threshold = 0.8
+            pick_goal_start_percent = 0.4            
         #print('creating planner...')
         planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path, 200, num_steps, step_sz, propagate_system, device)
         cost_threshold = cost_i * args.cost_threshold
@@ -205,7 +240,11 @@ def main(args):
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
         print('before plan_tree_SMP...')
-        res_x, res_u, res_t = planner.plan_tree_SMP("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_inform_state, goal_inform_state, \
+        print('start_state:')
+        print(start_state)
+        print('goal_state:')
+        print(goal_inform_state)
+        res_x, res_u, res_t = planner.plan_tree_SMP("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_state, goal_inform_state, \
                                 goal_radius, max_iteration, distance_computer, \
                                 delta_near, delta_drain, cost_threshold, \
                                 num_sample, min_time_steps, max_time_steps, \
@@ -462,10 +501,12 @@ def main(args):
             start_state = sgs[i][j][0]
             goal_inform_state = paths[i][j][-1]
             goal_state = sgs[i][j][1]
-            cost_i = costs[i][j].sum()
+            cost_i = np.sum(costs[i][j])
             #cost_i = 100000000.
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue_t, queue_cost))
+            # acrobot: 300000
+            # cartpole: 500000
+            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 3000000, queue_t, queue_cost))
             #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
             p.start()
             p.join()
@@ -538,7 +579,6 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
-    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
     parser.add_argument('--res_path', type=str, default='./plan_results/',help='path for saving trained models')
     
     parser.add_argument('--seen_N', type=int, default=10)

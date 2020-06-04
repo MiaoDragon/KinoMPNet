@@ -58,7 +58,7 @@ import time
 import matplotlib.pyplot as plt
 
 from plan_utility.line_line_cc import line_line_cc
-def IsInCollision(x, obc, obc_width=6.):
+def acrobot_IsInCollision(x, obc, obc_width=6.):
     STATE_THETA_1, STATE_THETA_2, STATE_V_1, STATE_V_2 = 0, 1, 2, 3
     MIN_V_1, MAX_V_1 = -6., 6.
     MIN_V_2, MAX_V_2 = -6., 6.
@@ -93,7 +93,7 @@ def IsInCollision(x, obc, obc_width=6.):
                 return True
     return False
 
-def enforce_bounds(state):
+def acrobot_enforce_bounds(state):
     STATE_THETA_1, STATE_THETA_2, STATE_V_1, STATE_V_2 = 0, 1, 2, 3
     MIN_V_1, MAX_V_1 = -6., 6.
     MIN_V_2, MAX_V_2 = -6., 6.
@@ -117,8 +117,95 @@ def enforce_bounds(state):
     return state
 
 
+
+
+
+
+def cartpole_IsInCollision(x, obc, obc_width=4.):
+    I = 10
+    L = 2.5
+    M = 10
+    m = 5
+    g = 9.8
+    H = 0.5
+
+    STATE_X = 0
+    STATE_V = 1
+    STATE_THETA = 2
+    STATE_W = 3
+    CONTROL_A = 0
+
+    MIN_X = -30
+    MAX_X = 30
+    MIN_V = -40
+    MAX_V = 40
+    MIN_W = -2
+    MAX_W = 2
+
+    
+    if x[0] < MIN_X or x[0] > MAX_X:
+        return True
+    
+    H = 0.5
+    pole_x1 = x[0]
+    pole_y1 = H
+    pole_x2 = x[0] + L * np.sin(x[2])
+    pole_y2 = H + L * np.cos(x[2])
+
+    
+    for i in range(len(obc)):
+        for j in range(0, 8, 2):
+            x1 = obc[i][j]
+            y1 = obc[i][j+1]
+            x2 = obc[i][(j+2) % 8]
+            y2 = obc[i][(j+3) % 8]
+            if line_line_cc(pole_x1, pole_y1, pole_x2, pole_y2, x1, y1, x2, y2):
+                return True
+    return False
+
+def cartpole_enforce_bounds(state):
+    I = 10
+    L = 2.5
+    M = 10
+    m = 5
+    g = 9.8
+    H = 0.5
+
+    STATE_X = 0
+    STATE_V = 1
+    STATE_THETA = 2
+    STATE_W = 3
+    CONTROL_A = 0
+
+    MIN_X = -30
+    MAX_X = 30
+    MIN_V = -40
+    MAX_V = 40
+    MIN_W = -2
+    MAX_W = 2
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    if state[1]<MIN_V:
+        state[1]=MIN_V
+    elif state[1]>MAX_V:
+        state[1]=MAX_V
+
+    if state[2]<-np.pi:
+        state[2]+=2*np.pi
+    elif state[2]>np.pi:
+        state[2]-=2*np.pi
+
+    if state[3]<MIN_W:
+        state[3]=MIN_W
+    elif state[3]>MAX_W:
+        state[3]=MAX_W
+    return state
+
+
+
+
 def main(args):
     # set seed
+    print(args.model_path)
     torch_seed = np.random.randint(low=0, high=1000)
     np_seed = np.random.randint(low=0, high=1000)
     py_seed = np.random.randint(low=0, high=1000)
@@ -130,25 +217,13 @@ def main(args):
     #    torch.cuda.set_device(args.device)
 
     # setup evaluation function and load function
-    if args.env_type == 'acrobot_obs':
+    if args.env_type == 'pendulum':
         obs_file = None
         obc_file = None
-        #cpp_propagator = _sst_module.SystemPropagator()
-        #dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-
-        obs_f = True
-        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-    if args.env_type == 'pendulum':
-        step_sz = 0.002
-        num_steps = 20
-
+        obs_f = False
+        #system = standard_cpp_systems.PSOPTPendulum()
+        #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
     elif args.env_type == 'cartpole_obs':
-        #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
         step_sz = 0.002
         num_steps = 21
         goal_radius=1.5
@@ -159,35 +234,87 @@ def main(args):
         min_time_steps = 10
         max_time_steps = 200
         integration_step = 0.002
-        obs_width = 4.0
         obs_f = True
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTCartPole()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        obs_width = 4.0
+        IsInCollision = cartpole_IsInCollision
+        enforce_bounds = cartpole_enforce_bounds
+
+        
+    elif args.env_type == 'acrobot_obs':
+        obs_file = None
+        obc_file = None
+        system = _sst_module.PSOPTAcrobot()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+
+        obs_f = True
+        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+        step_sz = 0.02
+        num_steps = 21
+        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
+        goal_S0 = np.diag([1.,1.,0,0])
+        #goal_S0 = np.identity(4)
+        goal_rho0 = 1.0
+        IsInCollision = acrobot_IsInCollision
+        enforce_bounds = acrobot_enforce_bounds
+
+        
+        
+    if args.env_type == 'pendulum':
+        step_sz = 0.002
+        num_steps = 20
+
     elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         obs_width = 6.0
         step_sz = 0.02
         num_steps = 21
-        goal_radius=10.0
+        goal_radius=2.0
         random_seed=0
-        delta_near=1.0
-        delta_drain=0.5
+        delta_near=0.1
+        delta_drain=0.05
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    mlp_path = os.path.join(os.getcwd()+'/c++/','%s_MLP_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
-    encoder_path = os.path.join(os.getcwd()+'/c++/','%s_encoder_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
-    #mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_epoch_5000.pt')
-    #encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_epoch_5000.pt')
-
-    #cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_%s_MLP_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
-    #cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_%s_encoder_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
-    cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_MLP_epoch_800_step_10.pt')
-    cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_encoder_epoch_800_step_10.pt')
-
+    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_mlp_annotated_test_gpu.pt')
+    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_encoder_annotated_test_cpu.pt')
     print('mlp_path:')
     print(mlp_path)
     #####################################################
-    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue_t, out_queue_cost):
-        if args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
+    def plan_one_path(obs_i, obs, obc, start_state, goal_state, goal_inform_state, paths, controls, costs, cost_i, max_iteration, out_queue_t, out_queue_cost):
+        if args.env_type == 'pendulum':
+            system = standard_cpp_systems.PSOPTPendulum()
+            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
+            step_sz = 0.002
+            num_steps = 20
+            traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 200, num_steps, 1, 20, step_sz)
+
+        elif args.env_type == 'cartpole_obs':
+            #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
+            obs_width = 4.0
+            psopt_system = _sst_module.PSOPTCartPole()
+            propagate_system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
+            distance_computer = propagate_system.distance_computer()
+            #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
+            step_sz = 0.002
+            num_steps = 21
+            goal_radius=1.5
+            random_seed=0
+            #delta_near=2.0
+            #delta_drain=1.2
+            delta_near=.2
+            delta_drain=.1
+
+            cost_threshold = 1.2
+            min_time_steps = 10
+            max_time_steps = 200
+            integration_step = 0.002
+        elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
             obs_width = 6.0
             psopt_system = _sst_module.PSOPTAcrobot()
@@ -200,60 +327,52 @@ def main(args):
             random_seed=0
             delta_near=1.0
             delta_drain=0.5
-            device=3
-            num_sample = 10
+            cost_threshold = 1.2
             min_time_steps = 5
             max_time_steps = 100
-            mpnet_goal_threshold = 2.0
-            mpnet_length_threshold = 30
-            random_sample_freq = 0.1
-            pick_goal_init_threshold = 0.1
-            pick_goal_end_threshold = 0.8
-            pick_goal_start_percent = 0.4
-        elif args.env_type == 'cartpole_obs':
-            obs_width = 4.0
-            psopt_system = _sst_module.PSOPTCartPole()
-            propagate_system = standard_cpp_systems.RectangleObs(obs, obs_width, 'cartpole')
-            distance_computer = propagate_system.distance_computer()
-            #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
-            step_sz = 0.002
-            num_steps = 101
-            goal_radius=1.5
-            random_seed=0
-            delta_near=2.0
-            delta_drain=1.2
-            #delta_near=1.0
-            #delta_drain=0.5
-            device=3
-            num_sample = 10
-            min_time_steps = 10
-            max_time_steps = 200
-
-            #min_time_steps = 10
-            #max_time_steps = 250
-            mpnet_goal_threshold = 2.0
-            mpnet_length_threshold = 90
-            pick_goal_init_threshold = 0.1
-            pick_goal_end_threshold = 0.8
-            pick_goal_start_percent = 0.4
-            random_sample_freq = 0.1
+            integration_step = 0.02            
+        planner = _sst_module.SSTWrapper(
+                    state_bounds=propagate_system.get_state_bounds(),
+                    control_bounds=propagate_system.get_control_bounds(),
+                    distance=distance_computer,
+                    start_state=start_state,
+                    goal_state=goal_state,
+                    goal_radius=goal_radius,
+                    random_seed=0,
+                    sst_delta_near=delta_near,
+                    sst_delta_drain=delta_drain
+                )
         #print('creating planner...')
-        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path, 200, num_steps, step_sz, propagate_system, device)
-        cost_threshold = cost_i * args.cost_threshold
-        #cost_threshold = 100000000.
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
-        print('before plan_tree_SMP...')
-        res_x, res_u, res_t = planner.plan_tree_SMP_hybrid("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_state, goal_inform_state, \
-                                goal_radius, max_iteration, distance_computer, \
-                                delta_near, delta_drain, cost_threshold, \
-                                num_sample, min_time_steps, max_time_steps, \
-                                mpnet_goal_threshold, mpnet_length_threshold, random_sample_freq, \
-                                pick_goal_init_threshold, pick_goal_end_threshold, pick_goal_start_percent)
-        print('after plan_tree_SMP.')
 
+        
+        #print('start_state:')
+        #print(paths)
+        #print('controls:')
+        #print(controls)
+        #print('costs:')
+        #print(costs)
+        
+        for i in range(len(controls)):
+            val = planner.add_to_tree(propagate_system, paths[i], controls[i], int(np.round(costs[i]/integration_step)), integration_step)
+            print('python next state: ')
+            print(paths[i+1])
+            #print('val: ', val)
+            # early break for initial path
+            solution = planner.get_solution()
+            if solution is not None:
+                # based on cost break
+                xs, us, ts = solution
+                t_sst = np.sum(ts)
+                #print(t_sst)
+                #print(cost_i)
+                if t_sst <= cost_i * cost_threshold:
+                    print('solved in %d iterations' % (i))
+                    break
         plan_time = time.time() - time0
-
+        solution = planner.get_solution()
+        
         """
         # visualization
         plt.ion()
@@ -322,29 +441,31 @@ def main(args):
         #    update_line(hl, ax, data[i])
         draw_update_line(ax)
         #state_t = start_state
-                
-        if len(res_u):
+
+        if solution is not None:
+            xs, us, ts = solution
+            
             # propagate data
-            p_start = res_x[0]
+            p_start = xs[0]
             detail_paths = [p_start]
             detail_controls = []
             detail_costs = []
             state = [p_start]
             control = []
             cost = []
-            for k in range(len(res_u)):
+            for k in range(len(us)):
                 #state_i.append(len(detail_paths)-1)
-                max_steps = int(res_t[k]/step_sz)
+                max_steps = int(ts[k]/step_sz)
                 accum_cost = 0.
                 #print('p_start:')
                 #print(p_start)
                 #print('data:')
                 #print(paths[i][j][k])
                 # modify it because of small difference between data and actual propagation
-                p_start = res_x[k]
-                state[-1] = res_x[k]
+                p_start = xs[k]
+                state[-1] = xs[k]
                 for step in range(1,max_steps+1):
-                    p_start = dynamics(p_start, res_u[k], step_sz)
+                    p_start = dynamics(p_start, us[k], step_sz)
                     p_start = enforce_bounds(p_start)
                     detail_paths.append(p_start)
                     accum_cost += step_sz
@@ -358,29 +479,23 @@ def main(args):
             #print(p_start)
             #print('data:')
             #print(paths[i][j][-1])
-            state[-1] = res_x[-1]
+            state[-1] = xs[-1]
             
             
             
             xs_to_plot = np.array(state)
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], propagate_system)
-                if IsInCollision(xs_to_plot[i], obs_i):
-                    print('in collision')
             ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
             # draw start and goal
             #ax.scatter(start_state[0], goal_state[0], marker='X')
             draw_update_line(ax)
             plt.waitforbuttonpress()
         """
-        
-        #im = planner.visualize_nodes(propagate_system)
-        #sec = input('Let us wait for user input')
-        #show_image_opencv(im, "planning_tree", wait=True)
-        
         # validate if the path contains collision
-        """
-        if len(res_u):
+        if solution is not None:
+            res_x, res_u, res_t = solution
+
             # propagate data
             p_start = res_x[0]
             detail_paths = [p_start]
@@ -398,8 +513,8 @@ def main(args):
                 #print('data:')
                 #print(paths[i][j][k])
                 # modify it because of small difference between data and actual propagation
-                p_start = res_x[k]
-                state[-1] = res_x[k]
+                #p_start = res_x[k]
+                #state[-1] = res_x[k]
                 for step in range(1,max_steps+1):
                     p_start = dynamics(p_start, res_u[k], step_sz)
                     p_start = enforce_bounds(p_start)
@@ -420,20 +535,16 @@ def main(args):
             #print(paths[i][j][-1])
             state[-1] = res_x[-1]
         # validation end
-        """
-        
+            
         print('plan time: %fs' % (plan_time))
-        if len(res_x) == 0:
+        if solution is None:
             print('failed.')
             out_queue_t.put(-1)
-            out_queue_cost.put(-1.0)
+            out_queue_cost.put(-1)
         else:
             print('path succeeded.')
-            print('cost: %f' % (np.sum(res_t)))
-            print('cost_threshold: %f' % (cost_threshold))
-            print('data cost: %f' % (cost_i))
             out_queue_t.put(plan_time)
-            out_queue_cost.put(np.sum(res_t))
+            out_queue_cost.put(cost_i)
     ####################################################################################
 
 
@@ -472,7 +583,7 @@ def main(args):
     
     # directory to save the results
     res_path = args.res_path
-    res_path = res_path+args.env_type+"_lr%f_%s_step_%d_hybrid/" % (args.learning_rate, args.opt, args.num_steps)
+    res_path = res_path+args.env_type+"_sst/"
     if not os.path.exists(res_path):
         os.makedirs(res_path)
     
@@ -500,12 +611,55 @@ def main(args):
             start_state = sgs[i][j][0]
             goal_inform_state = paths[i][j][-1]
             goal_state = sgs[i][j][1]
-            cost_i = np.sum(costs[i][j])
+            cost_i = costs[i][j].sum()
+            
+            # propagate data
+            p_start = start_state
+            detail_paths = [p_start]
+            detail_controls = []
+            detail_costs = []
+            state = [p_start]
+            control = []
+            cost = []
+            for k in range(len(controls[i][j])):
+                #state_i.append(len(detail_paths)-1)
+                max_steps = int(costs[i][j][k]/step_sz)
+                accum_cost = 0.
+                #print('p_start:')
+                #print(p_start)
+                #print('data:')
+                #print(paths[i][j][k])
+                # modify it because of small difference between data and actual propagation
+                #p_start = paths[i][j][k]
+                #state[-1] = paths[i][j][k]
+                for step in range(1,max_steps+1):
+                    p_start = dynamics(p_start, controls[i][j][k], step_sz)
+                    p_start = enforce_bounds(p_start)
+                    detail_paths.append(p_start)
+                    accum_cost += step_sz
+                    if (step % 1 == 0) or (step == max_steps):
+                        state.append(p_start)
+                        #print('control')
+                        #print(controls[i][j])
+                        control.append(controls[i][j][k])
+                        cost.append(accum_cost)
+                        accum_cost = 0.
+                        
+            #print('p_start:')
+            #print(p_start)
+            #print('data:')
+            #print(paths[i][j][-1])
+            #state[-1] = paths[i][j][-1]
+
+        
+            
+            
+            
             #cost_i = 100000000.
             # acrobot: 300000
             # cartpole: 500000
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 3000000, queue_t, queue_cost))
+            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, paths[i][j], controls[i][j], costs[i][j], cost_i, 3000000, queue_t, queue_cost))
             #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
             p.start()
             p.join()
@@ -575,11 +729,15 @@ def main(args):
     np.save(res_path+"data_cost.npy", data_cost_env)
 
     
+    
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # for training
+    parser.add_argument('--model_path', type=str, default='/media/arclabdl1/HD1/YLmiao/results/KMPnet_res/acrobot_obs_lr0.010000_SGD/',help='path for saving trained models')
     parser.add_argument('--res_path', type=str, default='./plan_results/',help='path for saving trained models')
-    
+
     parser.add_argument('--seen_N', type=int, default=10)
     parser.add_argument('--seen_NP', type=int, default=200)
     parser.add_argument('--seen_s', type=int, default=0)
@@ -596,16 +754,14 @@ if __name__ == '__main__':
     parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--device', type=int, default=0, help='cuda device')
-    parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
+    parser.add_argument('--data_folder', type=str, default='./data/cartpole_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
     parser.add_argument('--start_epoch', type=int, default=5000)
-    parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
-    parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
-    parser.add_argument('--opt', type=str, default='SGD')
+    parser.add_argument('--env_type', type=str, default='cartpole_obs', help='s2d for simple 2d, c2d for complex 2d')
+    parser.add_argument('--opt', type=str, default='Adagrad')
     parser.add_argument('--num_steps', type=int, default=20)
-    parser.add_argument('--plan_type', type=str, default='tree')
-    parser.add_argument('--cost_threshold', type=float, default=1.2)
+    parser.add_argument('--plan_type', type=str, default='line')
 
     args = parser.parse_args()
     print(args)

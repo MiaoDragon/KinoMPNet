@@ -58,7 +58,7 @@ import time
 import matplotlib.pyplot as plt
 
 from plan_utility.line_line_cc import line_line_cc
-def IsInCollision(x, obc, obc_width=6.):
+def acrobot_IsInCollision(x, obc, obc_width=6.):
     STATE_THETA_1, STATE_THETA_2, STATE_V_1, STATE_V_2 = 0, 1, 2, 3
     MIN_V_1, MAX_V_1 = -6., 6.
     MIN_V_2, MAX_V_2 = -6., 6.
@@ -93,7 +93,7 @@ def IsInCollision(x, obc, obc_width=6.):
                 return True
     return False
 
-def enforce_bounds(state):
+def acrobot_enforce_bounds(state):
     STATE_THETA_1, STATE_THETA_2, STATE_V_1, STATE_V_2 = 0, 1, 2, 3
     MIN_V_1, MAX_V_1 = -6., 6.
     MIN_V_2, MAX_V_2 = -6., 6.
@@ -114,6 +114,90 @@ def enforce_bounds(state):
         state[2:],
         [MIN_V_1, MIN_V_2],
         [MAX_V_1, MAX_V_2])
+    return state
+
+
+
+
+
+
+def cartpole_IsInCollision(x, obc, obc_width=4.):
+    I = 10
+    L = 2.5
+    M = 10
+    m = 5
+    g = 9.8
+    H = 0.5
+
+    STATE_X = 0
+    STATE_V = 1
+    STATE_THETA = 2
+    STATE_W = 3
+    CONTROL_A = 0
+
+    MIN_X = -30
+    MAX_X = 30
+    MIN_V = -40
+    MAX_V = 40
+    MIN_W = -2
+    MAX_W = 2
+
+    
+    if x[0] < MIN_X or x[0] > MAX_X:
+        return True
+    
+    H = 0.5
+    pole_x1 = x[0]
+    pole_y1 = H
+    pole_x2 = x[0] + L * np.sin(x[2])
+    pole_y2 = H + L * np.cos(x[2])
+
+    
+    for i in range(len(obc)):
+        for j in range(0, 8, 2):
+            x1 = obc[i][j]
+            y1 = obc[i][j+1]
+            x2 = obc[i][(j+2) % 8]
+            y2 = obc[i][(j+3) % 8]
+            if line_line_cc(pole_x1, pole_y1, pole_x2, pole_y2, x1, y1, x2, y2):
+                return True
+    return False
+
+def cartpole_enforce_bounds(state):
+    I = 10
+    L = 2.5
+    M = 10
+    m = 5
+    g = 9.8
+    H = 0.5
+
+    STATE_X = 0
+    STATE_V = 1
+    STATE_THETA = 2
+    STATE_W = 3
+    CONTROL_A = 0
+
+    MIN_X = -30
+    MAX_X = 30
+    MIN_V = -40
+    MAX_V = 40
+    MIN_W = -2
+    MAX_W = 2
+    MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+    if state[1]<MIN_V:
+        state[1]=MIN_V
+    elif state[1]>MAX_V:
+        state[1]=MAX_V
+
+    if state[2]<-np.pi:
+        state[2]+=2*np.pi
+    elif state[2]>np.pi:
+        state[2]-=2*np.pi
+
+    if state[3]<MIN_W:
+        state[3]=MIN_W
+    elif state[3]>MAX_W:
+        state[3]=MAX_W
     return state
 
 
@@ -138,16 +222,22 @@ def main(args):
         #system = standard_cpp_systems.PSOPTPendulum()
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
     elif args.env_type == 'cartpole_obs':
-        normalize = cartpole.normalize
-        unnormalize = cartpole.unnormalize
-        obs_file = None
-        obc_file = None
-        dynamics = cartpole.dynamics
-        jax_dynamics = cartpole.jax_dynamics
-        #enforce_bounds = cartpole.enforce_bounds
-        cae = CAE_acrobot_voxel_2d
-        mlp = mlp_acrobot.MLP
+        step_sz = 0.002
+        num_steps = 21
+        goal_radius=1.5
+        random_seed=0
+        delta_near=2.0
+        delta_drain=1.2
+        cost_threshold = 1.2
+        min_time_steps = 10
+        max_time_steps = 200
+        integration_step = 0.002
+        obs_width = 4.0
         obs_f = True
+        system = _sst_module.PSOPTCartPole()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
     elif args.env_type == 'acrobot_obs':
@@ -166,103 +256,6 @@ def main(args):
         #goal_S0 = np.identity(4)
         goal_rho0 = 1.0
 
-    elif args.env_type == 'acrobot_obs_2':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-    elif args.env_type == 'acrobot_obs_3':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-
-
-    elif args.env_type == 'acrobot_obs_5':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-    elif args.env_type == 'acrobot_obs_6':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        num_steps = 21
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
-        obs_width = 6.0
-
-    elif args.env_type == 'acrobot_obs_8':
-        obs_file = None
-        obc_file = None
-        system = _sst_module.PSOPTAcrobot()
-        cpp_propagator = _sst_module.SystemPropagator()
-        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        obs_f = True
-        bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
-        step_sz = 0.02
-        #num_steps = 21
-        num_steps = 21#args.num_steps*2
-        traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 400, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init:
-        #def cem_trajopt(x0, x1, step_sz, num_steps, x_init, u_init, t_init):
-        #    u, t = acrobot_obs.trajopt(x0, x1, 500, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        #    xs, us, dts, valid = propagate(x0, u, t, dynamics=dynamics, enforce_bounds=enforce_bounds, IsInCollision=lambda x: False, system=system, step_sz=step_sz)
-        #    return xs, us, dts
-        #traj_opt = cem_trajopt
-        obs_width = 6.0
-        goal_S0 = np.diag([1.,1.,0,0])
-        goal_rho0 = 1.0
-
-
 
     if args.env_type == 'pendulum':
         step_sz = 0.002
@@ -271,9 +264,19 @@ def main(args):
     elif args.env_type == 'cartpole_obs':
         #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
         step_sz = 0.002
-        num_steps = 20
-        goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
+        num_steps = 21
+        goal_radius=1.5
+        random_seed=0
+        delta_near=2.0
+        delta_drain=1.2
+        cost_threshold = 1.2
+        min_time_steps = 10
+        max_time_steps = 200
+        integration_step = 0.002
+        obs_width = 4.0
+        obs_f = True
+        IsInCollision = cartpole_IsInCollision
+        enforce_bounds = cartpole_enforce_bounds
     elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         obs_width = 6.0
@@ -286,8 +289,13 @@ def main(args):
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_epoch_5000.pt')
-    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_epoch_5000.pt')
+    mlp_path = os.path.join(os.getcwd()+'/c++/','%s_MLP_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
+    encoder_path = os.path.join(os.getcwd()+'/c++/','%s_encoder_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
+    #mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_epoch_5000.pt')
+    #encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_epoch_5000.pt')
+
+    #cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_%s_MLP_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
+    #cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_%s_encoder_lr%f_epoch_%d_step_%d.pt' % (args.env_type, args.learning_rate, args.start_epoch, args.num_steps))
     cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_MLP_epoch_800_step_10.pt')
     cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_encoder_epoch_800_step_10.pt')
 
@@ -301,16 +309,27 @@ def main(args):
             step_sz = 0.002
             num_steps = 20
             traj_opt = lambda x0, x1: bvp_solver.solve(x0, x1, 200, num_steps, 1, 20, step_sz)
-
         elif args.env_type == 'cartpole_obs':
-            #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
-            system = _sst_module.CartPole()
-            bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
+            obs_width = 4.0
+            psopt_system = _sst_module.PSOPTCartPole()
+            propagate_system = standard_cpp_systems.RectangleObs(obs, obs_width, 'cartpole')
+            distance_computer = propagate_system.distance_computer()
+            #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
             step_sz = 0.002
-            num_steps = 20
-            traj_opt = lambda x0, x1, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*50, x_init, u_init, t_init)
-            goal_S0 = np.identity(4)
-            goal_rho0 = 1.0
+            num_steps = 101
+            goal_radius=1.5
+            random_seed=0
+            delta_near=2.0
+            delta_drain=1.2
+            device=3
+            num_sample = 10
+            min_time_steps = 10
+            max_time_steps = 200
+            mpnet_goal_threshold = 2.0
+            mpnet_length_threshold = 40
+            pick_goal_init_threshold = 0.1
+            pick_goal_end_threshold = 0.8
+            pick_goal_start_percent = 0.4  
         elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
             #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
             obs_width = 6.0
@@ -330,6 +349,9 @@ def main(args):
         #cost_threshold = cost_i * 1.1
         cost_threshold = 100000000.
         
+        
+        
+        """
         # visualization
         plt.ion()
         fig = plt.figure()
@@ -397,12 +419,107 @@ def main(args):
             update_line(hl, ax, data[i])
         draw_update_line(ax)        
         # visualization end
+        """
+        
+
+        # visualize for cartpole
+        plt.ion()
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.set_autoscale_on(True)
+        hl, = ax.plot([], [], 'b')
+
+        #hl_real, = ax.plot([], [], 'r')
+        def update_line(h, ax, new_data):
+            h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
+            #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
+            #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
+
+
+        def draw_update_line(ax):
+            ax.relim()
+            ax.autoscale_view()
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+
+
+        # randomly pick up a point in the data, and find similar data in the dataset
+        # plot the next point
+        #ax.set_autoscale_on(True)
+        ax.set_xlim(-30, 30)
+        ax.set_ylim(-np.pi, np.pi)
+        hl, = ax.plot([], [], 'b')
+        #hl_real, = ax.plot([], [], 'r')
+        hl_for, = ax.plot([], [], 'g')
+        hl_back, = ax.plot([], [], 'r')
+        hl_for_mpnet, = ax.plot([], [], 'lightgreen')
+        hl_back_mpnet, = ax.plot([], [], 'salmon')
+
+        #print(obs)
+        def update_line(h, ax, new_data):
+            new_data = wrap_angle(new_data, propagate_system)
+            h.set_data(np.append(h.get_xdata(), new_data[0]), np.append(h.get_ydata(), new_data[1]))
+            #h.set_xdata(np.append(h.get_xdata(), new_data[0]))
+            #h.set_ydata(np.append(h.get_ydata(), new_data[1]))
+
+        def remove_last_k(h, ax, k):
+            h.set_data(h.get_xdata()[:-k], h.get_ydata()[:-k])
+
+        def draw_update_line(ax):
+            #ax.relim()
+            #ax.autoscale_view()
+            fig.canvas.draw()
+            fig.canvas.flush_events()
+            #plt.show()
+
+        def wrap_angle(x, system):
+            circular = system.is_circular_topology()
+            res = np.array(x)
+            for i in range(len(x)):
+                if circular[i]:
+                    # use our previously saved version
+                    res[i] = x[i] - np.floor(x[i] / (2*np.pi))*(2*np.pi)
+                    if res[i] > np.pi:
+                        res[i] = res[i] - 2*np.pi
+            return res
+        dx = 1
+        dtheta = 0.1
+        feasible_points = []
+        infeasible_points = []
+        imin = 0
+        imax = int(2*30./dx)
+        jmin = 0
+        jmax = int(2*np.pi/dtheta)
+
+        for i in range(imin, imax):
+            for j in range(jmin, jmax):
+                x = np.array([dx*i-30, 0., dtheta*j-np.pi, 0.])
+                if IsInCollision(x, obs_i):
+                    infeasible_points.append(x)
+                else:
+                    feasible_points.append(x)
+        feasible_points = np.array(feasible_points)
+        infeasible_points = np.array(infeasible_points)
+        print('feasible points')
+        print(feasible_points)
+        print('infeasible points')
+        print(infeasible_points)
+        ax.scatter(feasible_points[:,0], feasible_points[:,2], c='yellow')
+        ax.scatter(infeasible_points[:,0], infeasible_points[:,2], c='pink')
+        #for i in range(len(data)):
+        #    update_line(hl, ax, data[i])
+        draw_update_line(ax)
+        #state_t = start_state
+        # visualization end
+
         
         
         # generate a path by using SST to plan for some maximal iterations
 
         state_t = start_state
-        pick_goal_threshold = 1.0
+        pick_goal_threshold = .0
+        ax.scatter(goal_inform_state[0], goal_inform_state[2], marker='*', c='red')  # cartpole
+
         for i in range(max_iteration):
             time0 = time.time()
             # determine if picking goal based on iteration number
@@ -418,7 +535,7 @@ def main(args):
                                 delta_near, delta_drain, cost_threshold)
 
             if len(bvp_u) != 0:# and bvp_t[0] > 0.01:  # turn bvp_t off if want to use step_bvp
-                xw_scat = ax.scatter(mpnet_res[0], mpnet_res[1], c='lightgreen')
+                xw_scat = ax.scatter(mpnet_res[0], mpnet_res[2], c='lightgreen')
                 draw_update_line(ax)
                           
                 # propagate data
@@ -447,7 +564,9 @@ def main(args):
                 for j in range(len(xs_to_plot)):
                     xs_to_plot[j] = wrap_angle(xs_to_plot[j], propagate_system)
                 xs_to_plot = xs_to_plot[::5]
-                ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
+                #ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')  # acrobot
+                ax.scatter(xs_to_plot[:,0], xs_to_plot[:,2], c='green')  # cartpole
+
                 #ax.scatter(bvp_x[:,0], bvp_x[:,1], c='green')
                 print('solution: x')
                 print(bvp_x)
@@ -467,12 +586,15 @@ def main(args):
             # based on flag, determine how to change state_t
             if flag:
                 # only change state_t if in MPNet inform mode                
-                if len(bvp_u) != 0:
+                #if len(bvp_u) != 0:
+                if True:
                     # try using steered result as next start
+                    #if not IsInCollision(state_t, obs_i):
                     state_t = mpnet_res
                     print('after copying to state_t:')
                     print('state_t')
                     print(state_t)
+                    # if in collision, then not using it
                 else:
                     print('failure')
                     state_t = start_state # failed BVP, back to origin
@@ -624,16 +746,16 @@ if __name__ == '__main__':
     parser.add_argument('--AE_input_size', type=int, default=32, help='dimension of input to AE')
     parser.add_argument('--mlp_input_size', type=int , default=136, help='dimension of the input vector')
     parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
-    parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--device', type=int, default=0, help='cuda device')
-    parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
+    parser.add_argument('--data_folder', type=str, default='./data/cartpole_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=5000)
-    parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
+    parser.add_argument('--start_epoch', type=int, default=500)
+    parser.add_argument('--env_type', type=str, default='cartpole_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
-    parser.add_argument('--opt', type=str, default='Adagrad')
-    parser.add_argument('--num_steps', type=int, default=20)
+    parser.add_argument('--opt', type=str, default='SGD')
+    parser.add_argument('--num_steps', type=int, default=100)
     parser.add_argument('--plan_type', type=str, default='tree')
 
     args = parser.parse_args()
