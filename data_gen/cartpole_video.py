@@ -85,10 +85,14 @@ class CartPoleVisualizer(Visualizer):
     def __init__(self, system, params):
         super(CartPoleVisualizer, self).__init__(system, params)
         self.dt = 0.05
+        self.fig = plt.gcf()
+        self.ax1 = plt.subplot(121)
+        self.ax2 = plt.subplot(122)
 
     def _init(self):
+        ##### handle the animation
         # clear the current ax
-        ax = plt.gca()
+        ax = self.ax1
         ax.clear()
         # add patches
         state = self.states[0]
@@ -114,9 +118,45 @@ class CartPoleVisualizer(Visualizer):
         self.pole.set_transform(t)
         ax.add_patch(self.pole)
         ax.add_patch(self.cart)
+
+        #### handle search space
+        ax = self.ax2
+        ax.clear()
+        ax.set_xlim(-30, 30)
+        ax.set_ylim(-np.pi, np.pi)
+
+        dtheta = 0.1
+        feasible_points = []
+        infeasible_points = []
+        imin = 0
+        imax = int(2*np.pi/dtheta)
+
+
+        for i in range(imin, imax):
+            for j in range(imin, imax):
+                x = np.array([dtheta*i-np.pi, dtheta*j-np.pi, 0., 0.])
+                if IsInCollision(x, self.cc_obs):
+                    infeasible_points.append(x)
+                else:
+                    feasible_points.append(x)
+        feasible_points = np.array(feasible_points)
+        infeasible_points = np.array(infeasible_points)
+        print('feasible points')
+        print(feasible_points)
+        print('infeasible points')
+        print(infeasible_points)
+        scat_feas =ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
+        scat_infeas = ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
+
+        self.recs.append(scat_fes)
+        self.recs.append(scat_infeas)
+
+        scat_state = ax.scatter(state[0], state[2], c='green')
+        self.recs.append(scat_state)
+
         return self.recs
     def _animate(self, i):
-        ax = plt.gca()
+        ax = self.ax1
         ax.set_xlim(-40, 40)
         ax.set_ylim(-20, 20)
         state = self.states[i]
@@ -125,6 +165,13 @@ class CartPoleVisualizer(Visualizer):
                                                         -state[2]/np.pi * 180) + ax.transData
         self.recs[0].set_transform(t)
         self.recs[1].set_xy((state[0]-self.params['cart_w']/2,params['cart_h']))
+
+
+        # handle search space
+        ax = self.ax2
+        ax.set_xlim(-30, 30)
+        ax.set_ylim(-np.pi, np.pi)
+        self.recs[4].set_offsets([state[0], state[2]])
         # print location of cart
         return self.recs
 
@@ -149,7 +196,7 @@ class CartPoleVisualizer(Visualizer):
             obs_pt.append(obstacles[k][1]-obs_width/2)
             new_obs_i.append(obs_pt)
         obs_i = new_obs_i
-
+        self.cc_obs = obs_i
 
         # transform the waypoint states and actions into trajectory
         traj = []
