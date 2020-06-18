@@ -505,7 +505,7 @@ def main(args):
             # acrobot: 300000
             # cartpole: 500000
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 3000000, queue_t, queue_cost))
+            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue_t, queue_cost))
             #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
             p.start()
             p.join()

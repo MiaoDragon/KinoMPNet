@@ -8,17 +8,24 @@ sys.path.append('../deps/sparse_rrt')
 sys.path.append('..')
 
 from sparse_rrt.planners import SST
-f#rom env.cartpole_obs import CartPoleObs
-f#rom env.cartpole import CartPole
+#from env.cartpole_obs import CartPoleObs
+#from env.cartpole import CartPole
 from sparse_rrt.systems import standard_cpp_systems
 from sparse_rrt import _sst_module
 import numpy as np
 import time
 from tools.pcd_generation import rectangle_pcd
+from plan_utility.line_line_cc import line_line_cc
 
 import pickle
 import os
-
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+import matplotlib as mpl
+import matplotlib.patches as patches
+#from IPython.display import HTML
 
 # visualize the path
 """
@@ -84,14 +91,17 @@ def IsInCollision(x, obc, obc_width=4.):
 class CartPoleVisualizer(Visualizer):
     def __init__(self, system, params):
         super(CartPoleVisualizer, self).__init__(system, params)
-        self.dt = 0.05
+        self.dt = 2
         self.fig = plt.gcf()
+        self.fig.set_figheight(4)
+        self.fig.set_figwidth(8)
         self.ax1 = plt.subplot(121)
         self.ax2 = plt.subplot(122)
 
     def _init(self):
         ##### handle the animation
         # clear the current ax
+        print("in init")
         ax = self.ax1
         ax.clear()
         # add patches
@@ -125,37 +135,43 @@ class CartPoleVisualizer(Visualizer):
         ax.set_xlim(-30, 30)
         ax.set_ylim(-np.pi, np.pi)
 
+        dx = 1
         dtheta = 0.1
         feasible_points = []
         infeasible_points = []
         imin = 0
-        imax = int(2*np.pi/dtheta)
-
+        imax = int(2*30./dx)
+        jmin = 0
+        jmax = int(2*np.pi/dtheta)
 
         for i in range(imin, imax):
-            for j in range(imin, imax):
-                x = np.array([dtheta*i-np.pi, dtheta*j-np.pi, 0., 0.])
+            for j in range(jmin, jmax):
+                x = np.array([dx*i-30, 0., dtheta*j-np.pi, 0.])
                 if IsInCollision(x, self.cc_obs):
                     infeasible_points.append(x)
                 else:
                     feasible_points.append(x)
         feasible_points = np.array(feasible_points)
         infeasible_points = np.array(infeasible_points)
+        
         print('feasible points')
         print(feasible_points)
         print('infeasible points')
         print(infeasible_points)
-        scat_feas =ax.scatter(feasible_points[:,0], feasible_points[:,1], c='yellow')
-        scat_infeas = ax.scatter(infeasible_points[:,0], infeasible_points[:,1], c='pink')
+        scat_feas =ax.scatter(feasible_points[:,0], feasible_points[:,2], c='yellow')
+        scat_infeas = ax.scatter(infeasible_points[:,0], infeasible_points[:,2], c='pink')
 
-        self.recs.append(scat_fes)
+        self.recs.append(scat_feas)
         self.recs.append(scat_infeas)
 
         scat_state = ax.scatter(state[0], state[2], c='green')
         self.recs.append(scat_state)
+        print("after init")
 
         return self.recs
     def _animate(self, i):
+        print('animating, frame %d/%d' % (i, self.total))
+        
         ax = self.ax1
         ax.set_xlim(-40, 40)
         ax.set_ylim(-20, 20)
@@ -164,14 +180,14 @@ class CartPoleVisualizer(Visualizer):
         t = mpl.transforms.Affine2D().rotate_deg_around(state[0], self.params['cart_h'], \
                                                         -state[2]/np.pi * 180) + ax.transData
         self.recs[0].set_transform(t)
-        self.recs[1].set_xy((state[0]-self.params['cart_w']/2,params['cart_h']))
+        self.recs[1].set_xy((state[0]-self.params['cart_w']/2,0))
 
 
         # handle search space
         ax = self.ax2
         ax.set_xlim(-30, 30)
         ax.set_ylim(-np.pi, np.pi)
-        self.recs[4].set_offsets([state[0], state[2]])
+        self.recs[-1].set_offsets([state[0], state[2]])
         # print location of cart
         return self.recs
 
@@ -223,6 +239,7 @@ class CartPoleVisualizer(Visualizer):
         self.states = traj
         self.obs = obstacles
         print(len(self.states))
+        self.total = len(self.states)
         ani = animation.FuncAnimation(plt.gcf(), self._animate, range(0, len(self.states)),
                                       interval=self.dt, blit=True, init_func=self._init,
                                       repeat=True)
@@ -240,9 +257,9 @@ L = 2.5
 
 # convert from obs to point cloud
 # load generated point cloud
-writer=animation.FFMpegFileWriter(fps=50)
-for obs_idx in range(5):
-    for p_idx in range(10):
+writer=animation.FFMpegFileWriter(fps=500)
+for obs_idx in range(0,5):
+    for p_idx in range(2):
         # Create custom system
         #obs_list = [[-10., -3.],
         #            [0., 3.],

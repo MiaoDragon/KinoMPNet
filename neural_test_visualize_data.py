@@ -160,7 +160,7 @@ def main(args):
 
         #system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
         dynamics = lambda x, u, t: cpp_propagator.propagate(psopt_system, x, u, t)
-
+        cpp_state_validator = lambda x, obs: cpp_propagator.cartpole_validate(x, obs, obs_width)
         #system = standard_cpp_systems.RectangleObs(obs_list, args.obs_width, 'cartpole')
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
     elif args.env_type == 'acrobot_obs':
@@ -219,6 +219,7 @@ def main(args):
                 new_obs_i.append(obs_pt)
             obs_i = new_obs_i
 
+            """
             # visualization
             plt.ion()
             fig = plt.figure()
@@ -268,14 +269,20 @@ def main(args):
             imax = int(2*30./dx)
             jmin = 0
             jmax = int(2*np.pi/dtheta)
-
             for i in range(imin, imax):
                 for j in range(jmin, jmax):
                     x = np.array([dx*i-30, 0., dtheta*j-np.pi, 0.])
                     if IsInCollision(x, obs_i):
                         infeasible_points.append(x)
+                        print('state:', x)
+                        print('python collison')
+                        print("cpp collision result: ", cpp_state_validator(x, obs[envi]))
+                        
                     else:
                         feasible_points.append(x)
+                        print('state:', x)
+                        print('python not in collison')
+                        print("cpp collision result: ", cpp_state_validator(x, obs[envi]))
             feasible_points = np.array(feasible_points)
             infeasible_points = np.array(infeasible_points)
             print('feasible points')
@@ -288,7 +295,7 @@ def main(args):
             #    update_line(hl, ax, data[i])
             draw_update_line(ax)
             #state_t = start_state
-
+            """
             xs = paths[envi][pathi]
             us = controls[envi][pathi]
             ts = costs[envi][pathi]
@@ -302,7 +309,7 @@ def main(args):
             cost = []
             for k in range(len(us)):
                 #state_i.append(len(detail_paths)-1)
-                max_steps = int(ts[k]/step_sz)
+                max_steps = int(np.round(ts[k]/step_sz))
                 accum_cost = 0.
                 print('p_start:')
                 print(p_start)
@@ -325,6 +332,10 @@ def main(args):
                         #print(controls[i][j])
                         cost.append(accum_cost)
                         accum_cost = 0.
+                        
+                        print('state:', p_start)
+                        print('python IsInCollison result: ', IsInCollision(p_start, obs_i))
+                        print("cpp validate result: ", cpp_state_validator(p_start, obs[envi]))
                         assert not IsInCollision(p_start, obs_i)
 
             print('p_start:')
@@ -333,8 +344,7 @@ def main(args):
             print(paths[envi][pathi][-1])
             #state[-1] = xs[-1]
 
-
-
+            """
             xs_to_plot = np.array(state)
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], psopt_system)
@@ -343,7 +353,7 @@ def main(args):
             #ax.scatter(start_state[0], goal_state[0], marker='X')
             draw_update_line(ax)
             plt.waitforbuttonpress()
-
+            """
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -351,7 +361,7 @@ if __name__ == '__main__':
     parser.add_argument('--seen_N', type=int, default=10)
     parser.add_argument('--seen_NP', type=int, default=20)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=850)
+    parser.add_argument('--seen_sp', type=int, default=0)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)

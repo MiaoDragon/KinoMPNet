@@ -16,9 +16,9 @@ def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, sys
         #state_i.append(len(detail_paths)-1)
         max_steps = int(np.round(data_cost[k]/step_sz))
         accum_cost = 0.
-        # modify it because of small difference between data and actual propagation
-        p_start = data_path[k]
-        state[-1] = data_path[k]
+        ## modify it because of small difference between data and actual propagation
+        #p_start = data_path[k]
+        #state[-1] = data_path[k]
         for step in range(1,max_steps+1):
             p_start = dynamics(p_start, data_control[k], step_sz)
             accum_cost += step_sz
@@ -27,7 +27,7 @@ def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, sys
                 control.append(data_control[k])
                 cost.append(accum_cost)
                 accum_cost = 0.
-    state[-1] = data_path[-1]
+    #state[-1] = data_path[-1]
     return state, control, cost
 
 def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, system=None, step_sz=0.02, num_steps=20):
@@ -113,10 +113,19 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
             #print('after flip:')
             #print(p)
             for k in range(len(p)-1):
+                """
+                # If want to use all intermediate nodes as subgoal, then use the commented code
                 for l in range(k+1, len(p)):
                     waypoint_dataset.append(np.concatenate([p[k], p[l]]))
                     waypoint_targets.append(p[k+1])
                     env_indices.append(i)
+                """
+                # otherwise use the following
+                waypoint_dataset.append(np.concatenate([p[k], p[-1]]))
+                waypoint_targets.append(p[k+1])
+                env_indices.append(i)
+                
+                
                 u_init_dataset.append(np.concatenate([p[k], p[k+1]]))
                 u_init_targets.append(data_control[k])
                 t_init_dataset.append(np.concatenate([p[k], p[k+1]]))
@@ -163,7 +172,7 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
     else:
         obs_list = []
         obc_list = []
-        for i in range(N):
+        for i in range(s,s+N):
             file = open(data_folder+'obs_%d.pkl' % (i), 'rb')
             p = pickle._Unpickler(file)
             p.encoding = 'latin1'
@@ -186,12 +195,24 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
     control_env = []
     cost_env = []
     sg_env = []
+    
+    
+    
+    
+    path_nums = []
+
     for i in range(s,N+s):
         paths = []
         path_lengths = []
         costs = []
         controls = []
         sgs = []
+        
+        correct_paths = []
+        correct_costs = []
+        correct_controls = []
+        
+        
         for j in range(sp,NP+sp):
             dir = data_folder+str(i)+'/'
             path_file = dir+'path_%d' %(j) + ".pkl"
@@ -221,6 +242,43 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
             p = p.load()
             costs.append(p)
 
+
+            
+            """
+            path_file = dir+'path_corrected_%d' %(j) + ".pkl"
+            control_file = dir+'control_corrected_%d' %(j) + ".pkl"
+            cost_file = dir+'cost_corrected_%d' %(j) + ".pkl"
+            file = open(path_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            p = p.load()
+            correct_paths.append(p)
+            file = open(control_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            p = p.load()
+            correct_controls.append(p)
+            file = open(cost_file, 'rb')
+            p = pickle._Unpickler(file)
+            p.encoding = 'latin1'
+            p = p.load()
+            correct_costs.append(p)
+            # compare cost
+            path_nums.append(int(np.round(np.sum(costs[-1])/0.002)))
+            print('correct cost: ', np.array(correct_costs[-1]).shape)
+            print('cost: ', np.array(costs[-1]).shape)
+            #print('correct cost: ', np.sum(correct_costs[-1]))
+            #print('cost: ', np.sum(costs[-1]))
+            #print('difference: ', np.sum(correct_costs[-1])-np.sum(costs[-1]))
+            
+            #if np.abs(np.sum(correct_costs[-1])-np.sum(costs[-1])) > 0.:
+            #    return
+            """
+            
+            
+            
+            
+            
         path_env.append(paths)
         path_length_env.append(path_lengths)
         control_env.append(controls)
@@ -229,6 +287,7 @@ def load_test_dataset(N, NP, data_folder, obs_f=None, s=0, sp=0):
     if obs_list is not None:
         obs_list = np.array(obs_list)
         obc_list = np.array(obc_list)
+        
     return obc_list, obs_list, path_env, sg_env, path_length_env, control_env, cost_env
 
 

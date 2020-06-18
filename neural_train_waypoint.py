@@ -6,6 +6,7 @@ import sys
 sys.path.append('deps/sparse_rrt')
 sys.path.append('.')
 import torch
+import torch.nn as nn
 import model.AE.identity as cae_identity
 from model.mlp import MLP
 from model import mlp_acrobot, mlp_cartpole
@@ -62,6 +63,16 @@ def main(args):
         unnormalize = cart_pole_obs.unnormalize
         system = _sst_module.PSOPTCartPole()
         mlp = mlp_cartpole.MLP6
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+    elif args.env_type == 'cartpole_obs_3':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP4
         cae = CAE_cartpole_voxel_2d
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = cart_pole_obs.enforce_bounds
@@ -160,8 +171,9 @@ def main(args):
                    cae, mlp)
     # load net
     # load previously trained model if start epoch > 0
+
     model_dir = args.model_dir
-    model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
+    model_dir = model_dir+args.env_type+"_lr%f_%s_loss_%s_step_%d/" % (args.learning_rate, args.opt, args.loss, args.num_steps)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
     model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
@@ -191,6 +203,14 @@ def main(args):
     if args.start_epoch > 0:
         #load_opt_state(mpnet, os.path.join(args.model_path, model_path))
         load_opt_state(mpnet, os.path.join(model_dir, model_path))
+        
+
+    # set loss for mpnet
+    if args.loss == 'mse':
+        mpnet.loss_f = nn.MSELoss()
+    elif args.loss == 'l1_smooth':
+        mpnet.loss_f = nn.SmoothL1Loss()
+    
 
     # load train and test data
     print('loading...')
@@ -223,7 +243,7 @@ def main(args):
 
     # Train the Models
     print('training...')
-    writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps)
+    writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d_loss_%s' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, args.loss, )
     writer = SummaryWriter('./runs/'+writer_fname)
     record_i = 0
     val_record_i = 0
@@ -343,6 +363,8 @@ parser.add_argument('--start_epoch', type=int, default=0)
 parser.add_argument('--env_type', type=str, default='cartpole', help='environment')
 parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')
 parser.add_argument('--opt', type=str, default='Adagrad')
+parser.add_argument('--loss', type=str, default='mse')
+
 parser.add_argument('--direction', type=int, default=0, help='0: forward, 1: backward')
 #parser.add_argument('--opt', type=str, default='Adagrad')
 args = parser.parse_args()

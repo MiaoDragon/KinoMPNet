@@ -13,7 +13,7 @@ class KMPNet(nn.Module):
         else:
             self.encoder = CAE.Encoder(AE_input_size, mlp_input_size-total_input_size)
         self.mlp = MLP(mlp_input_size, output_size)
-        self.mse = nn.MSELoss()
+        self.loss_f = nn.MSELoss()
         self.opt = torch.optim.Adagrad(list(self.encoder.parameters())+list(self.mlp.parameters()))
         self.total_input_size = total_input_size
         self.AE_input_size = AE_input_size
@@ -36,7 +36,7 @@ class KMPNet(nn.Module):
         return self.mlp(mlp_in)
 
     def loss(self, pred, truth):
-        return self.mse(pred, truth)
+        return self.loss_f(pred, truth)
 
     def step(self, x, obs, y):
         # given a batch of data, optimize the parameters by one gradient descent step

@@ -8,8 +8,8 @@ def obs_gen(N, N_obs, N_pc=1400, width=4):
     low_h = - width/2 - L
     high_h = width/2 + L
     # predefined y values
-    y_up = H + width/2 + L/4
-    y_down = H - width/2 - L/4
+    y_up = H + width/2 + L/2
+    y_down = H - width/2 - L/2
     near = width * 1.2
     obs_list = []
     for i in range(N):

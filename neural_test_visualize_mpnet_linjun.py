@@ -145,7 +145,73 @@ def enforce_bounds(state):
     return state
 
 
+from torch import nn
+class PNet(nn.Module):
+	def __init__(self, input_size, output_size):
+		super(PNet, self).__init__()
+		self.fc = nn.Sequential(
+		nn.Linear(input_size, 512), nn.PReLU(), nn.Dropout(),
+#         nn.Linear(4096, 2048), nn.PReLU(), nn.Dropout(),
+#         nn.Linear(2048, 1024), nn.PReLU(), nn.Dropout(),
+#         nn.Linear(1024, 512), nn.PReLU(), nn.Dropout(),
+		nn.Linear(512, 256), nn.PReLU(), nn.Dropout(),
+		nn.Linear(256, 128), nn.PReLU(),#, nn.Dropout(),
+		nn.Linear(128, 64), nn.PReLU(),#, nn.Dropout(),
+		nn.Linear(64, 32), nn.PReLU(),
+		nn.Linear(32, output_size))
 
+	def forward(self, x):
+		out = self.fc(x)
+		return out
+
+class VoxelEncoder(nn.Module):
+	def __init__(self, input_size, output_size, in_channels):
+		super(VoxelEncoder, self).__init__()
+		input_size = [input_size, input_size]
+		self.encoder = nn.Sequential(
+			nn.Conv2d(in_channels=in_channels, out_channels=128, kernel_size=[5,5], stride=[2,2]),
+			nn.PReLU(),
+            nn.MaxPool2d(kernel_size=[2,2]),
+			nn.Conv2d(in_channels=128, out_channels=64, kernel_size=[3,3], stride=[1,1]),
+			nn.PReLU(),
+			nn.MaxPool2d(kernel_size=[2,2])
+		)
+		with torch.no_grad():
+			x = self.encoder(torch.autograd.Variable(torch.rand([1, in_channels] + input_size)))
+		first_fc_in_features = 1
+		for n in x.size()[1:]:
+			first_fc_in_features *= n
+		self.head = nn.Sequential(
+			nn.Linear(first_fc_in_features, 256),
+			nn.PReLU(),
+			nn.Linear(256, output_size)
+		)
+	def forward(self, x):
+		x = self.encoder(x)
+		x = x.view(x.size(0), -1)
+		x = self.head(x)
+		return x
+
+    
+class MPNet(nn.Module):
+    def __init__(self, ae_input_size=32, ae_output_size=64,
+                 in_channels=1,
+                 state_size=4,
+                 control_size=0):
+        super(MPNet, self).__init__()
+        self.encoder = VoxelEncoder(input_size=ae_input_size, 
+                                    output_size=ae_output_size,
+                                    in_channels=in_channels)
+        self.pnet = PNet(input_size=ae_output_size+state_size * 2,
+                         output_size=state_size+control_size)
+    
+    def forward(self, x, obs):
+        if obs is not None:
+            z = self.encoder(obs)
+            z_x = torch.cat((z,x), 1)
+        else:
+            z_x = x
+        return self.pnet(z_x)
 
 def main(args):
     # set seed
@@ -217,42 +283,47 @@ def main(args):
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
 
         
-    mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
-                   cae, mlp)
+    # mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
+    #                cae, mlp)
+
+    mpnet = MPNet(ae_input_size=32, ae_output_size=1024, in_channels=1, state_size=4)
+
+    
     # load net
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
     model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
-    print(model_dir)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
     model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
     torch_seed, np_seed, py_seed = 0, 0, 0
-    if args.start_epoch > 0:
+    # if args.start_epoch > 0:
         #load_net_state(mpnet, os.path.join(args.model_path, model_path))
-        load_net_state(mpnet, os.path.join(model_dir, model_path))
-        #torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
-        torch_seed, np_seed, py_seed = load_seed(os.path.join(model_dir, model_path))
-        # set seed after loading
-        torch.manual_seed(torch_seed)
-        np.random.seed(np_seed)
-        random.seed(py_seed)
+        # load_net_state(mpnet, os.path.join(model_dir, model_path))
+        # #torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
+        # torch_seed, np_seed, py_seed = load_seed(os.path.join(model_dir, model_path))
+        # # set seed after loading
+    torch.manual_seed(torch_seed)
+    np.random.seed(np_seed)
+    random.seed(py_seed)
+    mpnet.load_state_dict(torch.load('/media/arclabdl1/HD1/Linjun/mpc-mpnet-py/mpnet/output/cartpole_obs/default_norm/mpnet/ep10000.pth'))
+
 
     if torch.cuda.is_available():
         mpnet.cuda()
-        mpnet.mlp.cuda()
-        mpnet.encoder.cuda()
-        if args.opt == 'Adagrad':
-            mpnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
-        elif args.opt == 'Adam':
-            mpnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
-        elif args.opt == 'SGD':
-            mpnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
-        elif args.opt == 'ASGD':
-            mpnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
-    if args.start_epoch > 0:
+        # mpnet.mlp.cuda()
+        # mpnet.encoder.cuda()
+        # if args.opt == 'Adagrad':
+        #     mpnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+        # elif args.opt == 'Adam':
+        #     mpnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
+        # elif args.opt == 'SGD':
+        #     mpnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
+        # elif args.opt == 'ASGD':
+        #     mpnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
+    # if args.start_epoch > 0:
         #load_opt_state(mpnet, os.path.join(args.model_path, model_path))
-        load_opt_state(mpnet, os.path.join(model_dir, model_path))
+        # load_opt_state(mpnet, os.path.join(model_dir, model_path))
     
     mpnet.eval()
         
@@ -451,7 +522,7 @@ def main(args):
             # visualize mPNet path
             mpnet_paths = []
             state = xs[0]
-            for k in range(40):
+            for k in range(len(xs)):
                 mpnet_paths.append(state)
                 bi = np.concatenate([state, xs[-1]])
                 bi = np.array([bi])
@@ -471,10 +542,8 @@ def main(args):
                 bt = bt.detach().numpy()
                 print(bt.shape)
                 state = bt[0]
-            
-            print(mpnet_paths)
+
             xs_to_plot = np.array(mpnet_paths)
-            print(len(xs_to_plot))
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], psopt_system)
             ax.scatter(xs_to_plot[:,0], xs_to_plot[:,2], c='lightgreen')
@@ -512,7 +581,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/cartpole_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=5450)
+    parser.add_argument('--start_epoch', type=int, default=2450)
     parser.add_argument('--env_type', type=str, default='cartpole_obs_3', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[30.0, 40.0, 3.141592653589793, 2.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
