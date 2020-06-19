@@ -263,7 +263,7 @@ def main(args):
                 if id_new in id_list:
                     print('same start goal!')
                     continue
-
+                # add to the list if later the plan is successful
 
 
                 dir = args.path_folder+str(i+args.s)+'/'
@@ -286,6 +286,8 @@ def main(args):
                     sg = [start, end]
                     pickle.dump(sg, file)
                     file.close()
+                    # add to the list of ids
+                    id_list.append(id_new)
                     break
             print('path planning time: %f' % (time.time() - plan_start))
 
