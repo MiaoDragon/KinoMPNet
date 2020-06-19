@@ -222,10 +222,14 @@ def main(args):
     # load net
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
-    model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
+    if args.loss == 'mse':
+        model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
+    else:
+        model_dir = model_dir+args.env_type+"_lr%f_%s_loss_%s_step_%d/" % (args.learning_rate, args.opt, args.loss, args.num_steps)
     print(model_dir)
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
+    
     model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
@@ -451,7 +455,7 @@ def main(args):
             # visualize mPNet path
             mpnet_paths = []
             state = xs[0]
-            for k in range(40):
+            for k in range(int(len(xs_to_plot)/args.num_steps)):
                 mpnet_paths.append(state)
                 bi = np.concatenate([state, xs[-1]])
                 bi = np.array([bi])
@@ -512,10 +516,11 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/cartpole_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=5450)
-    parser.add_argument('--env_type', type=str, default='cartpole_obs_3', help='s2d for simple 2d, c2d for complex 2d')
+    parser.add_argument('--start_epoch', type=int, default=4250)
+    parser.add_argument('--env_type', type=str, default='cartpole_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[30.0, 40.0, 3.141592653589793, 2.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
+    parser.add_argument('--loss', type=str, default='l1_smooth')
 
     args = parser.parse_args()
     print(args)

@@ -62,7 +62,7 @@ def main(args):
         normalize = cart_pole_obs.normalize
         unnormalize = cart_pole_obs.unnormalize
         system = _sst_module.PSOPTCartPole()
-        mlp = mlp_cartpole.MLP6
+        mlp = mlp_cartpole.MLP2
         cae = CAE_cartpole_voxel_2d
         dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
         enforce_bounds = cart_pole_obs.enforce_bounds
@@ -173,10 +173,21 @@ def main(args):
     # load previously trained model if start epoch > 0
 
     model_dir = args.model_dir
-    model_dir = model_dir+args.env_type+"_lr%f_%s_loss_%s_step_%d/" % (args.learning_rate, args.opt, args.loss, args.num_steps)
+    if args.loss == 'mse':
+        if args.multigoal == 0:
+            model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d/" % (args.learning_rate, args.opt, args.num_steps)
+        else:
+            model_dir = model_dir+args.env_type+"_lr%f_%s_step_%d_multigoal/" % (args.learning_rate, args.opt, args.num_steps)
+    else:
+        if args.multigoal == 0:
+            model_dir = model_dir+args.env_type+"_lr%f_%s_loss_%s_step_%d/" % (args.learning_rate, args.opt, args.loss, args.num_steps)
+        else:
+            model_dir = model_dir+args.env_type+"_lr%f_%s_loss_%s_step_%d_multigoal/" % (args.learning_rate, args.opt, args.loss, args.num_steps)
+            
+        
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-    model_path='kmpnet_epoch_%d_direction_%d.pkl' %(args.start_epoch, args.direction)
+    model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
         #load_net_state(mpnet, os.path.join(args.model_path, model_path))
@@ -219,7 +230,8 @@ def main(args):
                                                 data_folder=args.path_folder, obs_f=True,
                                                 direction=args.direction,
                                                 dynamics=dynamics, enforce_bounds=enforce_bounds,
-                                                system=system, step_sz=step_sz, num_steps=args.num_steps)
+                                                system=system, step_sz=step_sz, 
+                                                num_steps=args.num_steps, multigoal=args.multigoal)
     # randomize the dataset before training
     data=list(zip(waypoint_dataset,waypoint_targets,env_indices))
     random.shuffle(data)
@@ -243,7 +255,18 @@ def main(args):
 
     # Train the Models
     print('training...')
-    writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d_loss_%s' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, args.loss, )
+    if args.loss == 'mse':
+        if args.multigoal == 0:
+            writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, )
+        else:
+            writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d_multigoal' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, )
+    else:
+        if args.multigoal == 0:
+            writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d_loss_%s' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, args.loss, )
+        else:
+            writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d_loss_%s_multigoal' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, args.loss, )
+            
+        
     writer = SummaryWriter('./runs/'+writer_fname)
     record_i = 0
     val_record_i = 0
@@ -364,6 +387,8 @@ parser.add_argument('--env_type', type=str, default='cartpole', help='environmen
 parser.add_argument('--world_size', nargs='+', type=float, default=20., help='boundary of world')
 parser.add_argument('--opt', type=str, default='Adagrad')
 parser.add_argument('--loss', type=str, default='mse')
+parser.add_argument('--multigoal', type=int, default=0, help='using itermediate nodes as goal or not')
+
 
 parser.add_argument('--direction', type=int, default=0, help='0: forward, 1: backward')
 #parser.add_argument('--opt', type=str, default='Adagrad')

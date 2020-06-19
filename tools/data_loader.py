@@ -22,15 +22,27 @@ def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, sys
         for step in range(1,max_steps+1):
             p_start = dynamics(p_start, data_control[k], step_sz)
             accum_cost += step_sz
-            if (step % num_steps == 0) or (step == max_steps):
+            if (step % 1 == 0) or (step == max_steps):
                 state.append(p_start)
                 control.append(data_control[k])
                 cost.append(accum_cost)
                 accum_cost = 0.
+    
+    # new method: don't care if intermediate nodes have the same control or not
+    # take every num_steps after the entire path is stored
+    state = state[::num_steps]
+
+    # if last node is not the same as goal, then add goal
+    if np.linalg.norm(np.array(state[-1]) - np.array(data_path[-1])) > 1e-3:
+        state.append(data_path[-1])
+
+    #control = control[::num_steps]  # this data is wrong
+    #cost = cost[::num_steps]   # this data is wrong
+    
     #state[-1] = data_path[-1]
     return state, control, cost
 
-def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, system=None, step_sz=0.02, num_steps=20):
+def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, system=None, step_sz=0.02, num_steps=20, multigoal=0):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -101,6 +113,8 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
             data_cost = p.load()
 
 
+            data_path_before_preprocess = data_path
+            
             if dynamics is not None:
                 # use dense input
                 data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps)
@@ -113,17 +127,17 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
             #print('after flip:')
             #print(p)
             for k in range(len(p)-1):
-                """
                 # If want to use all intermediate nodes as subgoal, then use the commented code
-                for l in range(k+1, len(p)):
-                    waypoint_dataset.append(np.concatenate([p[k], p[l]]))
+                if multigoal:
+                    for l in range(k+1, len(p)):
+                        waypoint_dataset.append(np.concatenate([p[k], p[l]]))
+                        waypoint_targets.append(p[k+1])
+                        env_indices.append(i)
+                else:
+                    # otherwise directly use the last node as goal
+                    waypoint_dataset.append(np.concatenate([p[k], p[-1]]))
                     waypoint_targets.append(p[k+1])
                     env_indices.append(i)
-                """
-                # otherwise use the following
-                waypoint_dataset.append(np.concatenate([p[k], p[-1]]))
-                waypoint_targets.append(p[k+1])
-                env_indices.append(i)
                 
                 
                 u_init_dataset.append(np.concatenate([p[k], p[k+1]]))
