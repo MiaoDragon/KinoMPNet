@@ -40,7 +40,14 @@ import matplotlib as mpl
 import matplotlib.patches as patches
 from visual.visualizer import Visualizer
 
+STATE_THETA_1, STATE_THETA_2, STATE_V_1, STATE_V_2 = 0, 1, 2, 3
+MIN_V_1, MAX_V_1 = -6., 6.
+MIN_V_2, MAX_V_2 = -6., 6.
+MIN_TORQUE, MAX_TORQUE = -4., 4.
 
+MIN_ANGLE, MAX_ANGLE = -np.pi, np.pi
+
+LENGTH = 20.
 
 
 def IsInCollision(x, obc, obc_width=6.):
@@ -243,12 +250,12 @@ class AcrobotVisualizer(Visualizer):
 obs_list = []
 width = 6.
 near = width * 1.2
-
+integration_step = 0.02
 
 # convert from obs to point cloud
 # load generated point cloud
-writer=animation.FFMpegFileWriter(fps=500)
-for obs_idx in range(0,5):
+writer=animation.FFMpegFileWriter(fps=int(1/integration_step))
+for obs_idx in range(0,2):
     for p_idx in range(2):
         # Create custom system
         #obs_list = [[-10., -3.],
