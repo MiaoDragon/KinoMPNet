@@ -382,7 +382,7 @@ def main(args):
                 bobs = torch.FloatTensor(bobs)
                 bobs = to_var(bobs)
             loss = mpnet.loss(mpnet(bi, bobs), bt)
-            print('validation loss: %f' % (loss.cpu().data))
+            print('validation loss: ', loss.cpu().data)
 
             val_loss_avg += loss.cpu().data
             val_loss_avg_i += 1
