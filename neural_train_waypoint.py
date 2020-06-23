@@ -183,8 +183,8 @@ def main(args):
             model_dir = model_dir+args.env_type+"_lr%f_%s_loss_%s_step_%d/" % (args.learning_rate, args.opt, args.loss, args.num_steps)
         else:
             model_dir = model_dir+args.env_type+"_lr%f_%s_loss_%s_step_%d_multigoal/" % (args.learning_rate, args.opt, args.loss, args.num_steps)
-            
-        
+
+
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
     model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
@@ -214,14 +214,40 @@ def main(args):
     if args.start_epoch > 0:
         #load_opt_state(mpnet, os.path.join(args.model_path, model_path))
         load_opt_state(mpnet, os.path.join(model_dir, model_path))
-        
+
 
     # set loss for mpnet
     if args.loss == 'mse':
-        mpnet.loss_f = nn.MSELoss()
+        #mpnet.loss_f = nn.MSELoss()
+        def mse_loss(y1, y2):
+            l = (y1 - y2) ** 2
+            l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+        mpnet.loss_f = mse_loss
+
     elif args.loss == 'l1_smooth':
-        mpnet.loss_f = nn.SmoothL1Loss()
-    
+        #mpnet.loss_f = nn.SmoothL1Loss()
+        def l1_smooth_loss(y1, y2):
+            l1 = torch.abs(y1 - y2)
+            cond = l1 < 1
+            l = torch.where(cond, 0.5 * l1 ** 2, l1)
+            l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+        mpnet.loss_f = l1_smooth_loss
+
+    elif args.loss == 'mse_decoupled':
+        def mse_decoupled(y1, y2):
+            # for angle terms, wrap it to -pi~pi
+            l_0 = torch.abs(y1[:,0] - y2[:,0])
+            l_1 = torch.abs(y1[:,1] - y2[:,1])
+            l_2 = torch.abs(y1[:,2] - y2[:,2]) # angular dimension
+            l_3 = torch.abs(y1[:,3] - y2[:,3])
+            cond = l_2 > np.pi
+            l_2 = torch.where(cond, 2*np.pi-l_2, l_2)
+            l_0 = torch.mean(l_0)
+            l_1 = torch.mean(l_1)
+            l_2 = torch.mean(l_2)
+            l_3 = torch.mean(l_3)
+            return torch.cat([l_0, l_1, l_2, l_3])
+        mpnet.loss_f = mse_decoupled
 
     # load train and test data
     print('loading...')
@@ -230,7 +256,7 @@ def main(args):
                                                 data_folder=args.path_folder, obs_f=True,
                                                 direction=args.direction,
                                                 dynamics=dynamics, enforce_bounds=enforce_bounds,
-                                                system=system, step_sz=step_sz, 
+                                                system=system, step_sz=step_sz,
                                                 num_steps=args.num_steps, multigoal=args.multigoal)
     # randomize the dataset before training
     data=list(zip(waypoint_dataset,waypoint_targets,env_indices))
@@ -265,8 +291,8 @@ def main(args):
             writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d_loss_%s' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, args.loss, )
         else:
             writer_fname = 'cont_%s_%f_%s_direction_%d_step_%d_loss_%s_multigoal' % (args.env_type, args.learning_rate, args.opt, args.direction, args.num_steps, args.loss, )
-            
-        
+
+
     writer = SummaryWriter('./runs/'+writer_fname)
     record_i = 0
     val_record_i = 0
@@ -290,7 +316,11 @@ def main(args):
             bt = targets_i
             bi = torch.FloatTensor(bi)
             bt = torch.FloatTensor(bt)
-            bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
+
+            # edit: disable this for investigation of the good weights for training, and for wrapping
+            #bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
+
+
             mpnet.zero_grad()
             bi=to_var(bi)
             bt=to_var(bt)
@@ -311,7 +341,11 @@ def main(args):
             loss_avg_i += 1
             if loss_avg_i >= loss_steps:
                 loss_avg = loss_avg / loss_avg_i
-                writer.add_scalar('train_loss', loss_avg, record_i)
+                writer.add_scalar('train_loss_0', loss_avg[0], record_i)
+                writer.add_scalar('train_loss_1', loss_avg[1], record_i)
+                writer.add_scalar('train_loss_2', loss_avg[2], record_i)
+                writer.add_scalar('train_loss_3', loss_avg[3], record_i)
+
                 record_i += 1
                 loss_avg = 0.
                 loss_avg_i = 0
@@ -347,7 +381,10 @@ def main(args):
             val_loss_avg_i += 1
             if val_loss_avg_i >= loss_steps:
                 val_loss_avg = val_loss_avg / val_loss_avg_i
-                writer.add_scalar('val_loss', val_loss_avg, val_record_i)
+                writer.add_scalar('val_loss_0', val_loss_avg[0], val_record_i)
+                writer.add_scalar('val_loss_1', val_loss_avg[1], val_record_i)
+                writer.add_scalar('val_loss_2', val_loss_avg[2], val_record_i)
+                writer.add_scalar('val_loss_3', val_loss_avg[3], val_record_i)
                 val_record_i += 1
                 val_loss_avg = 0.
                 val_loss_avg_i = 0

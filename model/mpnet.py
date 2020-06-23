@@ -42,6 +42,7 @@ class KMPNet(nn.Module):
         # given a batch of data, optimize the parameters by one gradient descent step
         # assume here x and y are torch tensors, and have been
         self.zero_grad()
-        loss = self.loss(self.forward(x, obs), y)
+        # edited: loss now returns a D dimension vector recording loss on each input dimension
+        loss = torch.mean(self.loss(self.forward(x, obs), y))
         loss.backward()
         self.opt.step()
