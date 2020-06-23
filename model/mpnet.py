@@ -6,14 +6,14 @@ import copy
 this defines the MPNet to be used, which will utilize MLP and AE.
 """
 class KMPNet(nn.Module):
-    def __init__(self, total_input_size, AE_input_size, mlp_input_size, output_size, CAE, MLP):
+    def __init__(self, total_input_size, AE_input_size, mlp_input_size, output_size, CAE, MLP, loss_f):
         super(KMPNet, self).__init__()
         if CAE is None:
             self.encoder = None
         else:
             self.encoder = CAE.Encoder(AE_input_size, mlp_input_size-total_input_size)
         self.mlp = MLP(mlp_input_size, output_size)
-        self.loss_f = nn.MSELoss()
+        self.loss_f = loss_f
         self.opt = torch.optim.Adagrad(list(self.encoder.parameters())+list(self.mlp.parameters()))
         self.total_input_size = total_input_size
         self.AE_input_size = AE_input_size
