@@ -199,7 +199,7 @@ def main(args):
             l_1 = torch.mean(l_1)
             l_2 = torch.mean(l_2)
             l_3 = torch.mean(l_3)
-            return torch.cat([l_0, l_1, l_2, l_3])
+            return torch.stack([l_0, l_1, l_2, l_3])
         loss_f = mse_decoupled
 
 
