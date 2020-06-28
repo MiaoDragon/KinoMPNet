@@ -189,12 +189,14 @@ def main(args):
     elif args.loss == 'mse_decoupled':
         def mse_decoupled(y1, y2):
             # for angle terms, wrap it to -pi~pi
-            l_0 = torch.abs(y1[:,0] - y2[:,0])
-            l_1 = torch.abs(y1[:,1] - y2[:,1])
+            l_0 = torch.abs(y1[:,0] - y2[:,0]) ** 2
+            l_1 = torch.abs(y1[:,1] - y2[:,1]) ** 2
             l_2 = torch.abs(y1[:,2] - y2[:,2]) # angular dimension
-            l_3 = torch.abs(y1[:,3] - y2[:,3])
-            cond = l_2 > np.pi
-            l_2 = torch.where(cond, 2*np.pi-l_2, l_2)
+            l_3 = torch.abs(y1[:,3] - y2[:,3]) ** 2
+            
+            cond = (l_2 > 1.0) * (l_2 <= 2.0)   # np.pi after normalization is 1.0
+            l_2 = torch.where(cond, 2.0-l_2, l_2)
+            l_2 = l_2 ** 2
             l_0 = torch.mean(l_0)
             l_1 = torch.mean(l_1)
             l_2 = torch.mean(l_2)
@@ -324,7 +326,6 @@ def main(args):
             bi = torch.FloatTensor(bi)
             bt = torch.FloatTensor(bt)
 
-            # edit: disable this for investigation of the good weights for training, and for wrapping
             #bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
 
 
@@ -337,6 +338,8 @@ def main(args):
                 bobs = obs[env_indices_i].astype(np.float32)
                 bobs = torch.FloatTensor(bobs)
                 bobs = to_var(bobs)
+            print('mpnet output: ')
+            print(mpnet(bi, bobs))
             print('before training losses:')
             print(mpnet.loss(mpnet(bi, bobs), bt))
             mpnet.step(bi, bobs, bt)
@@ -348,6 +351,7 @@ def main(args):
             loss_avg_i += 1
             if loss_avg_i >= loss_steps:
                 loss_avg = loss_avg / loss_avg_i
+                writer.add_scalar('train_loss', torch.mean(loss_avg), record_i)
                 writer.add_scalar('train_loss_0', loss_avg[0], record_i)
                 writer.add_scalar('train_loss_1', loss_avg[1], record_i)
                 writer.add_scalar('train_loss_2', loss_avg[2], record_i)
@@ -372,7 +376,7 @@ def main(args):
             bt = targets_i
             bi = torch.FloatTensor(bi)
             bt = torch.FloatTensor(bt)
-            bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
+            #bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
             bi=to_var(bi)
             bt=to_var(bt)
             if obs is None:
@@ -388,6 +392,7 @@ def main(args):
             val_loss_avg_i += 1
             if val_loss_avg_i >= loss_steps:
                 val_loss_avg = val_loss_avg / val_loss_avg_i
+                writer.add_scalar('val_loss', torch.mean(val_loss_avg), val_record_i)
                 writer.add_scalar('val_loss_0', val_loss_avg[0], val_record_i)
                 writer.add_scalar('val_loss_1', val_loss_avg[1], val_record_i)
                 writer.add_scalar('val_loss_2', val_loss_avg[2], val_record_i)
