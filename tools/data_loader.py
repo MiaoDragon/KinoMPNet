@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import sys
 def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps):
+    #print('inside preprocess to generate detailed trajectory...')
     p_start = data_path[0]
     detail_paths = [p_start]
     detail_controls = []
@@ -30,11 +31,18 @@ def preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, sys
     
     # new method: don't care if intermediate nodes have the same control or not
     # take every num_steps after the entire path is stored
-    state = state[::num_steps]
+    remaining_states = (len(state)-1) % num_steps
 
+    state = state[::num_steps]
+    
     # if last node is not the same as goal, then add goal
     if np.linalg.norm(np.array(state[-1]) - np.array(data_path[-1])) > 1e-3:
         state.append(data_path[-1])
+
+    #last_cost = cost[-remaining_states:].sum()
+    # this cost is correct. But the intermediate controls might not be the same each time
+    cost = np.array(cost)
+    cost = [cost[i:i+num_steps].sum() for i in range(0, len(cost), num_steps)]    
 
     #control = control[::num_steps]  # this data is wrong
     #cost = cost[::num_steps]   # this data is wrong
@@ -86,7 +94,11 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
     u_init_targets = []
     t_init_targets = []
 
+    
+    data_cost_all = []
+    
     for i in range(N):
+        data_cost_env = []
         print('loading... env: %d' % (i))
         for j in range(NP):
             dir = data_folder+str(i)+'/'
@@ -118,6 +130,9 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
             if dynamics is not None:
                 # use dense input
                 data_path, data_control, data_cost = preprocess(data_path, data_control, data_cost, dynamics, enforce_bounds, system, step_sz, num_steps)
+                
+            data_cost_env.append(np.sum(data_cost))
+            
             p = data_path
             #print('before flip:')
             #print(p)
@@ -149,7 +164,28 @@ def load_train_dataset(N, NP, data_folder, obs_f=None, direction=0, dynamics=Non
         #control_env.append(controls)
         #cost_env.append(costs)
         #sg_env.append(sgs)
+        data_cost_all.append(data_cost_env)
+
     ## TODO: print out intermediate results to visualize
+    
+    
+    data_cost_all = np.array(data_cost_all)
+    print('previous training mean:')
+    print(data_cost_all[:,:800].mean())
+    print(data_cost_all[:,:800].std())
+    print('previous testing mean:')
+    print(data_cost_all[:,800:1000].mean())
+
+    print(data_cost_all[:,800:1000].std())
+
+    print('training mean:')
+    print(data_cost_all[:,:1800].mean())
+    print(data_cost_all[:,:1800].std())
+
+    print('testing mean:')
+    print(data_cost_all[:,1800:].mean())
+    print(data_cost_all[:,1800:].std())
+
     waypoint_dataset = np.array(waypoint_dataset)
     waypoint_targets = np.array(waypoint_targets)
     env_indices = np.array(env_indices)
@@ -374,7 +410,7 @@ def voxelize2d(points, voxel_size=(24, 24), padding_size=(32, 32), resolution=0.
 
 
 
-def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, system=None, step_sz=0.02, num_steps=20):
+def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamics=None, enforce_bounds=None, system=None, step_sz=0.02, num_steps=20, multigoal=0):
     # obtain the generated paths, and transform into
     # (obc, dataset, targets, env_indices)
     # return list NOT NUMPY ARRAY
@@ -384,6 +420,10 @@ def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamic
     # direction: 0 -- forward;  1 -- backward
 
     # load obs and obc (obc: obstacle point cloud)
+    if multigoal:
+        print('using multigoal')
+    else:
+        print('not using multigoal')
     if obs_f is None:
         obs = None
         obc = None
@@ -460,12 +500,20 @@ def load_train_dataset_cost(N, NP, data_folder, obs_f=None, direction=0, dynamic
             #print('after flip:')
             #print(p)
             for k in range(len(p)-1):
-                for l in range(k+1, len(p)):
-                    cost_dataset.append(np.concatenate([p[k], p[l]]))
+                if multigoal:
+                    for l in range(k+1, len(p)):
+                        cost_dataset.append(np.concatenate([p[k], p[l]]))
+                        #print('start idx: %d, end idx: %d' % (k, l))
+                        #print(data_cost[k:l].sum())
+                        cost_targets.append(data_cost[k:l].sum())
+                        env_indices.append(i)
+                else:
+                    cost_dataset.append(np.concatenate([p[k], p[-1]]))
                     #print('start idx: %d, end idx: %d' % (k, l))
                     #print(data_cost[k:l].sum())
-                    cost_targets.append(data_cost[k:l].sum())
+                    cost_targets.append(data_cost[k:].sum())
                     env_indices.append(i)
+
                 u_init_dataset.append(np.concatenate([p[k], p[k+1]]))
                 u_init_targets.append(data_control[k])
                 t_init_dataset.append(np.concatenate([p[k], p[k+1]]))

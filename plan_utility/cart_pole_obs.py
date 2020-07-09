@@ -1,6 +1,10 @@
 import torch
 import jax
 import numpy as np
+import sys
+sys.path.append('..')
+from plan_utility.line_line_cc import line_line_cc
+
 def normalize(x, bound):
     # normalize to -1 ~ 1  (bound can be a tensor)
     #return x
@@ -181,5 +185,45 @@ def jax_dynamics(state, control):
         (-m * g * L * jax.numpy.sin(_theta))) * mass_term
     return jax.numpy.asarray(deriv)
 
-def IsInCollision(x, obc):
+
+def IsInCollision(x, obc, obc_width=4.):
+    I = 10
+    L = 2.5
+    M = 10
+    m = 5
+    g = 9.8
+    H = 0.5
+
+    STATE_X = 0
+    STATE_V = 1
+    STATE_THETA = 2
+    STATE_W = 3
+    CONTROL_A = 0
+
+    MIN_X = -30
+    MAX_X = 30
+    MIN_V = -40
+    MAX_V = 40
+    MIN_W = -2
+    MAX_W = 2
+
+    
+    if x[0] < MIN_X or x[0] > MAX_X:
+        return True
+    
+    H = 0.5
+    pole_x1 = x[0]
+    pole_y1 = H
+    pole_x2 = x[0] + L * np.sin(x[2])
+    pole_y2 = H + L * np.cos(x[2])
+
+    
+    for i in range(len(obc)):
+        for j in range(0, 8, 2):
+            x1 = obc[i][j]
+            y1 = obc[i][j+1]
+            x2 = obc[i][(j+2) % 8]
+            y2 = obc[i][(j+3) % 8]
+            if line_line_cc(pole_x1, pole_y1, pole_x2, pole_y2, x1, y1, x2, y2):
+                return True
     return False

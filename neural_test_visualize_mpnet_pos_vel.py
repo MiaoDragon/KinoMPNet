@@ -184,6 +184,8 @@ def main(args):
         enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 100
+        pos_indices = [0, 2]
+        vel_indices = [1, 3]
     elif args.env_type == 'cartpole_obs_2':
         obs_file = None
         obc_file = None
@@ -205,6 +207,8 @@ def main(args):
         enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 100
+        pos_indices = [0, 2]
+        vel_indices = [1, 3]
     elif args.env_type == 'cartpole_obs_3':
         obs_file = None
         obc_file = None
@@ -226,7 +230,9 @@ def main(args):
         enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 200
-    elif args.env_type == 'cartpole_obs_4':
+        pos_indices = [0, 2]
+        vel_indices = [1, 3]
+    elif args.env_type == 'cartpole_obs_4_small':
         obs_file = None
         obc_file = None
         obs_f = True
@@ -247,8 +253,124 @@ def main(args):
         enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 200
-  
+        pos_indices = np.array([0, 2])
+        vel_indices = np.array([1, 3])
+    elif args.env_type == 'cartpole_obs_4_big':
+        obs_file = None
+        obc_file = None
+        obs_f = True
+        obs_width = 4.0
+        step_sz = 0.002
+        psopt_system = _sst_module.PSOPTCartPole()
+        cpp_propagator = _sst_module.SystemPropagator()
 
+        #system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
+        dynamics = lambda x, u, t: cpp_propagator.propagate(psopt_system, x, u, t)
+
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 200
+        pos_indices = np.array([0, 2])
+        vel_indices = np.array([1, 3])
+    elif args.env_type == 'cartpole_obs_4_small_x_theta':
+        obs_file = None
+        obc_file = None
+        obs_f = True
+        obs_width = 4.0
+        step_sz = 0.002
+        psopt_system = _sst_module.PSOPTCartPole()
+        cpp_propagator = _sst_module.SystemPropagator()
+
+        #system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
+        dynamics = lambda x, u, t: cpp_propagator.propagate(psopt_system, x, u, t)
+
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 200
+        pos_indices = np.array([0, 1])
+        vel_indices = np.array([2, 3])
+        
+    elif args.env_type == 'cartpole_obs_4_big_x_theta':
+        obs_file = None
+        obc_file = None
+        obs_f = True
+        obs_width = 4.0
+        step_sz = 0.002
+        psopt_system = _sst_module.PSOPTCartPole()
+        cpp_propagator = _sst_module.SystemPropagator()
+
+        #system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
+        dynamics = lambda x, u, t: cpp_propagator.propagate(psopt_system, x, u, t)
+
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 200
+        pos_indices = np.array([0, 1])
+        vel_indices = np.array([2, 3])
+    elif args.env_type == 'cartpole_obs_4_small_decouple_output':
+        obs_file = None
+        obc_file = None
+        obs_f = True
+        obs_width = 4.0
+        step_sz = 0.002
+        psopt_system = _sst_module.PSOPTCartPole()
+        cpp_propagator = _sst_module.SystemPropagator()
+
+        #system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
+        dynamics = lambda x, u, t: cpp_propagator.propagate(psopt_system, x, u, t)
+
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 200
+        pos_indices = np.array([0, 2])
+        vel_indices = np.array([1, 3])
+    elif args.env_type == 'cartpole_obs_4_big_decouple_output':
+        obs_file = None
+        obc_file = None
+        obs_f = True
+        obs_width = 4.0
+        step_sz = 0.002
+        psopt_system = _sst_module.PSOPTCartPole()
+        cpp_propagator = _sst_module.SystemPropagator()
+
+        #system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
+        dynamics = lambda x, u, t: cpp_propagator.propagate(psopt_system, x, u, t)
+
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 200
+        pos_indices = np.array([0, 2])
+        vel_indices = np.array([1, 3])
     elif args.env_type == 'acrobot_obs':
         obs_file = None
         obc_file = None
@@ -260,8 +382,86 @@ def main(args):
         #bvp_solver = _sst_module.PSOPTBVPWrapper(system, 4, 1, 0)
 
         
-    mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
-                   cae, mlp, None)
+
+    # set loss for mpnet
+    if args.loss == 'mse':
+        #mpnet.loss_f = nn.MSELoss()
+        def mse_loss(y1, y2):
+            l = (y1 - y2) ** 2
+            l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+            return l
+        loss_f = mse_loss
+
+    elif args.loss == 'l1_smooth':
+        #mpnet.loss_f = nn.SmoothL1Loss()
+        def l1_smooth_loss(y1, y2):
+            l1 = torch.abs(y1 - y2)
+            cond = l1 < 1
+            l = torch.where(cond, 0.5 * l1 ** 2, l1)
+            l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+            return l
+        loss_f = l1_smooth_loss
+
+    elif args.loss == 'mse_decoupled':
+        def mse_decoupled(y1, y2):
+            # for angle terms, wrap it to -pi~pi
+            l_0 = torch.abs(y1[:,0] - y2[:,0]) ** 2
+            l_1 = torch.abs(y1[:,1] - y2[:,1]) ** 2
+            l_2 = torch.abs(y1[:,2] - y2[:,2]) # angular dimension
+            l_3 = torch.abs(y1[:,3] - y2[:,3]) ** 2
+            cond = (l_2 > 1.0) * (l_2 <= 2.0)
+            l_2 = torch.where(cond, 2*1.0-l_2, l_2)
+            l_2 = l_2 ** 2
+            l_0 = torch.mean(l_0)
+            l_1 = torch.mean(l_1)
+            l_2 = torch.mean(l_2)
+            l_3 = torch.mean(l_3)
+            return torch.stack([l_0, l_1, l_2, l_3])
+        loss_f = mse_decoupled
+
+    elif args.loss == 'l1_smooth_decoupled':
+        
+        # this only is for cartpole, need to adapt to other systems
+        #TODO
+        def l1_smooth_decoupled(y1, y2):
+            # for angle terms, wrap it to -pi~pi
+            l_0 = torch.abs(y1[:,0] - y2[:,0])
+            l_1 = torch.abs(y1[:,1] - y2[:,1]) # angular dimension
+            cond = (l_1 > 1.0) * (l_1 <= 2.0)
+            l_1 = torch.where(cond, 2*1.0-l_1, l_1)
+            
+            # then change to l1_smooth_loss
+            cond = l_0 < 1
+            l_0 = torch.where(cond, 0.5 * l_0 ** 2, l_0)
+            cond = l_1 < 1
+            l_1 = torch.where(cond, 0.5 * l_1 ** 2, l_1)
+            
+            l_0 = torch.mean(l_0)
+            l_1 = torch.mean(l_1)
+            return torch.stack([l_0, l_1])
+        def l1_smooth_loss(y1, y2):
+            l1 = torch.abs(y1 - y2)
+            cond = l1 < 1
+            l = torch.where(cond, 0.5 * l1 ** 2, l1)
+            l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+            return l
+        #loss_f_p = l1_smooth_decoupled
+        #loss_f_v = l1_smooth_loss
+        loss_f = l1_smooth_loss
+
+        
+    if 'decouple_output' in args.env_type or args.env_type == 'cartpole_obs_2':
+        print('mpnet using decoupled output')
+        mpnet_pnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f)
+        mpnet_vnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f)
+    else:
+        mpnet_pnet = KMPNet(args.total_input_size//2, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f)
+        mpnet_vnet = KMPNet(args.total_input_size//2, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f)
+
     # load net
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
@@ -280,35 +480,54 @@ def main(args):
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
     
-    model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
+    model_pnet_path='kmpnet_pnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
+    model_vnet_path='kmpnet_vnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
         #load_net_state(mpnet, os.path.join(args.model_path, model_path))
-        load_net_state(mpnet, os.path.join(model_dir, model_path))
+        load_net_state(mpnet_pnet, os.path.join(model_dir, model_pnet_path))
+        load_net_state(mpnet_vnet, os.path.join(model_dir, model_vnet_path))
+
         #torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
-        torch_seed, np_seed, py_seed = load_seed(os.path.join(model_dir, model_path))
+        torch_seed, np_seed, py_seed = load_seed(os.path.join(model_dir, model_pnet_path))
         # set seed after loading
         torch.manual_seed(torch_seed)
         np.random.seed(np_seed)
         random.seed(py_seed)
 
     if torch.cuda.is_available():
-        mpnet.cuda()
-        mpnet.mlp.cuda()
-        mpnet.encoder.cuda()
+        mpnet_pnet.cuda()
+        mpnet_pnet.mlp.cuda()
+        mpnet_pnet.encoder.cuda()
+        mpnet_vnet.cuda()
+        mpnet_vnet.mlp.cuda()
+        mpnet_vnet.encoder.cuda()
+
         if args.opt == 'Adagrad':
-            mpnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+            mpnet_pnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+            mpnet_vnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
+            
         elif args.opt == 'Adam':
-            mpnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
+            mpnet_pnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
+            mpnet_vnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
+
         elif args.opt == 'SGD':
-            mpnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
+            mpnet_pnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
+            mpnet_vnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
+
         elif args.opt == 'ASGD':
-            mpnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
+            mpnet_pnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
+            mpnet_vnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
+
     if args.start_epoch > 0:
         #load_opt_state(mpnet, os.path.join(args.model_path, model_path))
-        load_opt_state(mpnet, os.path.join(model_dir, model_path))
+        load_opt_state(mpnet_pnet, os.path.join(model_dir, model_pnet_path))
+        load_opt_state(mpnet_vnet, os.path.join(model_dir, model_vnet_path))
+
     
-    mpnet.eval()
+    mpnet_pnet.eval()
+    mpnet_vnet.eval()
+
         
         
         
@@ -337,7 +556,9 @@ def main(args):
     
     plt.ion()
     fig = plt.figure()
-    ax = fig.add_subplot(111)
+    ax = fig.add_subplot(121)
+    ax_vel = fig.add_subplot(122)
+
     ax.set_autoscale_on(True)
     hl, = ax.plot([], [], 'b')
     
@@ -354,6 +575,9 @@ def main(args):
         fig.canvas.draw()
         fig.canvas.flush_events()
  
+    world_size = np.array(args.world_size)
+    pos_world_size = list(world_size[pos_indices])
+    vel_world_size = list(world_size[vel_indices])
 
     # randomly pick up a point in the data, and find similar data in the dataset
     # plot the next point
@@ -390,7 +614,6 @@ def main(args):
             ax.set_ylim(-np.pi, np.pi)
             ax_vel.set_xlim(-40, 40)
             ax_vel.set_ylim(-2, 2)
-            
             hl, = ax.plot([], [], 'b')
             #hl_real, = ax.plot([], [], 'r')
             hl_for, = ax.plot([], [], 'g')
@@ -498,10 +721,11 @@ def main(args):
             xs_to_plot = np.array(state)
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], psopt_system)
-            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,2], c='green')
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,2], c='green', s=0.1)
             # draw start and goal
             #ax.scatter(start_state[0], goal_state[0], marker='X')
             draw_update_line(ax)
+            
             ax_vel.scatter(xs_to_plot[:,1], xs_to_plot[:,3], c='green', s=0.1)
             draw_update_line(ax_vel)
             
@@ -517,10 +741,27 @@ def main(args):
                 mpnet_paths.append(state)
                 bi = np.concatenate([state, xs[-1]])
                 bi = np.array([bi])
-                bi = torch.from_numpy(bi).type(torch.FloatTensor)
-                print(bi)
-                bi = normalize(bi, args.world_size)
-                bi=to_var(bi)
+                if 'decouple_output' in args.env_type or args.env_type == 'cartpole_obs_2':
+                    p_bi = bi
+                    v_bi = bi
+                else:
+                    print(np.concatenate([pos_indices, pos_indices+args.total_input_size//2]))
+                    p_bi = bi[:, np.concatenate([pos_indices, pos_indices+args.total_input_size//2])]
+                    v_bi = bi[:, np.concatenate([vel_indices, vel_indices+args.total_input_size//2])]
+                p_bi = torch.from_numpy(p_bi).type(torch.FloatTensor)
+                v_bi = torch.from_numpy(v_bi).type(torch.FloatTensor)
+
+                print(p_bi)
+                print(v_bi)
+                if 'decouple_output' in args.env_type or args.env_type == 'cartpole_obs_2':
+                    print('using normalizatino of decoupled output')
+                    # only decouple output but not input
+                    p_bi, v_bi = normalize(p_bi, args.world_size), normalize(v_bi, args.world_size)
+                else:
+                    p_bi, v_bi = normalize(p_bi, pos_world_size), normalize(v_bi, vel_world_size)
+                p_bi=to_var(p_bi)
+                v_bi=to_var(v_bi)
+
                 if obc is None:
                     bobs = None
                 else:
@@ -528,12 +769,19 @@ def main(args):
                     print(bobs.shape)
                     bobs = torch.FloatTensor(bobs)
                     bobs = to_var(bobs)
-                bt = mpnet(bi, bobs).cpu()
-                bt = unnormalize(bt, args.world_size)
-                bt = bt.detach().numpy()
-                print(bt.shape)
-                state = bt[0]
-            
+                p_bt = mpnet_pnet(p_bi, bobs).cpu()
+                p_bt = unnormalize(p_bt, pos_world_size)
+                p_bt = p_bt.detach().numpy()
+                
+                v_bt = mpnet_vnet(v_bi, bobs).cpu()
+                v_bt = unnormalize(v_bt, vel_world_size)
+                v_bt = v_bt.detach().numpy()
+                print(p_bt.shape)
+                
+                print(v_bt.shape)
+                state = np.zeros(args.output_size)
+                state[pos_indices] = p_bt[0]
+                state[vel_indices] = v_bt[0]
             print(mpnet_paths)
             xs_to_plot = np.array(mpnet_paths)
             print(len(xs_to_plot))
@@ -543,6 +791,7 @@ def main(args):
             # draw start and goal
             #ax.scatter(start_state[0], goal_state[0], marker='X')
             draw_update_line(ax)
+
             ax_vel.scatter(xs_to_plot[:,1], xs_to_plot[:,3], c='lightgreen')
             draw_update_line(ax_vel)
             plt.waitforbuttonpress()
@@ -560,7 +809,7 @@ if __name__ == '__main__':
     parser.add_argument('--seen_N', type=int, default=1)
     parser.add_argument('--seen_NP', type=int, default=20)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=1905)
+    parser.add_argument('--seen_sp', type=int, default=1800)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)
@@ -571,13 +820,13 @@ if __name__ == '__main__':
     parser.add_argument('--AE_input_size', nargs='+', type=int, default=32, help='dimension of input to AE')
     parser.add_argument('--mlp_input_size', type=int , default=40, help='dimension of the input vector')
     parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
-    parser.add_argument('--learning_rate', type=float, default=0.01)
+    parser.add_argument('--learning_rate', type=float, default=0.001)
     parser.add_argument('--device', type=int, default=0, help='cuda device')
     parser.add_argument('--data_folder', type=str, default='./data/cartpole_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=9950)
-    parser.add_argument('--env_type', type=str, default='cartpole_obs_4', help='s2d for simple 2d, c2d for complex 2d')
+    parser.add_argument('--start_epoch', type=int, default=800)
+    parser.add_argument('--env_type', type=str, default='cartpole_obs_4_big_decouple_output', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[30.0, 40.0, 3.141592653589793, 2.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')
     parser.add_argument('--loss', type=str, default='mse')

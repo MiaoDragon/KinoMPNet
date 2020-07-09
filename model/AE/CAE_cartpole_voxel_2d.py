@@ -58,7 +58,9 @@ class Encoder(nn.Module):
                 nn.PReLU(),
                 nn.MaxPool2d(2, stride=2),
         )
+            print(input_size)
             x = self.encoder(torch.autograd.Variable(torch.rand([1, 1] + input_size)))
+            print(x.size())
             first_fc_in_features = 1
             for n in x.size()[1:]:
                 first_fc_in_features *= n

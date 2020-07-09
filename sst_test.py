@@ -339,7 +339,7 @@ def main(args):
                     start_state=start_state,
                     goal_state=goal_state,
                     goal_radius=goal_radius,
-                    random_seed=0,
+                    random_seed=100,
                     sst_delta_near=delta_near,
                     sst_delta_drain=delta_drain
                 )
@@ -735,7 +735,7 @@ if __name__ == '__main__':
     parser.add_argument('--seen_N', type=int, default=10)
     parser.add_argument('--seen_NP', type=int, default=100)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=852)
+    parser.add_argument('--seen_sp', type=int, default=1800)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)

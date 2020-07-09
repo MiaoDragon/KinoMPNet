@@ -6,10 +6,12 @@ import sys
 sys.path.append('deps/sparse_rrt')
 sys.path.append('.')
 import torch
+import torch.nn as nn
+
 import model.AE.identity as cae_identity
 from model.mlp import MLP
-from model import mlp_acrobot
-from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3
+from model import mlp_acrobot, mlp_cartpole
+from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3, CAE_cartpole_voxel_2d
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
@@ -22,13 +24,14 @@ from sparse_rrt import _sst_module
 
 from tensorboardX import SummaryWriter
 
+
 def main(args):
     #global hl
+
     if torch.cuda.is_available():
         torch.cuda.set_device(args.device)
     # environment setting
-    cae = cae_identity
-    mlp = MLP
+    multigoal = False
     cpp_propagator = _sst_module.SystemPropagator()
     if args.env_type == 'pendulum':
         normalize = pendulum.normalize
@@ -55,6 +58,33 @@ def main(args):
         enforce_bounds = cartpole.enforce_bounds
         step_sz = 0.002
         num_steps = 20
+        cae = cae_identity
+        mlp = MLP
+    elif args.env_type == 'cartpole_obs_4':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3_no_dropout
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        multigoal = False
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+    elif args.env_type == 'cartpole_obs_4_multigoal':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3_no_dropout
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        #dynamics = None
+        multigoal = True
+
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+        
     elif args.env_type == 'acrobot_obs':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
@@ -144,8 +174,46 @@ def main(args):
         step_sz = 0.02
         num_steps = 20
 
+
+    # set loss for mpnet
+    if args.loss == 'mse':
+        #mpnet.loss_f = nn.MSELoss()
+        def mse_loss(y1, y2):
+            l = (y1 - y2) ** 2
+            l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+            return l
+        loss_f = mse_loss
+
+    elif args.loss == 'l1_smooth':
+        #mpnet.loss_f = nn.SmoothL1Loss()
+        def l1_smooth_loss(y1, y2):
+            l1 = torch.abs(y1 - y2)
+            cond = l1 < 1
+            l = torch.where(cond, 0.5 * l1 ** 2, l1)
+            l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+        loss_f = l1_smooth_loss
+
+    elif args.loss == 'mse_decoupled':
+        def mse_decoupled(y1, y2):
+            # for angle terms, wrap it to -pi~pi
+            l_0 = torch.abs(y1[:,0] - y2[:,0]) ** 2
+            l_1 = torch.abs(y1[:,1] - y2[:,1]) ** 2
+            l_2 = torch.abs(y1[:,2] - y2[:,2]) # angular dimension
+            l_3 = torch.abs(y1[:,3] - y2[:,3]) ** 2
+            
+            cond = (l_2 > 1.0) * (l_2 <= 2.0)   # np.pi after normalization is 1.0
+            l_2 = torch.where(cond, 2.0-l_2, l_2)
+            l_2 = l_2 ** 2
+            l_0 = torch.mean(l_0)
+            l_1 = torch.mean(l_1)
+            l_2 = torch.mean(l_2)
+            l_3 = torch.mean(l_3)
+            return torch.stack([l_0, l_1, l_2, l_3])
+        loss_f = mse_decoupled
+        
+
     mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
-                   cae, mlp)
+                   cae, mlp, loss_f)
     # load net
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
@@ -187,7 +255,8 @@ def main(args):
                                                 data_folder=args.path_folder, obs_f=True,
                                                 direction=args.direction,
                                                 dynamics=dynamics, enforce_bounds=enforce_bounds,
-                                                system=system, step_sz=step_sz, num_steps=args.num_steps)
+                                                system=system, step_sz=step_sz, num_steps=args.num_steps,
+                                                multigoal=multigoal)
     # randomize the dataset before training
     data=list(zip(cost_dataset,cost_targets,env_indices))
     random.shuffle(data)
@@ -332,6 +401,8 @@ parser.add_argument('--env_type', type=str, default='acrobot_obs', help='environ
 parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
 parser.add_argument('--opt', type=str, default='Adagrad')
 parser.add_argument('--direction', type=int, default=0, help='0: forward, 1: backward')
+parser.add_argument('--loss', type=str, default='mse')
+
 #parser.add_argument('--opt', type=str, default='Adagrad')
 args = parser.parse_args()
 print(args)

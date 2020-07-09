@@ -94,8 +94,8 @@ def main(args):
         cae = CAE_cartpole_voxel_2d
         
         # dynamics: None    -- without integration to dense trajectory
-        #dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        dynamics = None
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        #dynamics = None
         enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 20
@@ -109,14 +109,76 @@ def main(args):
         cae = CAE_cartpole_voxel_2d
         
         # dynamics: None    -- without integration to dense trajectory
-        #dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
-        dynamics = None
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        #dynamics = None
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+        pos_indices = np.array([0, 2])
+        vel_indices = np.array([1, 3])
+    elif args.env_type == 'cartpole_obs_4_small_x_theta':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        
+        # dynamics: None    -- without integration to dense trajectory
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        #dynamics = None
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+        pos_indices = np.array([0, 1])
+        vel_indices = np.array([2, 3])
+    elif args.env_type == 'cartpole_obs_4_big_x_theta':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        
+        # dynamics: None    -- without integration to dense trajectory
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        #dynamics = None
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+        pos_indices = np.array([0, 1])
+        vel_indices = np.array([2, 3])
+    elif args.env_type == 'cartpole_obs_4_small_decouple_output':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        
+        # dynamics: None    -- without integration to dense trajectory
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        #dynamics = None
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+        pos_indices = np.array([0, 2])
+        vel_indices = np.array([1, 3])
+    elif args.env_type == 'cartpole_obs_4_big_decouple_output':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        
+        # dynamics: None    -- without integration to dense trajectory
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        #dynamics = None
         enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 20
         pos_indices = np.array([0, 2])
         vel_indices = np.array([1, 3])
 
+        
+        
     elif args.env_type == 'acrobot_obs':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
@@ -295,11 +357,18 @@ def main(args):
         loss_f_v = l1_smooth_loss
 
 
-
-    mpnet_pnet = KMPNet(args.total_input_size//2, args.AE_input_size, args.mlp_input_size, args.output_size//2,
-                   cae, mlp, loss_f_p)
-    mpnet_vnet = KMPNet(args.total_input_size//2, args.AE_input_size, args.mlp_input_size, args.output_size//2,
-                   cae, mlp, loss_f_v)
+    if 'decouple_output' in args.env_type:
+        print('mpnet using decoupled output')
+        mpnet_pnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f_p)
+        mpnet_vnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f_v)
+    else:
+        mpnet_pnet = KMPNet(args.total_input_size//2, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f_p)
+        mpnet_vnet = KMPNet(args.total_input_size//2, args.AE_input_size, args.mlp_input_size, args.output_size//2,
+                       cae, mlp, loss_f_v)
+        
     # load net
     # load previously trained model if start epoch > 0
 
@@ -375,7 +444,7 @@ def main(args):
     _, _, _, _ = data_loader.load_train_dataset(N=args.no_env, NP=args.no_motion_paths,
                                                 data_folder=args.path_folder, obs_f=True,
                                                 direction=args.direction,
-                                                dynamics=dynamics, enforce_bounds=enforce_bounds,
+                                                dynamics=None, enforce_bounds=enforce_bounds,
                                                 system=system, step_sz=step_sz,
                                                 num_steps=args.num_steps, multigoal=args.multigoal)
     # randomize the dataset before training
@@ -388,14 +457,31 @@ def main(args):
     print(np.concatenate([pos_indices, pos_indices+args.total_input_size//2]))
     p_dataset = dataset[:, np.concatenate([pos_indices, pos_indices+args.total_input_size//2])]
     v_dataset = dataset[:, np.concatenate([vel_indices, vel_indices+args.total_input_size//2])]
+    print('hey')
+    print('dataset:')
+    print(dataset)
+    print('p_dataset')
+    print(p_dataset)
+    print('v_dataset')
+    print(v_dataset)
+    if 'decouple_output' in args.env_type:
+        # only decouple output
+        print('only decouple output but not input')
+        p_dataset = dataset
+        v_dataset = dataset
+    print(p_dataset.shape)
+    print(v_dataset.shape)
+    
+    
+    
     p_targets = targets[:,pos_indices]
     v_targets = targets[:,vel_indices]   # this is only for cartpole
                                 # TODO: add string for choosing env
 
-    #p_targets = list(p_targets)
-    #v_targets = list(v_targets)
+    p_targets = list(p_targets)
+    v_targets = list(v_targets)
     #targets = list(targets)
-    #env_indices = list(env_indices)
+    env_indices = list(env_indices)
     dataset = np.array(dataset)
     #targets = np.array(targets)
     env_indices = np.array(env_indices)
@@ -407,36 +493,16 @@ def main(args):
     val_p_targets = p_targets[-val_len:]
     val_v_targets = v_targets[-val_len:]
     val_env_indices = env_indices[-val_len:]
-    print('val_p_dataset size:')
-    print(val_p_dataset.shape)
-    print('val_v_dataset size:')
-    print(val_v_dataset.shape)
-    print('val_p_targets size:')
-    print(val_p_targets.shape)
-    print('val_v_targets size:')
-    print(val_v_targets.shape)
-    print('val_env_indices size:')
-    print(val_env_indices.shape)
-
 
     p_dataset = p_dataset[:-val_len]
     v_dataset = v_dataset[:-val_len]
     p_targets = p_targets[:-val_len]
     v_targets = v_targets[:-val_len]
     env_indices = env_indices[:-val_len]
-    print('p_dataset size:')
-    print(p_dataset.shape)
-    print('v_dataset size:')
-    print(v_dataset.shape)
-    print('p_targets size:')
-    print(p_targets.shape)
-    print('v_targets size:')
-    print(v_targets.shape)
-    print('env_indices size:')
-    print(env_indices.shape)
 
     # Train the Models
-    print('training...')
+
+
 
     record_i = 0
     val_record_i = 0
@@ -468,19 +534,6 @@ def main(args):
             p_targets_i = p_targets[i:i+args.batch_size]
             v_targets_i = v_targets[i:i+args.batch_size]
             env_indices_i = env_indices[i:i+args.batch_size]
-            
-            
-            print("p_dataset_i:")
-            print(p_dataset_i)
-            print("v_dataset_i:")
-            print(v_dataset_i)
-            print("p_targets_i:")
-            print(p_targets_i)
-            print("v_targets_i:")
-            print(v_targets_i)
-            print("env_indices_i:")
-            print(env_indices_i)
-            
             # record
             p_bi = p_dataset_i.astype(np.float32)
             v_bi = v_dataset_i.astype(np.float32)
@@ -496,17 +549,13 @@ def main(args):
             v_bt = torch.FloatTensor(v_bt)
 
             # edit: disable this for investigation of the good weights for training, and for wrapping
-            p_bi, v_bi, p_bt, v_bt = normalize(p_bi, pos_world_size), normalize(v_bi, vel_world_size), normalize(p_bt, pos_world_size), normalize(v_bt, vel_world_size)
-            
-            print('after normalization:')
-            print('p_bi:')
-            print(p_bi)
-            print('v_bi:')
-            print(v_bi)
-            print('p_bt:')
-            print(p_bt)
-            print('v_bt:')
-            print(v_bt)
+            if 'decouple_output' in args.env_type:
+                print('using normalizatino of decoupled output')
+                # only decouple output but not input
+                p_bi, v_bi, p_bt, v_bt = normalize(p_bi, args.world_size), normalize(v_bi, args.world_size), normalize(p_bt, pos_world_size), normalize(v_bt, vel_world_size)
+            else:
+                p_bi, v_bi, p_bt, v_bt = normalize(p_bi, pos_world_size), normalize(v_bi, vel_world_size), normalize(p_bt, pos_world_size), normalize(v_bt, vel_world_size)
+
 
             mpnet_pnet.zero_grad()
             mpnet_vnet.zero_grad()
@@ -520,8 +569,6 @@ def main(args):
                 bobs = None
             else:
                 bobs = obs[env_indices_i].astype(np.float32)
-                print('bobs:')
-                print(bobs)
                 bobs = torch.FloatTensor(bobs)
                 bobs = to_var(bobs)
             print('-------pnet-------')
@@ -546,7 +593,18 @@ def main(args):
             v_loss_avg += v_loss.cpu().data
             v_loss_avg_i += 1
             
-               
+
+            if p_loss_avg_i >= loss_steps:
+                p_loss_avg = p_loss_avg / p_loss_avg_i
+
+                record_i += 1
+                p_loss_avg = 0.
+                p_loss_avg_i = 0
+
+                v_loss_avg = 0.
+                v_loss_avg_i = 0
+
+                
             # validation
             # calculate the corresponding batch in val_dataset
             p_dataset_i = val_p_dataset[val_i:val_i+args.batch_size]
@@ -556,21 +614,7 @@ def main(args):
             v_targets_i = val_v_targets[val_i:val_i+args.batch_size]
 
             env_indices_i = val_env_indices[val_i:val_i+args.batch_size]
-            
-            print('val_i:')
-            print(val_i)
-            print('validation p_dataset_i:')
-            print(p_dataset_i)
-            print('validation v_dataset_i:')
-            print(v_dataset_i)
-            print('validation p_targets_i:')
-            print(p_targets_i)
-            print('validation v_targets_i:')
-            print(v_targets_i)
-
             val_i = val_i + args.batch_size
-
-
             if val_i > val_len:
                 val_i = 0
             # record
@@ -589,7 +633,12 @@ def main(args):
 
             p_bt = torch.FloatTensor(p_bt)
             v_bt = torch.FloatTensor(v_bt)
-            p_bi, v_bi, p_bt, v_bt = normalize(p_bi, pos_world_size), normalize(v_bi, vel_world_size), normalize(p_bt, pos_world_size), normalize(v_bt, vel_world_size)
+            if 'decouple_output' in args.env_type:
+                # only decouple output but not input
+                p_bi, v_bi, p_bt, v_bt = normalize(p_bi, args.world_size), normalize(v_bi, args.world_size), normalize(p_bt, pos_world_size), normalize(v_bt, vel_world_size)
+            else:
+                p_bi, v_bi, p_bt, v_bt = normalize(p_bi, pos_world_size), normalize(v_bi, vel_world_size), normalize(p_bt, pos_world_size), normalize(v_bt, vel_world_size)
+                
             p_bi=to_var(p_bi)
             v_bi=to_var(v_bi)
             p_bt=to_var(p_bt)
@@ -614,6 +663,18 @@ def main(args):
 
             v_val_loss_avg += v_loss.cpu().data
             v_val_loss_avg_i += 1
+
+            
+            if p_val_loss_avg_i >= loss_steps:
+                p_val_loss_avg = p_val_loss_avg / p_val_loss_avg_i
+
+                
+                val_record_i += 1
+                p_val_loss_avg = 0.
+                p_val_loss_avg_i = 0
+                
+                v_val_loss_avg = 0.
+                v_val_loss_avg_i = 0
 
 
 parser = argparse.ArgumentParser()

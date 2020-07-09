@@ -3,12 +3,9 @@ Given a list of states, render the environment
 """
 from numpy import sin, cos
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy.integrate as integrate
-import matplotlib.animation as animation
-import matplotlib as mpl
-import matplotlib.patches as patches
-from IPython.display import HTML
+
+#from IPython.display import HTML
 
 class Visualizer():
     def __init__(self, system, params):

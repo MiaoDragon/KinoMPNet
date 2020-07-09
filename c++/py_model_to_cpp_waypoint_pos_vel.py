@@ -10,6 +10,7 @@ from model.mlp import MLP
 from model import mlp_acrobot, mlp_cartpole
 from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3, CAE_cartpole_voxel_2d
 from model.mpnet import KMPNet
+from model.mpnet_pos_vel import PosVelKMPNet
 from tools.utility import *
 import argparse
 import numpy as np
@@ -106,8 +107,12 @@ def main(args):
         loss_f = mse_decoupled
 
 
-    mpnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size,
+    mpnet_pnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size // 2,
                    cae, mlp, loss_f)
+    mpnet_vnet = KMPNet(args.total_input_size, args.AE_input_size, args.mlp_input_size, args.output_size // 2,
+                   cae, mlp, loss_f)
+
+    mpnet_pos_vel = PosVelKMPNet(mpnet_p, mpnet_v)
     # load net
     # load previously trained model if start epoch > 0
     model_dir = args.model_dir
@@ -125,33 +130,30 @@ def main(args):
     
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
-    model_path='kmpnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
+    model_pnet_path='kmpnet_pnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
+    model_vnet_path='kmpnet_vnet_epoch_%d_direction_%d_step_%d.pkl' %(args.start_epoch, args.direction, args.num_steps)
     torch_seed, np_seed, py_seed = 0, 0, 0
     if args.start_epoch > 0:
         #load_net_state(mpnet, os.path.join(args.model_path, model_path))
-        load_net_state(mpnet, os.path.join(model_dir, model_path))
+        load_net_state(mpnet_p, os.path.join(model_dir, model_pnet_path))
+        load_net_state(mpnet_v, os.path.join(model_dir, model_vnet_path))
+
         #torch_seed, np_seed, py_seed = load_seed(os.path.join(args.model_path, model_path))
-        torch_seed, np_seed, py_seed = load_seed(os.path.join(model_dir, model_path))
+        torch_seed, np_seed, py_seed = load_seed(os.path.join(model_dir, model_pnet_path))
         # set seed after loading
         torch.manual_seed(torch_seed)
         np.random.seed(np_seed)
         random.seed(py_seed)
 
     if torch.cuda.is_available():
-        mpnet.cuda()
-        mpnet.mlp.cuda()
-        mpnet.encoder.cuda()
-        if args.opt == 'Adagrad':
-            mpnet.set_opt(torch.optim.Adagrad, lr=args.learning_rate)
-        elif args.opt == 'Adam':
-            mpnet.set_opt(torch.optim.Adam, lr=args.learning_rate)
-        elif args.opt == 'SGD':
-            mpnet.set_opt(torch.optim.SGD, lr=args.learning_rate, momentum=0.9)
-        elif args.opt == 'ASGD':
-            mpnet.set_opt(torch.optim.ASGD, lr=args.learning_rate)
-    if args.start_epoch > 0:
-        #load_opt_state(mpnet, os.path.join(args.model_path, model_path))
-        load_opt_state(mpnet, os.path.join(model_dir, model_path))
+        mpnet_pnet.cuda()
+        mpnet_pnet.mlp.cuda()
+        mpnet_pnet.encoder.cuda()
+
+        mpnet_vnet.cuda()
+        mpnet_vnet.mlp.cuda()
+        mpnet_vnet.encoder.cuda()
+
 
     # load train and test data
     print('loading...')

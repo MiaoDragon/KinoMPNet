@@ -78,6 +78,17 @@ def main(args):
         enforce_bounds = cart_pole_obs.enforce_bounds
         step_sz = 0.002
         num_steps = 20
+    elif args.env_type == 'cartpole_obs_4':
+        normalize = cart_pole_obs.normalize
+        unnormalize = cart_pole_obs.unnormalize
+        system = _sst_module.PSOPTCartPole()
+        mlp = mlp_cartpole.MLP3
+        cae = CAE_cartpole_voxel_2d
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = cart_pole_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 20
+        
     elif args.env_type == 'acrobot_obs':
         normalize = acrobot_obs.normalize
         unnormalize = acrobot_obs.unnormalize
@@ -175,6 +186,7 @@ def main(args):
         def mse_loss(y1, y2):
             l = (y1 - y2) ** 2
             l = torch.mean(l, dim=0)  # sum alone the batch dimension, now the dimension is the same as input dimension
+            return l
         loss_f = mse_loss
 
     elif args.loss == 'l1_smooth':
@@ -326,7 +338,7 @@ def main(args):
             bi = torch.FloatTensor(bi)
             bt = torch.FloatTensor(bt)
 
-            #bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
+            bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
 
 
             mpnet.zero_grad()
@@ -376,7 +388,7 @@ def main(args):
             bt = targets_i
             bi = torch.FloatTensor(bi)
             bt = torch.FloatTensor(bt)
-            #bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
+            bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
             bi=to_var(bi)
             bt=to_var(bt)
             if obs is None:
