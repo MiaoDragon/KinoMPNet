@@ -201,6 +201,157 @@ def cartpole_enforce_bounds(state):
     return state
 
 
+def car_enforce_bounds(state):
+    '''
+    check if state satisfies the bound
+    apply threshold to velocity and angle
+    return a new state toward which the bound has been enforced
+    '''
+    WIDTH = 2.0
+    LENGTH = 1.0
+
+    STATE_X = 0
+    STATE_Y = 1
+
+    STATE_THETA = 2 
+    MIN_X = -25
+    MAX_X = 25
+    MIN_Y = -35
+    MAX_Y = 35
+    
+    
+    new_state = np.array(state)
+    """
+    if state[STATE_V] < MIN_V/30.:
+        new_state[STATE_V] = MIN_V/30.
+    elif state[STATE_V] > MAX_V/30.:
+        new_state[STATE_V] = MAX_V/30.
+    """
+    if state[2] < -np.pi:
+        new_state[2] += 2*np.pi
+    elif state[2] > np.pi:
+        new_state[2] -= 2*np.pi
+    return new_state
+
+
+
+def overlap(b1corner,b1axis,b1orign,b1dx,b1dy,b2corner,b2axis,b2orign,b2dx,b2dy):
+    # this only checks overlap of b1 w.r.t. b2
+    # a complete check should do in both directions
+    b2ds = [b2dx, b2dy]
+    for a in range(0,2):
+        t=b1corner[0][0]*b2axis[a][0]+b1corner[0][1]*b2axis[a][1] # project corner to the axis by inner product
+
+        tMin = t
+        tMax = t
+        for c in range(1,4):
+            t = b1corner[c][0]*b2axis[a][0]+b1corner[c][1]*b2axis[a][1] # project corner to the axis by inner product
+            # find range by [tMin, tMax]
+            if t < tMin:
+                tMin = t
+            elif t > tMax:
+                tMax = t
+        # since b2 the other corners (corner 1, 2, 3) are larger than b2orign (project of corner 0 to axis)
+        # specifically, the range is [b2orign[i], b2orign[i]+size(i)] (of the projected point by dot product)
+        # we only need to compare tMax with b2orign[i], and tMin with size(i)+b2orign[i]
+        if ((tMin > (b2ds[a] + b2orign[a])) or (tMax < b2orign[a])):
+            return False
+
+    return True
+
+def car_IsInCollision(x, obc, obc_width=4.):
+    car_width = 2.0
+    car_len = 1.0
+    width = 8.0
+    WIDTH = 2.0
+    LENGTH = 1.0
+    STATE_X = 0
+    STATE_Y = 1
+    STATE_THETA = 2
+    MIN_X = -25
+    MAX_X = 25
+    MIN_Y = -35
+    MAX_Y = 35
+    if x[0] < MIN_X or x[0] > MAX_X or x[1] < MIN_Y or x[1] > MAX_Y:
+        return True
+        
+    robot_corner=np.zeros((4,2),dtype=np.float32)
+    robot_axis=np.zeros((2,2),dtype=np.float32)
+    robot_orign=np.zeros(2,dtype=np.float32)
+    length=np.zeros(2,dtype=np.float32)
+    X1=np.zeros(2,dtype=np.float32)
+    Y1=np.zeros(2,dtype=np.float32)
+
+    X1[0]=np.cos(x[STATE_THETA])*(WIDTH/2.0)
+    X1[1]=-np.sin(x[STATE_THETA])*(WIDTH/2.0)
+    Y1[0]=np.sin(x[STATE_THETA])*(LENGTH/2.0)
+    Y1[1]=np.cos(x[STATE_THETA])*(LENGTH/2.0)
+
+    for j in range(0,2):
+        # order: (left-bottom, right-bottom, right-upper, left-upper)
+        # assume angle (state_theta) is clockwise
+        robot_corner[0][j]=x[j]-X1[j]-Y1[j]
+        robot_corner[1][j]=x[j]+X1[j]-Y1[j]
+        robot_corner[2][j]=x[j]+X1[j]+Y1[j]
+        robot_corner[3][j]=x[j]-X1[j]+Y1[j]
+
+        # axis: horizontal and vertical
+        robot_axis[0][j] = robot_corner[1][j] - robot_corner[0][j]
+        robot_axis[1][j] = robot_corner[3][j] - robot_corner[0][j]
+
+    #print('robot corners:')
+    #print(robot_corner)
+    length[0]=np.sqrt(robot_axis[0][0]*robot_axis[0][0]+robot_axis[0][1]*robot_axis[0][1])
+    length[1]=np.sqrt(robot_axis[1][0]*robot_axis[1][0]+robot_axis[1][1]*robot_axis[1][1])
+    # normalize the axis
+    for i in range(0,2):
+        for j in range(0,2):
+            robot_axis[i][j]=robot_axis[i][j]/float(length[i])
+
+    # obtain the projection of the left-bottom corner to the axis, to obtain the minimal projection length
+    robot_orign[0]=robot_corner[0][0]*robot_axis[0][0]+ robot_corner[0][1]*robot_axis[0][1]
+    robot_orign[1]=robot_corner[0][0]*robot_axis[1][0]+ robot_corner[0][1]*robot_axis[1][1]
+    #print('robot orign:')
+    #print(robot_orign)
+    for i in range(len(obc)):
+        cf=True
+
+        obs_corner=np.zeros((4,2),dtype=np.float32)
+        obs_axis=np.zeros((2,2),dtype=np.float32)
+        obs_orign=np.zeros(2,dtype=np.float32)
+        length2=np.zeros(2,dtype=np.float32)
+
+        for j in range(0,2):
+            # order: (left-bottom, right-bottom, right-upper, left-upper)
+            obs_corner[0][j] = obc[i][j]
+            obs_corner[1][j] = obc[i][2+j]
+            obs_corner[2][j] = obc[i][2*2+j]
+            obs_corner[3][j] = obc[i][3*2+j]
+            
+            # horizontal axis and vertical
+            obs_axis[0][j] = obs_corner[1][j] - obs_corner[0][j]
+            obs_axis[1][j] = obs_corner[3][j] - obs_corner[0][j]
+            #obs_axis[0][j] = obs_corner[3][j] - obs_corner[0][j]
+            #obs_axis[1][j] = obs_corner[1][j] - obs_corner[0][j]
+
+        length2[0]=np.sqrt(obs_axis[0][0]*obs_axis[0][0]+obs_axis[0][1]*obs_axis[0][1])
+        length2[1]=np.sqrt(obs_axis[1][0]*obs_axis[1][0]+obs_axis[1][1]*obs_axis[1][1])
+
+        # normalize the axis
+        for i1 in range(0,2):
+            for j1 in range(0,2):
+                obs_axis[i1][j1]=obs_axis[i1][j1]/float(length2[i1])
+
+        # obtain the inner product of the left-bottom corner with the axis to obtain the minimal of projection value
+        obs_orign[0]=obs_corner[0][0]*obs_axis[0][0]+ obs_corner[0][1]*obs_axis[0][1]  # dot product at 0-th corner
+        obs_orign[1]=obs_corner[0][0]*obs_axis[1][0]+ obs_corner[0][1]*obs_axis[1][1]
+        # do checking in both direction (b1 -> b2, b2 -> b1). If at least one shows not-overlapping, then it is not overlapping
+        cf=overlap(robot_corner,robot_axis,robot_orign,car_width,car_len,obs_corner,obs_axis,obs_orign,width,width)
+        cf=cf and overlap(obs_corner,obs_axis,obs_orign,width,width,robot_corner,robot_axis,robot_orign,car_width,car_len)
+        if cf==True:
+            return True
+    return False
+
 
 
 def main(args):
@@ -262,7 +413,21 @@ def main(args):
         goal_rho0 = 1.0
         IsInCollision = acrobot_IsInCollision
         enforce_bounds = acrobot_enforce_bounds
-
+        
+    elif args.env_type == 'car_obs':
+        obs_file = None
+        obc_file = None
+        system = _sst_module.Car()
+        cpp_propagator = _sst_module.SystemPropagator()
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        obs_f = True
+        step_sz = 0.002
+        num_steps = 501
+        obs_width = 8.0
+        IsInCollision = car_IsInCollision
+        enforce_bounds = car_enforce_bounds
+        delta_near=.6
+        delta_drain=0.2
         
         
     if args.env_type == 'pendulum':
@@ -286,7 +451,7 @@ def main(args):
     print('mlp_path:')
     print(mlp_path)
     #####################################################
-    def plan_one_path(obs_i, obs, obc, detailed_data_path, data_path, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue_t, out_queue_cost):
+    def plan_one_path(obs_i, obs, obc, detailed_data_path, data_path, start_state, goal_state, goal_inform_state, cost_i, max_iteration, out_queue_t, out_queue_cost, random_seed):
         if args.env_type == 'pendulum':
             system = standard_cpp_systems.PSOPTPendulum()
             bvp_solver = _sst_module.PSOPTBVPWrapper(system, 2, 1, 0)
@@ -299,8 +464,8 @@ def main(args):
             obs_width = 4.0
             psopt_system = _sst_module.PSOPTCartPole()
             propagate_system = standard_cpp_systems.RectangleObs(obs, 4., 'cartpole')
-            distance_computer = propagate_system.distance_computer()
-            #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
+            #distance_computer = propagate_system.distance_computer()
+            distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
             step_sz = 0.002
             num_steps = 21
             goal_radius=1.5
@@ -309,7 +474,7 @@ def main(args):
             delta_drain=1.2
             #delta_near=.2
             #delta_drain=.1
-            cost_threshold = 1.4
+            cost_threshold = 1.2
             min_time_steps = 10
             max_time_steps = 200
             #min_time_steps = 5
@@ -331,7 +496,22 @@ def main(args):
             cost_threshold = 1.2
             min_time_steps = 5
             max_time_steps = 100
-            integration_step = 0.02            
+            integration_step = 0.02       
+        elif args.env_type == 'car_obs':
+            obs_width = 8.0
+            psopt_system = _sst_module.Car()
+            propagate_system = standard_cpp_systems.RectangleObs(obs, 8., 'car')
+            distance_computer = propagate_system.distance_computer()
+            step_sz = 0.002
+            num_steps = 501
+            goal_radius=2.0
+            random_seed=0
+            cost_threshold = 1.2
+            delta_near=.6
+            delta_drain=0.2
+            min_time_steps = 20
+            max_time_steps = 200
+            integration_step = 0.002            
         planner = _sst_module.SSTWrapper(
                     state_bounds=propagate_system.get_state_bounds(),
                     control_bounds=propagate_system.get_control_bounds(),
@@ -339,7 +519,7 @@ def main(args):
                     start_state=start_state,
                     goal_state=goal_state,
                     goal_radius=goal_radius,
-                    random_seed=100,
+                    random_seed=random_seed,
                     sst_delta_near=delta_near,
                     sst_delta_drain=delta_drain
                 )
@@ -367,13 +547,16 @@ def main(args):
                     break
         plan_time = time.time() - time0
         solution = planner.get_solution()
-        
+        xs, us, ts = solution
+        print(np.linalg.norm(np.array(xs[-1]) - goal_state))
+ 
         """
         # visualization
         plt.ion()
         fig = plt.figure()
         ax = fig.add_subplot(111)
         #ax.set_autoscale_on(True)
+        #ax.set_xlim(-30, 30)
         ax.set_xlim(-np.pi, np.pi)
         ax.set_ylim(-np.pi, np.pi)
         hl, = ax.plot([], [], 'b')
@@ -399,7 +582,7 @@ def main(args):
             fig.canvas.draw()
             fig.canvas.flush_events()
             #plt.show()
-
+            
         def wrap_angle(x, system):
             circular = system.is_circular_topology()
             res = np.array(x)
@@ -410,15 +593,19 @@ def main(args):
                     if res[i] > np.pi:
                         res[i] = res[i] - 2*np.pi
             return res
+        dx = 1
         dtheta = 0.1
         feasible_points = []
         infeasible_points = []
         imin = 0
+        #imax = int(2*30./dx)
         imax = int(2*np.pi/dtheta)
+        jmin = 0
+        jmax = int(2*np.pi/dtheta)
 
 
         for i in range(imin, imax):
-            for j in range(imin, imax):
+            for j in range(jmin, jmax):
                 x = np.array([dtheta*i-np.pi, dtheta*j-np.pi, 0., 0.])
                 if IsInCollision(x, obs_i):
                     infeasible_points.append(x)
@@ -437,6 +624,16 @@ def main(args):
         draw_update_line(ax)
         #state_t = start_state
 
+        xs_to_plot = np.array(detailed_data_path)
+        for i in range(len(xs_to_plot)):
+            xs_to_plot[i] = wrap_angle(detailed_data_path[i], propagate_system)
+        ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='lightgreen', s=0.5)
+        # draw start and goal
+        #ax.scatter(start_state[0], goal_state[0], marker='X')
+        draw_update_line(ax)
+        #plt.waitforbuttonpress()
+
+        
         if solution is not None:
             xs, us, ts = solution
             
@@ -450,15 +647,14 @@ def main(args):
             cost = []
             for k in range(len(us)):
                 #state_i.append(len(detail_paths)-1)
-                max_steps = int(ts[k]/step_sz)
+                print(ts[k])
+                max_steps = int(np.round(ts[k]/step_sz))
                 accum_cost = 0.
                 #print('p_start:')
                 #print(p_start)
                 #print('data:')
                 #print(paths[i][j][k])
                 # modify it because of small difference between data and actual propagation
-                p_start = xs[k]
-                state[-1] = xs[k]
                 for step in range(1,max_steps+1):
                     p_start = dynamics(p_start, us[k], step_sz)
                     p_start = enforce_bounds(p_start)
@@ -474,19 +670,27 @@ def main(args):
             #print(p_start)
             #print('data:')
             #print(paths[i][j][-1])
-            state[-1] = xs[-1]
+            #state[-1] = xs[-1]
             
             
             
             xs_to_plot = np.array(state)
             for i in range(len(xs_to_plot)):
                 xs_to_plot[i] = wrap_angle(xs_to_plot[i], propagate_system)
-            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
+            ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green', s=0.5)
+            start_state_np = np.array(start_state)
+            goal_state_np = np.array(goal_state)
+            ax.scatter([start_state_np[0]], [start_state_np[1]], c='blue', marker='*')
+            ax.scatter([goal_state_np[0]], [goal_state_np[1]], c='red', marker='*')
+
             # draw start and goal
             #ax.scatter(start_state[0], goal_state[0], marker='X')
             draw_update_line(ax)
             plt.waitforbuttonpress()
         """
+        
+
+        
         # validate if the path contains collision
         if solution is not None:
             res_x, res_u, res_t = solution
@@ -507,7 +711,7 @@ def main(args):
             cost = []
             for k in range(len(res_u)):
                 #state_i.append(len(detail_paths)-1)
-                max_steps = int(res_t[k]/step_sz)
+                max_steps = int(np.round(res_t[k]/step_sz))
                 accum_cost = 0.
                 #print('p_start:')
                 #print(p_start)
@@ -536,7 +740,7 @@ def main(args):
             #print(p_start)
             #print('data:')
             #print(paths[i][j][-1])
-            state[-1] = res_x[-1]
+            #state[-1] = res_x[-1]
         # validation end
             
         print('plan time: %fs' % (plan_time))
@@ -547,7 +751,7 @@ def main(args):
         else:
             print('path succeeded.')
             out_queue_t.put(plan_time)
-            out_queue_cost.put(cost_i)
+            out_queue_cost.put(t_sst)
     ####################################################################################
 
 
@@ -613,11 +817,9 @@ def main(args):
         #print(obs_i)
         for j in range(len(paths[i])):
             start_state = sgs[i][j][0]
-            goal_inform_state = paths[i][j][-1]
+            #goal_inform_state = paths[i][j][-1]
+            goal_inform_state = sgs[i][j][1]
             goal_state = sgs[i][j][1]
-            cost_i = np.sum(costs[i][j])
-            
-
             # propagate data
             p_start = paths[i][j][0]
             detail_paths = [p_start]
@@ -628,7 +830,8 @@ def main(args):
             cost = []
             for k in range(len(controls[i][j])):
                 #state_i.append(len(detail_paths)-1)
-                max_steps = int(costs[i][j][k]/step_sz)
+                #max_steps = int(costs[i][j][k]/step_sz)
+                max_steps = 1000000
                 accum_cost = 0.
                 for step in range(1,max_steps+1):
                     p_start = dynamics(p_start, controls[i][j][k], step_sz)
@@ -645,20 +848,35 @@ def main(args):
                         if IsInCollision(p_start, obs_i):
                             print('collision happens at u_index: %d, step: %d' % (k, step))
                         assert not IsInCollision(p_start, obs_i)
+                    if np.linalg.norm(p_start - paths[i][j][k+1]) <= 1e-7:
+                        break
         # validation end
-                        
-
-
+        
+        
+            cost_i = np.sum(cost)
             #cost_i = 100000000.
             # acrobot: 300000
             # cartpole: 500000
             print('environment: %d/%d, path: %d/%d' % (i+1, len(paths), j+1, len(paths[i])))
-            p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], state, paths[i][j], start_state, goal_state, goal_inform_state, cost_i, 300000, queue_t, queue_cost))
-            #plan_one_path(obs_i, obs[i], obc[i], start_state, goal_state, goal_inform_state, cost_i, 300000, queue)
-            p.start()
-            p.join()
-            plan_t = queue_t.get()
-            plan_cost = queue_cost.get()
+            plan_t_trials = []
+            plan_cost_trials = []
+            for trial in range(1):
+                random_seed = random.randint(0, 100)
+                #random_seed = 0
+                p = Process(target=plan_one_path, args=(obs_i, obs[i], obc[i], state, paths[i][j], start_state, goal_state, goal_inform_state, cost_i, args.num_iter, queue_t, queue_cost, random_seed))
+                #plan_one_path(obs_i, obs[i], obc[i], state, paths[i][j], start_state, goal_state, goal_inform_state, cost_i, args.num_iter, queue_t, queue_cost, random_seed)
+                p.start()
+                p.join()
+                plan_t = queue_t.get()
+                plan_cost = queue_cost.get()
+                if plan_t != -1:
+                    plan_t_trials.append(plan_t)
+                    plan_cost_trials.append(plan_cost)
+            #assert len(plan_ts) == 10
+            
+            plan_t = np.mean(plan_t_trials)
+            plan_cost = np.mean(plan_cost_trials)
+            
             if plan_t == -1:
                 # failed, do not record in the flattened list
                 plan_res_all.append(0)
@@ -678,6 +896,8 @@ def main(args):
                 plan_time_path.append(plan_t)
                 plan_cost_path.append(plan_cost)
                 data_cost_path.append(cost_i)
+            print('plan costs:')
+            print(plan_costs)
             print('average accuracy up to now: %f' % (np.array(plan_res_all).flatten().mean()))
             print('plan average time: %f' % (np.array(plan_times).mean()))
             print('plan time std: %f' % (np.array(plan_times).std()))
@@ -695,10 +915,10 @@ def main(args):
         # for every environment planned, save
         # save the 2d list
         # save as numpy array
-        np.save(res_path+"plan_res.npy", np.array(plan_res_env))
-        np.save(res_path+"plan_time.npy", np.array(plan_time_env))
-        np.save(res_path+"plan_cost.npy", np.array(plan_cost_env))
-        np.save(res_path+"data_cost.npy", np.array(data_cost_env))
+        #np.save(res_path+"plan_res.npy", np.array(plan_res_env))
+        #np.save(res_path+"plan_time.npy", np.array(plan_time_env))
+        #np.save(res_path+"plan_cost.npy", np.array(plan_cost_env))
+        #np.save(res_path+"data_cost.npy", np.array(data_cost_env))
 
         
         
@@ -733,7 +953,7 @@ if __name__ == '__main__':
     parser.add_argument('--res_path', type=str, default='./plan_results/',help='path for saving trained models')
 
     parser.add_argument('--seen_N', type=int, default=10)
-    parser.add_argument('--seen_NP', type=int, default=100)
+    parser.add_argument('--seen_NP', type=int, default=200)
     parser.add_argument('--seen_s', type=int, default=0)
     parser.add_argument('--seen_sp', type=int, default=1800)
     parser.add_argument('--unseen_N', type=int, default=0)
@@ -756,6 +976,7 @@ if __name__ == '__main__':
     parser.add_argument('--opt', type=str, default='Adagrad')
     parser.add_argument('--num_steps', type=int, default=20)
     parser.add_argument('--plan_type', type=str, default='line')
+    parser.add_argument('--num_iter', type=int, default=3000000)
 
     args = parser.parse_args()
     print(args)

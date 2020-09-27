@@ -264,8 +264,8 @@ def main(args):
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_mlp_annotated_test_gpu.pt')
-    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_encoder_annotated_test_cpu.pt')
+    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_lr0.010000_epoch_2850_step_20.pt')
+    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_lr0.010000_epoch_2850_step_20.pt')
     cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_MLP_epoch_300_step_20.pt')
     cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_encoder_epoch_300_step_20.pt')
 
@@ -298,13 +298,13 @@ def main(args):
             #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
             step_sz = 0.02
             num_steps = 21
-            goal_radius=10.0
+            goal_radius=2.0
             random_seed=0
-            delta_near=1.0
-            delta_drain=0.4
+            delta_near=.1
+            delta_drain=0.05
         #print('creating planner...')
         planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path,
-                                              args.bvp_iter, num_steps, step_sz, propagate_system)
+                                              args.bvp_iter, num_steps, step_sz, propagate_system, 3)
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
         #print('obc:')
@@ -508,7 +508,7 @@ if __name__ == '__main__':
     # Model parameters
     parser.add_argument('--total_input_size', type=int, default=8, help='dimension of total input')
     parser.add_argument('--AE_input_size', type=int, default=32, help='dimension of input to AE')
-    parser.add_argument('--mlp_input_size', type=int , default=136, help='dimension of the input vector')
+    parser.add_argument('--mlp_input_size', type=int , default=40, help='dimension of the input vector')
     parser.add_argument('--output_size', type=int , default=4, help='dimension of the input vector')
     parser.add_argument('--learning_rate', type=float, default=0.01)
     parser.add_argument('--device', type=int, default=0, help='cuda device')
@@ -518,12 +518,12 @@ if __name__ == '__main__':
     parser.add_argument('--start_epoch', type=int, default=5000)
     parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
-    parser.add_argument('--opt', type=str, default='SGD')
+    parser.add_argument('--opt', type=str, default='Adagrad')
     parser.add_argument('--num_steps', type=int, default=20)
     parser.add_argument('--plan_type', type=str, default='tree')
-    parser.add_argument('--bvp_iter', type=int, default=10)
-    parser.add_argument('--delta_near', type=float, default=1.0)
-    parser.add_argument('--delta_drain', type=float, default=0.3)
+    parser.add_argument('--bvp_iter', type=int, default=20)
+    parser.add_argument('--delta_near', type=float, default=.1)
+    parser.add_argument('--delta_drain', type=float, default=.05)
     
 
     args = parser.parse_args()

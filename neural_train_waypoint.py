@@ -9,17 +9,18 @@ import torch
 import torch.nn as nn
 import model.AE.identity as cae_identity
 from model.mlp import MLP
-from model import mlp_acrobot, mlp_cartpole
-from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3, CAE_cartpole_voxel_2d
+from model import mlp_acrobot, mlp_cartpole, mlp_car
+from model.AE import CAE_acrobot_voxel_2d, CAE_acrobot_voxel_2d_2, CAE_acrobot_voxel_2d_3, CAE_cartpole_voxel_2d, CAE_car_voxel_2d
 from model.mpnet import KMPNet
 from tools import data_loader
 from tools.utility import *
-from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs
+from plan_utility import cart_pole, cart_pole_obs, pendulum, acrobot_obs, car_obs
 import argparse
 import numpy as np
 import random
 import os
 from sparse_rrt import _sst_module
+from tqdm import tqdm
 
 from tensorboardX import SummaryWriter
 
@@ -177,7 +178,28 @@ def main(args):
         enforce_bounds = acrobot_obs.enforce_bounds
         step_sz = 0.02
         num_steps = 20
-
+    elif args.env_type == 'car_obs':
+        normalize = car_obs.normalize
+        unnormalize = car_obs.unnormalize
+        system = _sst_module.Car()
+        mlp = mlp_car.MLP
+        cae = CAE_car_voxel_2d
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = car_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 500
+    elif args.env_type == 'car_obs_2':
+        normalize = car_obs.normalize
+        unnormalize = car_obs.unnormalize
+        system = _sst_module.Car()
+        mlp = mlp_car.MLP2
+        cae = CAE_car_voxel_2d
+        #dynamics = acrobot_obs.dynamics
+        dynamics = lambda x, u, t: cpp_propagator.propagate(system, x, u, t)
+        enforce_bounds = car_obs.enforce_bounds
+        step_sz = 0.002
+        num_steps = 500
 
 
     # set loss for mpnet
@@ -199,21 +221,19 @@ def main(args):
         loss_f = l1_smooth_loss
 
     elif args.loss == 'mse_decoupled':
+        circular = system.is_circular_topology()
         def mse_decoupled(y1, y2):
             # for angle terms, wrap it to -pi~pi
-            l_0 = torch.abs(y1[:,0] - y2[:,0]) ** 2
-            l_1 = torch.abs(y1[:,1] - y2[:,1]) ** 2
-            l_2 = torch.abs(y1[:,2] - y2[:,2]) # angular dimension
-            l_3 = torch.abs(y1[:,3] - y2[:,3]) ** 2
-            
-            cond = (l_2 > 1.0) * (l_2 <= 2.0)   # np.pi after normalization is 1.0
-            l_2 = torch.where(cond, 2.0-l_2, l_2)
-            l_2 = l_2 ** 2
-            l_0 = torch.mean(l_0)
-            l_1 = torch.mean(l_1)
-            l_2 = torch.mean(l_2)
-            l_3 = torch.mean(l_3)
-            return torch.stack([l_0, l_1, l_2, l_3])
+            ls = []
+            for i in range(len(y1[0])):
+                ls_i = torch.abs(y1[:,i] - y2[:,i])
+                if circular[i]:
+                    cond = (ls_i > 1.0) * (ls_i <= 2.0) # np.pi after normalization is 1.0
+                    ls_i = torch.where(cond, 2.0 - ls_i, ls_i)
+                ls_i = ls_i ** 2
+                ls_i = torch.mean(ls_i)
+                ls.append(ls_i)
+            return torch.stack(ls)
         loss_f = mse_decoupled
 
 
@@ -325,7 +345,7 @@ def main(args):
     for epoch in range(args.start_epoch+1,args.num_epochs+1):
         print('epoch' + str(epoch))
         val_i = 0
-        for i in range(0,len(dataset),args.batch_size):
+        for i in tqdm(range(0,len(dataset),args.batch_size)):
             print('epoch: %d, training... path: %d' % (epoch, i+1))
             dataset_i = dataset[i:i+args.batch_size]
             targets_i = targets[i:i+args.batch_size]
@@ -337,7 +357,8 @@ def main(args):
             bt = targets_i
             bi = torch.FloatTensor(bi)
             bt = torch.FloatTensor(bt)
-
+            print('mpnet input before normalization:')
+            print(bi)
             bi, bt = normalize(bi, args.world_size), normalize(bt, args.world_size)
 
 
@@ -350,6 +371,8 @@ def main(args):
                 bobs = obs[env_indices_i].astype(np.float32)
                 bobs = torch.FloatTensor(bobs)
                 bobs = to_var(bobs)
+            print('mpnet input:')
+            print(bi)
             print('mpnet output: ')
             print(mpnet(bi, bobs))
             print('before training losses:')
@@ -364,10 +387,8 @@ def main(args):
             if loss_avg_i >= loss_steps:
                 loss_avg = loss_avg / loss_avg_i
                 writer.add_scalar('train_loss', torch.mean(loss_avg), record_i)
-                writer.add_scalar('train_loss_0', loss_avg[0], record_i)
-                writer.add_scalar('train_loss_1', loss_avg[1], record_i)
-                writer.add_scalar('train_loss_2', loss_avg[2], record_i)
-                writer.add_scalar('train_loss_3', loss_avg[3], record_i)
+                for train_loss_i in range(len(loss_avg)):                    
+                    writer.add_scalar('train_loss_%d' % (train_loss_i), loss_avg[train_loss_i], record_i)
 
                 record_i += 1
                 loss_avg = 0.
@@ -405,10 +426,8 @@ def main(args):
             if val_loss_avg_i >= loss_steps:
                 val_loss_avg = val_loss_avg / val_loss_avg_i
                 writer.add_scalar('val_loss', torch.mean(val_loss_avg), val_record_i)
-                writer.add_scalar('val_loss_0', val_loss_avg[0], val_record_i)
-                writer.add_scalar('val_loss_1', val_loss_avg[1], val_record_i)
-                writer.add_scalar('val_loss_2', val_loss_avg[2], val_record_i)
-                writer.add_scalar('val_loss_3', val_loss_avg[3], val_record_i)
+                for val_loss_i in range(len(val_loss_avg)):                    
+                    writer.add_scalar('val_loss_%d' % (val_loss_i), val_loss_avg[val_loss_i], val_record_i)
                 val_record_i += 1
                 val_loss_avg = 0.
                 val_loss_avg_i = 0

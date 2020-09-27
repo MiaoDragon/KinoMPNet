@@ -217,6 +217,7 @@ def main(args):
             distance_computer = propagate_system.distance_computer()
             #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
             step_sz = 0.002
+            integration_step = 0.002
             num_steps = 101
             goal_radius=1.5
             random_seed=0
@@ -234,7 +235,21 @@ def main(args):
             pick_goal_end_threshold = 0.8
             pick_goal_start_percent = 0.4            
         #print('creating planner...')
-        planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path, 200, num_steps, step_sz, propagate_system, device)
+        
+        #planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, cost_mlp_path, cost_encoder_path, 200, num_steps, step_sz, propagate_system, device)
+        
+        planner = _sst_module.SSTWrapper(
+                    state_bounds=propagate_system.get_state_bounds(),
+                    control_bounds=propagate_system.get_control_bounds(),
+                    distance=distance_computer,
+                    start_state=start_state,
+                    goal_state=goal_state,
+                    goal_radius=goal_radius,
+                    random_seed=0,
+                    sst_delta_near=delta_near,
+                    sst_delta_drain=delta_drain
+                )        
+
         cost_threshold = cost_i * args.cost_threshold
         #cost_threshold = 100000000.
         # generate a path by using SST to plan for some maximal iterations
@@ -244,6 +259,7 @@ def main(args):
         print(start_state)
         print('goal_state:')
         print(goal_inform_state)
+        
         res_x, res_u, res_t = planner.plan_tree_SMP("sst", propagate_system, psopt_system, obc.flatten(), start_state, goal_state, goal_inform_state, \
                                 goal_radius, max_iteration, distance_computer, \
                                 delta_near, delta_drain, cost_threshold, \
@@ -254,6 +270,7 @@ def main(args):
         print('after plan_tree_SMP.')
 
         plan_time = time.time() - time0
+        
 
         """
         # visualization

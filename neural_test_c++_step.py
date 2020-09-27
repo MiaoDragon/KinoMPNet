@@ -161,21 +161,15 @@ def main(args):
         step_sz = 0.02
         num_steps = 21
         traj_opt = lambda x0, x1, step_sz, num_steps, x_init, u_init, t_init: bvp_solver.solve(x0, x1, 200, num_steps, step_sz*1, step_sz*(num_steps-1), x_init, u_init, t_init)
-        goal_S0 = np.diag([1.,1.,0,0])
-        #goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
+        obs_width = 6.0
+        step_sz = 0.02
+        num_steps = 21
+        goal_radius=2.0
+        random_seed=0
+        delta_near=0.1
+        delta_drain=0.05
 
 
-    if args.env_type == 'pendulum':
-        step_sz = 0.002
-        num_steps = 20
-
-    elif args.env_type == 'cartpole_obs':
-        #system = standard_cpp_systems.RectangleObs(obs[i], 4.0, 'cartpole')
-        step_sz = 0.002
-        num_steps = 20
-        goal_S0 = np.identity(4)
-        goal_rho0 = 1.0
     elif args.env_type in ['acrobot_obs','acrobot_obs_2', 'acrobot_obs_3', 'acrobot_obs_4', 'acrobot_obs_8']:
         #system = standard_cpp_systems.RectangleObs(obs[i], 6.0, 'acrobot')
         obs_width = 6.0
@@ -188,8 +182,8 @@ def main(args):
 
     # load previously trained model if start epoch > 0
     #model_path='kmpnet_epoch_%d_direction_0_step_%d.pkl' %(args.start_epoch, args.num_steps)
-    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_mlp_annotated_test_gpu.pt')
-    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_encoder_annotated_test_cpu.pt')
+    mlp_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_MLP_lr0.010000_epoch_2850_step_20.pt')
+    encoder_path = os.path.join(os.getcwd()+'/c++/','acrobot_obs_encoder_lr0.010000_epoch_2850_step_20.pt')
     cost_mlp_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_MLP_epoch_300_step_20.pt')
     cost_encoder_path = os.path.join(os.getcwd()+'/c++/','costnet_acrobot_obs_8_encoder_epoch_300_step_20.pt')
 
@@ -221,16 +215,21 @@ def main(args):
             distance_computer = propagate_system.distance_computer()
             #distance_computer = _sst_module.euclidean_distance(np.array(propagate_system.is_circular_topology()))
 
+            psopt_step_sz = 0.02
+            psopt_num_steps = 21
+
             step_sz = 0.02
             num_steps = 21
             goal_radius=2
             random_seed=0
-            delta_near=1.0
-            delta_drain=0.5
+            #delta_near=1.0
+            #delta_drain=0.5
+            delta_near=0.1
+            delta_drain=0.05
         #print('creating planner...')
         planner = vis_planners.DeepSMPWrapper(mlp_path, encoder_path, 
                                               cost_mlp_path, cost_encoder_path, 
-                                              20, num_steps, step_sz, propagate_system)
+                                              20, psopt_num_steps, psopt_step_sz, step_sz, propagate_system, args.device)
         # generate a path by using SST to plan for some maximal iterations
         time0 = time.time()
         #print('obc:')
@@ -362,7 +361,7 @@ def main(args):
                 for i in range(len(xs_to_plot)):
                     xs_to_plot[i] = wrap_angle(xs_to_plot[i], propagate_system)
                 #ax.scatter(xs_to_plot[:,0], xs_to_plot[:,1], c='green')
-                ax.scatter(bvp_x[:,0], bvp_x[:,1], c='green')
+                ax.scatter(bvp_x[:,0], bvp_x[:,1], c='green', s=10.0)
                 print('solution: x')
                 print(bvp_x)
                 print('solution: u')
@@ -372,7 +371,7 @@ def main(args):
                 # draw start and goal
                 #ax.scatter(start_state[0], goal_state[0], marker='X')
                 draw_update_line(ax)
-                xw_scat = ax.scatter(mpnet_res[0], mpnet_res[1], c='brown')
+                xw_scat = ax.scatter(mpnet_res[0], mpnet_res[1], c='brown', s=10.)
                 draw_update_line(ax)
                 #state_t = state[-1]
                 # try using mpnet_res as new start
@@ -485,7 +484,7 @@ if __name__ == '__main__':
     parser.add_argument('--seen_N', type=int, default=10)
     parser.add_argument('--seen_NP', type=int, default=2)
     parser.add_argument('--seen_s', type=int, default=0)
-    parser.add_argument('--seen_sp', type=int, default=800)
+    parser.add_argument('--seen_sp', type=int, default=801)
     parser.add_argument('--unseen_N', type=int, default=0)
     parser.add_argument('--unseen_NP', type=int, default=0)
     parser.add_argument('--unseen_s', type=int, default=0)
@@ -501,7 +500,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_folder', type=str, default='./data/acrobot_obs/')
     parser.add_argument('--obs_file', type=str, default='./data/cartpole/obs.pkl')
     parser.add_argument('--obc_file', type=str, default='./data/cartpole/obc.pkl')
-    parser.add_argument('--start_epoch', type=int, default=5000)
+    parser.add_argument('--start_epoch', type=int, default=2850)
     parser.add_argument('--env_type', type=str, default='acrobot_obs', help='s2d for simple 2d, c2d for complex 2d')
     parser.add_argument('--world_size', nargs='+', type=float, default=[3.141592653589793, 3.141592653589793, 6.0, 6.0], help='boundary of world')
     parser.add_argument('--opt', type=str, default='Adagrad')

@@ -8,6 +8,7 @@ from torch.autograd import Variable
 class Encoder(nn.Module):
     # ref: https://github.com/lxxue/voxnet-pytorch/blob/master/models/voxnet.py
     # adapted from SingleView 2
+    """
     def __init__(self, input_size=32, output_size=128):
         super(Encoder, self).__init__()
         input_size = [input_size, input_size]
@@ -30,7 +31,28 @@ class Encoder(nn.Module):
             nn.PReLU(),
             nn.Linear(128, output_size)
         )
-
+    """
+    
+    def __init__(self, input_size=32, output_size=32):
+            super(Encoder, self).__init__()
+            input_size = [input_size, input_size]
+            self.encoder = nn.Sequential(
+                nn.Conv2d(in_channels=1, out_channels=7, kernel_size=[6,6], stride=[2,2]),
+                nn.PReLU(),
+                nn.MaxPool2d(2, stride=2),
+        )
+            x = self.encoder(torch.autograd.Variable(torch.rand([1, 1] + input_size)))
+            first_fc_in_features = 1
+            for n in x.size()[1:]:
+                first_fc_in_features *= n
+            print('length of the output of one encoder')
+            print(first_fc_in_features)
+            self.head = nn.Sequential(
+                nn.Linear(first_fc_in_features, 64),
+                nn.PReLU(),
+                nn.Linear(64, output_size)
+            )
+            
     def forward(self, x):
         # x shape: BxCxWxH
         #size = x.size()
