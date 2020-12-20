@@ -35,8 +35,11 @@ for i in range(10):
 #[(0, 932), (1, 935), (2, 923), (8, 141), (5,931), (7, 927)]
 # (5,931), (6, 286)
 
-obs_idx = 1
-p_idx = 916
+import sys
+#print 'Number of arguments:', len(sys.argv), 'arguments.'
+#print 'Argument List:', str(sys.argv)
+obs_idx = int(sys.argv[1])
+p_idx = int(sys.argv[2])
         
 print('obs_idx: ')
 print(obs_idx)

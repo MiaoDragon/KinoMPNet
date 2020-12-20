@@ -37,8 +37,8 @@ for i in range(10):
 import sys
 #print 'Number of arguments:', len(sys.argv), 'arguments.'
 #print 'Argument List:', str(sys.argv)
-obs_idx = sys.argv[1]
-p_idx = sys.argv[2]
+obs_idx = int(sys.argv[1])
+p_idx = int(sys.argv[2])
 
 
 # Create custom system

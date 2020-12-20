@@ -189,8 +189,6 @@ class AcrobotVisualizer(Visualizer):
         # print location of point
         return self.recs
 
-
-
     def animate(self, states, actions, costs, obstacles):
         '''
         given a list of states, actions and obstacles, animate the robot
